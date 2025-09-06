@@ -80,9 +80,13 @@ class AuditLog(Base):
 # --- Helpers (no business logic; just parsing/skeletons) ---
 
 def _client_ip() -> str:
-    # TODO: implement X-Forwarded-For fallback for production reverse proxy
-    # xff = request.headers.get("X-Forwarded-For")
-    # return xff.split(",")[0].strip() if xff else (request.remote_addr or "0.0.0.0")
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        # First IP in the list is the original client
+        return xff.split(",")[0].strip()
+    xri = request.headers.get("X-Real-IP")
+    if xri:
+        return xri
     return request.remote_addr or "0.0.0.0"
 
 def _ua() -> str:
