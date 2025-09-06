@@ -40,15 +40,24 @@ def create_app() -> Flask:
 
     # --- CORS (dev only) ---
     # For dev Vite at http://localhost:5173. Tighten for prod.
-    CORS(app, 
-         resources={r"/api/*": {"origins": ["http://localhost:5173"]}},
-         supports_credentials=True)
+    frontend_origins = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173"  # default dev FE origins
+    )
+    origins_list = [o.strip() for o in frontend_origins.split(",") if o.strip()]
     
-    # Session cookie config for dev
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": origins_list}},
+        supports_credentials=True,
+    )
+    
+    # Session cookie config for dev/prod
+    is_prod = os.getenv("ENVIRONMENT") == "production"
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=False,  # dev over http
+        SESSION_COOKIE_SAMESITE="Lax",   # good for top-level nav flows
+        SESSION_COOKIE_SECURE=is_prod,   # flips on under HTTPS/nginx
     )
 
     # --- Blueprints ---
@@ -65,5 +74,5 @@ def create_app() -> Flask:
 # For `python app.py` dev runs
 if __name__ == "__main__":
     app = create_app()
-    # TODO: set host/port via env if needed
-    app.run(port=5000, debug=True)
+    # Read PORT env if set, else default to 5050
+    app.run(port=int(os.getenv("PORT", 5050)), debug=True)

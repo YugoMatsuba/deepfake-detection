@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/useAuth.js";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -18,8 +18,8 @@ export default function Login() {
     setSubmitting(true);
     
     try {
-      const username = email.trim(); // Backend expects username, not email
-      await login(username, password);
+      const usernameValue = username.trim();
+      await login(usernameValue, password);
       navigate("/", { replace: true });
     } catch (error) {
       setErr(error.body?.error || error.message || "Login failed");
@@ -41,18 +41,18 @@ export default function Login() {
         <form onSubmit={onSubmit} className="grid gap-3">
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block mb-1 text-[13px]">
-              Email
+            <label htmlFor="username" className="block mb-1 text-[13px]">
+              Username
             </label>
             <input
-              id="email"
-              type="email"
-              autoComplete="email"
+              id="username"
+              type="text"
+              autoComplete="username"
               required
               disabled={submitting}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="username"
               className="w-full box-border px-3 py-2 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
           </div>
