@@ -50,7 +50,7 @@ from typing import Optional
 
 from flask import Blueprint, request, jsonify, session
 from sqlalchemy import String, Integer, Boolean, ForeignKey, Text, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from sqlalchemy.orm import Mapped, mapped_column, Session
 
 from api import Base, get_db, hash_password, verify_password  # type: ignore
 
@@ -80,7 +80,9 @@ class AuditLog(Base):
 # --- Helpers (no business logic; just parsing/skeletons) ---
 
 def _client_ip() -> str:
-    # TODO: implement X-Forwarded-For fallback
+    # TODO: implement X-Forwarded-For fallback for production reverse proxy
+    # xff = request.headers.get("X-Forwarded-For")
+    # return xff.split(",")[0].strip() if xff else (request.remote_addr or "0.0.0.0")
     return request.remote_addr or "0.0.0.0"
 
 def _ua() -> str:
@@ -127,12 +129,14 @@ def register():
     """
     with get_db() as db:
         data = _require_json()
+        # TODO: normalize username with .lower() for consistent lookups
         username = (data.get("username") or "").strip()
         password = data.get("password") or ""
         if not username or not password:
             return jsonify(error="invalid_payload"), 400
 
         # any existing users?
+        # TODO: use SQLAlchemy 2.x style: db.execute(select(func.count()).select_from(User)).scalar_one()
         count = db.query(User).count()  # SQLAlchemy 2.x allows this legacy; fine for SQLite
         if count > 0:
             admin = _require_admin(db)
@@ -166,6 +170,7 @@ def login():
     """
     with get_db() as db:
         data = _require_json()
+        # TODO: normalize username with .lower() for consistent lookups
         username = (data.get("username") or "").strip()
         password = data.get("password") or ""
         if not username or not password:
@@ -180,7 +185,7 @@ def login():
         if not u.active:
             db.add(AuditLog(user_id=u.id, event="login_failed", ip=_client_ip(), user_agent=_ua()))
             db.commit()
-            return jsonify(error="inactive_user"), 403
+            return jsonify(error="invalid_credentials"), 401
 
         if not verify_password(u.password_hash, password):
             db.add(AuditLog(user_id=u.id, event="login_failed", ip=_client_ip(), user_agent=_ua()))
@@ -188,6 +193,7 @@ def login():
             return jsonify(error="invalid_credentials"), 401
 
         # success
+        session.clear()  # prevent fixation
         session["user_id"] = u.id
         session["role"] = u.role
         db.add(AuditLog(user_id=u.id, event="login", ip=_client_ip(), user_agent=_ua()))
@@ -205,8 +211,8 @@ def logout():
       - return 204
     """
     with get_db() as db:
-        uid = session.pop("user_id", None)
-        role = session.pop("role", None)
+        uid = session.get("user_id")
+        session.clear()
         if uid:
             db.add(AuditLog(user_id=uid, event="logout", ip=_client_ip(), user_agent=_ua()))
             db.commit()
@@ -225,7 +231,7 @@ def me():
         u = _require_auth(db)
         if not u:
             return jsonify(error="unauthenticated"), 401
-        return jsonify(id=u.id, username=u.username, role=u.role), 200
+        return jsonify(user={"id": u.id, "username": u.username, "role": u.role}), 200
 
 
 @bp.get("/audit")

@@ -30,7 +30,7 @@ def create_app() -> Flask:
     db_url = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
     # Ensure instance dir exists for SQLite file
-    (Path(__file__).parent / "instance").mkdir(exist_ok=True)
+    Path(app.instance_path).mkdir(parents=True, exist_ok=True)
 
     # --- DB init ---
     init_engine(db_url=db_url)
@@ -40,7 +40,16 @@ def create_app() -> Flask:
 
     # --- CORS (dev only) ---
     # For dev Vite at http://localhost:5173. Tighten for prod.
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    CORS(app, 
+         resources={r"/api/*": {"origins": ["http://localhost:5173"]}},
+         supports_credentials=True)
+    
+    # Session cookie config for dev
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=False,  # dev over http
+    )
 
     # --- Blueprints ---
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
