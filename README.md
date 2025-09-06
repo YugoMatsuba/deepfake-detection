@@ -33,8 +33,9 @@ See `.env.example` for configuration options.
 
 ## Demo
 
-The integrated authentication system is ready for Sprint 1 demo with:
-- Secure session-based auth
-- Production-ready environment configuration  
-- Clean SPA architecture with React Router
-- Real backend integration (no mocks)
+This is intended to be a sprint 1 demo just to get familiar with the tech stack. Features are:
+- Session-based auth
+- Environment configuration  
+- SPA architecture with React Router
+- Frontend to backend integration
+- sqlite db (to be moved to Postgres for prod)
