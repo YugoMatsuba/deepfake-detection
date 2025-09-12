@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiLogin, apiMe, apiLogout } from '../api/auth.js';
+import { apiLogin, apiMe, apiLogout, apiSignUp } from '../api/auth.js';
 
 const AuthContext = createContext(null);
 
@@ -51,6 +51,20 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const signup = async (username, password) => {
+  setError(null);
+  try {
+    const data = await apiSignUp({ username, password });
+    // If your backend logs the user in immediately after signup:
+    setUser(data.user);
+    setStatus('authenticated'); // or 'registered' if you prefer a separate state
+    return data;
+  } catch (err) {
+    // Let caller (e.g., SignUp page) handle display
+    throw err;
+  }
+};
+
   const logout = async () => {
     try {
       await apiLogout();
@@ -68,6 +82,7 @@ export function AuthProvider({ children }) {
     status,
     error,
     login,
+    signup,
     logout,
     refreshMe
   };

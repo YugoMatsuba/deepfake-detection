@@ -109,11 +109,15 @@ export default function Login() {
 
         <footer className="mt-2 text-center text-xs opacity-80">
           Don’t have an account?{" "}
-          <a href="#" className="text-gray-900 underline">
-            Sign up
-          </a>
-        </footer>
-      </div>
-    </div>
-  );
+      <button
+        type="button"
+        onClick={() => navigate("/signup")}
+        className="text-gray-900 underline"
+      >
+        Sign up
+      </button>
+    </footer>
+  </div>
+</div>
+);
 }

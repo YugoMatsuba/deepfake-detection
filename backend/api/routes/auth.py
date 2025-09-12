@@ -48,6 +48,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy.exc import IntegrityError
 from flask import Blueprint, request, jsonify, session
 from sqlalchemy import String, Integer, Boolean, ForeignKey, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, Session
@@ -204,6 +205,58 @@ def login():
         db.commit()
         return jsonify(user={"id": u.id, "username": u.username, "role": u.role}), 200
 
+@bp.post("/signup")
+def signup():
+    """
+    Create a new user account (no email).
+    - 400 invalid_request / weak_password
+    - 409 username_taken
+    - 201 { user: ... } and sets session
+    """
+    with get_db() as db:
+        data = _require_json()
+        username = (data.get("username") or "").strip().lower()
+        password = data.get("password") or ""
+
+        # basic validation
+        if not username or not password:
+            db.add(AuditLog(user_id=None, event="signup_failed_invalid", ip=_client_ip(), user_agent=_ua()))
+            db.commit()
+            return jsonify(error="invalid_request"), 400
+
+        # pre-check for duplicate (race-safe via IntegrityError below)
+        exists = db.query(User.id).filter(User.username == username).first()
+        if exists:
+            db.add(AuditLog(user_id=None, event="signup_failed_duplicate", ip=_client_ip(), user_agent=_ua()))
+            db.commit()
+            return jsonify(error="username_taken"), 409
+
+        # create user 
+        u = User(
+            username=username,
+            password_hash=hash_password(password),
+            active=True,                 # or rely on model default
+            # role defaults to "investigator"
+        )
+        db.add(u)
+
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            db.add(AuditLog(user_id=None, event="signup_failed_duplicate", ip=_client_ip(), user_agent=_ua()))
+            db.commit()
+            return jsonify(error="username_taken"), 409
+
+        # success: audit + auto-login
+        db.add(AuditLog(user_id=u.id, event="signup", ip=_client_ip(), user_agent=_ua()))
+        db.commit()
+
+        session.clear()
+        session["user_id"] = u.id
+        session["role"] = u.role
+
+        return jsonify(user={"id": u.id, "username": u.username, "role": u.role}), 201
 
 @bp.post("/logout")
 def logout():
