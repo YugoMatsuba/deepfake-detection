@@ -57,19 +57,30 @@ def load_ucf(weights_path: str, device: str) -> torch.nn.Module:
     return model
 
 
-def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference=True) -> tuple[torch.Tensor, torch.Tensor]:
+def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference=True) -> Dict[str, torch.Tensor]:
     """
     Predict per-frame fake probabilities using UCF shared head only.
 
     Based on ucf_detector.py lines 237-241: inference=True uses head_sha only.
+    Follows exact DeepfakeBench return format.
+
+    Args:
+        model: Loaded UCF model in eval mode
+        batch_rgb: Normalized RGB tensor [N, 3, 256, 256] on model's device
+        inference: If True, use shared head path only (default True)
 
     Returns:
-        Tuple of (logits[N, 2], probs[N]) - shared head logits and fake probabilities on CPU
+        Dict with keys:
+            - 'cls': shared head logits [N, 2] on CPU
+            - 'prob': fake probabilities [N] on CPU
+            - 'feat': shared features [N, feat_dim] on CPU
     """
     if batch_rgb.numel() == 0:
-        empty_logits = torch.empty(0, 2, dtype=torch.float32)
-        empty_probs = torch.empty(0, dtype=torch.float32)
-        return empty_logits, empty_probs
+        return {
+            'cls': torch.empty(0, 2, dtype=torch.float32),
+            'prob': torch.empty(0, dtype=torch.float32),
+            'feat': torch.empty(0, 512, dtype=torch.float32)  # Typical feature dim
+        }
 
     with inference_guard():
         if inference:
@@ -84,6 +95,11 @@ def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference
             assert not out_sha.requires_grad and not probs.requires_grad
             assert out_sha.device == batch_rgb.device
 
-            return to_cpu(out_sha), to_cpu(probs)
+            # Return DeepfakeBench-format dictionary
+            return {
+                'cls': to_cpu(out_sha),
+                'prob': to_cpu(probs),
+                'feat': to_cpu(shared_features)
+            }
         else:
             raise NotImplementedError("UCF training mode not implemented in adapter")

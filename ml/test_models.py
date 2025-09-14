@@ -86,6 +86,19 @@ class TestModelUtils:
         # All probabilities should be in [0, 1]
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
 
+    def test_softmax_fake_assertion(self):
+        """Test that softmax_fake asserts on wrong logit shapes."""
+        # Wrong shapes should trigger assertion
+        with pytest.raises(AssertionError, match="Expected 2-class logits"):
+            softmax_fake(torch.randn(4, 3))  # 3 classes instead of 2
+
+        with pytest.raises(AssertionError, match="Expected 2-class logits"):
+            softmax_fake(torch.randn(4,))  # 1D instead of 2D
+
+        # Correct shape should work
+        result = softmax_fake(torch.randn(4, 2))
+        assert result.shape == (4,)
+
 
 class TestSPSLPhaseChannel:
     """Test SPSL phase channel computation."""
@@ -142,11 +155,19 @@ class TestAdapterInterfaces:
         mock_model.classifier.return_value = mock_logits
 
         batch = torch.randn(4, 3, 256, 256)
-        logits, probs = predict_probs_xception(mock_model, batch)
+        result_dict = predict_probs_xception(mock_model, batch)
 
-        # Check interface compliance
+        # Check DeepfakeBench dictionary format
+        assert isinstance(result_dict, dict)
+        assert set(result_dict.keys()) == {'cls', 'prob', 'feat'}
+
+        logits = result_dict['cls']
+        probs = result_dict['prob']
+        features = result_dict['feat']
+
         assert logits.shape == (4, 2)
         assert probs.shape == (4,)
+        assert features.shape == (4, 512)
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         mock_model.features.assert_called_once_with(batch)
@@ -162,11 +183,19 @@ class TestAdapterInterfaces:
         mock_model.classifier.return_value = mock_logits
 
         batch_rgb = torch.randn(3, 3, 256, 256)
-        logits, probs = predict_probs_spsl(mock_model, batch_rgb)
+        result_dict = predict_probs_spsl(mock_model, batch_rgb)
 
-        # Check interface compliance
+        # Check DeepfakeBench dictionary format
+        assert isinstance(result_dict, dict)
+        assert set(result_dict.keys()) == {'cls', 'prob', 'feat'}
+
+        logits = result_dict['cls']
+        probs = result_dict['prob']
+        features = result_dict['feat']
+
         assert logits.shape == (3, 2)
         assert probs.shape == (3,)
+        assert features.shape == (3, 512)
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         # Model should be called with 4-channel input (RGB + Phase)
@@ -183,11 +212,19 @@ class TestAdapterInterfaces:
         mock_model.forward_shared_head.return_value = mock_logits
 
         batch_rgb = torch.randn(2, 3, 256, 256)
-        logits, probs = predict_probs_ucf(mock_model, batch_rgb)
+        result_dict = predict_probs_ucf(mock_model, batch_rgb)
 
-        # Check interface compliance
+        # Check DeepfakeBench dictionary format
+        assert isinstance(result_dict, dict)
+        assert set(result_dict.keys()) == {'cls', 'prob', 'feat'}
+
+        logits = result_dict['cls']
+        probs = result_dict['prob']
+        features = result_dict['feat']
+
         assert logits.shape == (2, 2)
         assert probs.shape == (2,)
+        assert features.shape == (2, 512)
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         mock_model.features_shared.assert_called_once_with(batch_rgb)
@@ -198,21 +235,24 @@ class TestAdapterInterfaces:
         empty_batch = torch.empty(0, 3, 256, 256)
         mock_model = MagicMock()
 
-        # All should return empty tensors with correct shapes
-        xception_logits, xception_probs = predict_probs_xception(mock_model, empty_batch)
-        assert xception_logits.shape == (0, 2)
-        assert xception_probs.shape == (0,)
-        assert xception_logits.dtype == torch.float32
+        # All should return empty dictionaries with correct shapes
+        xception_result = predict_probs_xception(mock_model, empty_batch)
+        assert isinstance(xception_result, dict)
+        assert xception_result['cls'].shape == (0, 2)
+        assert xception_result['prob'].shape == (0,)
+        assert xception_result['feat'].shape == (0, 512)
 
-        spsl_logits, spsl_probs = predict_probs_spsl(mock_model, empty_batch)
-        assert spsl_logits.shape == (0, 2)
-        assert spsl_probs.shape == (0,)
-        assert spsl_logits.dtype == torch.float32
+        spsl_result = predict_probs_spsl(mock_model, empty_batch)
+        assert isinstance(spsl_result, dict)
+        assert spsl_result['cls'].shape == (0, 2)
+        assert spsl_result['prob'].shape == (0,)
+        assert spsl_result['feat'].shape == (0, 512)
 
-        ucf_logits, ucf_probs = predict_probs_ucf(mock_model, empty_batch)
-        assert ucf_logits.shape == (0, 2)
-        assert ucf_probs.shape == (0,)
-        assert ucf_logits.dtype == torch.float32
+        ucf_result = predict_probs_ucf(mock_model, empty_batch)
+        assert isinstance(ucf_result, dict)
+        assert ucf_result['cls'].shape == (0, 2)
+        assert ucf_result['prob'].shape == (0,)
+        assert ucf_result['feat'].shape == (0, 512)
 
 
 class TestSkeletonModels:

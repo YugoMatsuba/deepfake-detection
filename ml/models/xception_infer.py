@@ -99,24 +99,37 @@ def load_xception(weights_path: str, device: str) -> torch.nn.Module:
     return model
 
 
-def predict_probs_xception(model: torch.nn.Module, batch: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def predict_probs_xception(model: torch.nn.Module, batch: torch.Tensor) -> Dict[str, torch.Tensor]:
     """
     Predict per-frame fake probabilities using Xception model.
+
+    Follows exact DeepfakeBench return format from xception_detector.py lines 108-117.
 
     Args:
         model: Loaded Xception model in eval mode
         batch: Normalized tensor [N, 3, 256, 256] on model's device
 
     Returns:
-        Tuple of (logits[N, 2], probs[N]) - logits and fake probabilities on CPU
+        Dict with keys:
+            - 'cls': logits [N, 2] on CPU
+            - 'prob': fake probabilities [N] on CPU
+            - 'feat': features [N, feat_dim] on CPU
     """
     if batch.numel() == 0:
-        empty_logits = torch.empty(0, 2, dtype=torch.float32)
-        empty_probs = torch.empty(0, dtype=torch.float32)
-        return empty_logits, empty_probs
+        return {
+            'cls': torch.empty(0, 2, dtype=torch.float32),
+            'prob': torch.empty(0, dtype=torch.float32),
+            'feat': torch.empty(0, 512, dtype=torch.float32)  # Typical Xception feature dim
+        }
 
     with inference_guard():
-        features = model.features(batch)
+        features = model.features(batch)  # [N, feat_dim]
         logits = model.classifier(features)  # [N, 2]
         probs = softmax_fake(logits)  # [N]
-        return to_cpu(logits), to_cpu(probs)
+
+        # Return DeepfakeBench-format dictionary
+        return {
+            'cls': to_cpu(logits),
+            'prob': to_cpu(probs),
+            'feat': to_cpu(features)
+        }

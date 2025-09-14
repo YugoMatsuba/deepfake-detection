@@ -112,17 +112,28 @@ def load_spsl(weights_path: str, device: str) -> torch.nn.Module:
     return model
 
 
-def predict_probs_spsl(model: torch.nn.Module, batch_rgb: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def predict_probs_spsl(model: torch.nn.Module, batch_rgb: torch.Tensor) -> Dict[str, torch.Tensor]:
     """
     Predict per-frame fake probabilities using SPSL model.
 
+    Follows exact DeepfakeBench return format matching other detectors.
+
+    Args:
+        model: Loaded SPSL model in eval mode
+        batch_rgb: Normalized RGB tensor [N, 3, 256, 256] on model's device
+
     Returns:
-        Tuple of (logits[N, 2], probs[N]) - logits and fake probabilities on CPU
+        Dict with keys:
+            - 'cls': logits [N, 2] on CPU
+            - 'prob': fake probabilities [N] on CPU
+            - 'feat': features [N, feat_dim] on CPU
     """
     if batch_rgb.numel() == 0:
-        empty_logits = torch.empty(0, 2, dtype=torch.float32)
-        empty_probs = torch.empty(0, dtype=torch.float32)
-        return empty_logits, empty_probs
+        return {
+            'cls': torch.empty(0, 2, dtype=torch.float32),
+            'prob': torch.empty(0, dtype=torch.float32),
+            'feat': torch.empty(0, 512, dtype=torch.float32)  # Typical feature dim
+        }
 
     with inference_guard():
         # Compute phase channel using exact DeepfakeBench method
@@ -144,4 +155,9 @@ def predict_probs_spsl(model: torch.nn.Module, batch_rgb: torch.Tensor) -> tuple
         assert not logits.requires_grad and not probs.requires_grad
         assert logits.device == batch_rgb.device
 
-        return to_cpu(logits), to_cpu(probs)
+        # Return DeepfakeBench-format dictionary
+        return {
+            'cls': to_cpu(logits),
+            'prob': to_cpu(probs),
+            'feat': to_cpu(features)
+        }

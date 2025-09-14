@@ -113,6 +113,7 @@ def softmax_fake(logits: torch.Tensor) -> torch.Tensor:
     Returns:
         Tensor with shape [N] - fake class probabilities in [0, 1]
     """
+    assert logits.shape[-1] == 2, f"Expected 2-class logits, got shape {logits.shape}"
     return torch.softmax(logits, dim=1)[:, 1]
 
 
