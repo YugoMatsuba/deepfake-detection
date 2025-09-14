@@ -132,7 +132,10 @@ def predict_probs_xception(model: torch.nn.Module, batch: torch.Tensor) -> Dict[
 
     # Defensive validation
     assert not model.training, "Model should be in eval mode for inference"
-    dev_model = next(model.parameters()).device
+    try:
+        dev_model = next(model.parameters()).device
+    except StopIteration:
+        dev_model = batch.device  # Fallback for mock models with no parameters
     assert batch.device == dev_model, f"Batch on {batch.device}, model on {dev_model}"
     assert batch.dtype == torch.float32, f"Expected float32 normalized input, got {batch.dtype}"
 

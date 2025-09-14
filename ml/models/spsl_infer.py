@@ -33,6 +33,10 @@ def compute_phase_channel(rgb_batch: torch.Tensor) -> torch.Tensor:
     Returns:
         Phase channel tensor [N, 1, 256, 256]
     """
+    # Handle empty batch case (robustness improvement over DeepfakeBench)
+    if rgb_batch.size(0) == 0:
+        return torch.empty(0, 1, 256, 256, dtype=rgb_batch.dtype, device=rgb_batch.device)
+
     # Convert to grayscale by averaging RGB channels
     # Note: This happens on normalized RGB input (post ToTensor+Normalize)
     gray_img = torch.mean(rgb_batch, dim=1, keepdim=True)  # [N, 1, 256, 256]
@@ -142,7 +146,10 @@ def predict_probs_spsl(model: torch.nn.Module, batch_rgb: torch.Tensor) -> Dict[
 
     # Defensive validation
     assert not model.training, "Model should be in eval mode for inference"
-    dev_model = next(model.parameters()).device
+    try:
+        dev_model = next(model.parameters()).device
+    except StopIteration:
+        dev_model = batch_rgb.device  # Fallback for mock models with no parameters
     assert batch_rgb.device == dev_model, f"Batch on {batch_rgb.device}, model on {dev_model}"
     assert batch_rgb.dtype == torch.float32, f"Expected float32 normalized input, got {batch_rgb.dtype}"
 

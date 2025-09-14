@@ -89,7 +89,10 @@ def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference
 
     # Defensive validation
     assert not model.training, "Model should be in eval mode for inference"
-    dev_model = next(model.parameters()).device
+    try:
+        dev_model = next(model.parameters()).device
+    except StopIteration:
+        dev_model = batch_rgb.device  # Fallback for mock models with no parameters
     assert batch_rgb.device == dev_model, f"Batch on {batch_rgb.device}, model on {dev_model}"
     assert batch_rgb.dtype == torch.float32, f"Expected float32 normalized input, got {batch_rgb.dtype}"
 

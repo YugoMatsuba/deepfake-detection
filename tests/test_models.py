@@ -149,10 +149,12 @@ class TestAdapterInterfaces:
         """Test Xception predict_probs interface."""
         # Create mock model
         mock_model = MagicMock()
-        mock_features = torch.randn(4, 512)  # Mock features
+        mock_model.training = False  # Set eval mode for defensive validation
+        mock_features = torch.randn(4, 32)  # Mock features matching skeleton dim
         mock_logits = torch.tensor([[0.1, 0.9], [0.7, 0.3], [0.4, 0.6], [0.2, 0.8]])
         mock_model.features.return_value = mock_features
         mock_model.classifier.return_value = mock_logits
+        mock_model.last_linear.in_features = 32  # Match skeleton feature dim
 
         batch = torch.randn(4, 3, 256, 256)
         result_dict = predict_probs_xception(mock_model, batch)
@@ -167,7 +169,7 @@ class TestAdapterInterfaces:
 
         assert logits.shape == (4, 2)
         assert probs.shape == (4,)
-        assert features.shape == (4, 512)
+        assert features.shape == (4, 32)  # Match skeleton feature dim
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         mock_model.features.assert_called_once_with(batch)
@@ -177,10 +179,12 @@ class TestAdapterInterfaces:
         """Test SPSL predict_probs interface."""
         # Create mock model
         mock_model = MagicMock()
-        mock_features = torch.randn(3, 512)
+        mock_model.training = False  # Set eval mode for defensive validation
+        mock_features = torch.randn(3, 32)  # Mock features matching skeleton dim
         mock_logits = torch.tensor([[0.2, 0.8], [0.6, 0.4], [0.3, 0.7]])
         mock_model.features.return_value = mock_features
         mock_model.classifier.return_value = mock_logits
+        mock_model.last_linear.in_features = 32  # Match skeleton feature dim
 
         batch_rgb = torch.randn(3, 3, 256, 256)
         result_dict = predict_probs_spsl(mock_model, batch_rgb)
@@ -195,7 +199,7 @@ class TestAdapterInterfaces:
 
         assert logits.shape == (3, 2)
         assert probs.shape == (3,)
-        assert features.shape == (3, 512)
+        assert features.shape == (3, 32)  # Match skeleton feature dim
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         # Model should be called with 4-channel input (RGB + Phase)
@@ -206,10 +210,12 @@ class TestAdapterInterfaces:
         """Test UCF predict_probs interface."""
         # Create mock model
         mock_model = MagicMock()
-        mock_features = torch.randn(2, 512)
+        mock_model.training = False  # Set eval mode for defensive validation
+        mock_features = torch.randn(2, 32)  # Mock features matching skeleton dim
         mock_logits = torch.tensor([[0.4, 0.6], [0.8, 0.2]])
         mock_model.features_shared.return_value = mock_features
         mock_model.forward_shared_head.return_value = mock_logits
+        mock_model.head_sha.in_features = 32  # Match skeleton feature dim
 
         batch_rgb = torch.randn(2, 3, 256, 256)
         result_dict = predict_probs_ucf(mock_model, batch_rgb)
@@ -224,7 +230,7 @@ class TestAdapterInterfaces:
 
         assert logits.shape == (2, 2)
         assert probs.shape == (2,)
-        assert features.shape == (2, 512)
+        assert features.shape == (2, 32)  # Match skeleton feature dim
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         mock_model.features_shared.assert_called_once_with(batch_rgb)
@@ -234,25 +240,30 @@ class TestAdapterInterfaces:
         """Test all adapters handle empty batches correctly."""
         empty_batch = torch.empty(0, 3, 256, 256)
         mock_model = MagicMock()
+        mock_model.training = False  # Set eval mode for defensive validation
+
+        # Set up mock feature dimensions to match skeleton models
+        mock_model.last_linear.in_features = 32  # Xception and SPSL skeleton feature dim
+        mock_model.head_sha.in_features = 32     # UCF skeleton feature dim
 
         # All should return empty dictionaries with correct shapes
         xception_result = predict_probs_xception(mock_model, empty_batch)
         assert isinstance(xception_result, dict)
         assert xception_result['cls'].shape == (0, 2)
         assert xception_result['prob'].shape == (0,)
-        assert xception_result['feat'].shape == (0, 512)
+        assert xception_result['feat'].shape == (0, 32)  # Dynamic feature dim
 
         spsl_result = predict_probs_spsl(mock_model, empty_batch)
         assert isinstance(spsl_result, dict)
         assert spsl_result['cls'].shape == (0, 2)
         assert spsl_result['prob'].shape == (0,)
-        assert spsl_result['feat'].shape == (0, 512)
+        assert spsl_result['feat'].shape == (0, 32)  # Dynamic feature dim
 
         ucf_result = predict_probs_ucf(mock_model, empty_batch)
         assert isinstance(ucf_result, dict)
         assert ucf_result['cls'].shape == (0, 2)
         assert ucf_result['prob'].shape == (0,)
-        assert ucf_result['feat'].shape == (0, 512)
+        assert ucf_result['feat'].shape == (0, 32)  # Dynamic feature dim
 
 
 class TestSkeletonModels:
