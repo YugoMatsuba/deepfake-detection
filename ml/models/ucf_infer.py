@@ -35,7 +35,11 @@ class UCFBackboneSkeleton(nn.Module):
             nn.BatchNorm2d(32), nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten()
         )
-        # Shared head for inference (head_sha in DeepfakeBench)
+
+        # NOTE: Real DeepfakeBench UCF uses Xception encoders with 256-dim shared features
+        # (512 encoder features split into 256 specific + 256 shared). This skeleton uses
+        # 32 features for simplicity. When implementing full architecture, change this to
+        # match the actual encoder feature dimensions (256 for shared head).
         self.head_sha = nn.Linear(32, self.num_classes)
 
     def features_shared(self, input_tensor: torch.Tensor) -> torch.Tensor:

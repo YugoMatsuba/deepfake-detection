@@ -68,6 +68,10 @@ class SPSLBackboneSkeleton(nn.Module):
             nn.BatchNorm2d(32), nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten()
         )
+
+        # NOTE: Real DeepfakeBench SPSL uses Xception backbone with 2048 features.
+        # This skeleton uses 32 features for simplicity. When implementing full architecture,
+        # change this to match the actual Xception backbone feature dimensions.
         self.last_linear = nn.Linear(32, self.num_classes)
 
     def features(self, input_tensor: torch.Tensor) -> torch.Tensor:

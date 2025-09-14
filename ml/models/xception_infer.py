@@ -44,6 +44,10 @@ class XceptionBackboneSkeleton(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
+
+        # NOTE: Real DeepfakeBench Xception has 2048 features (or 512 with adjust_channel).
+        # This skeleton uses 32 features for simplicity. When implementing full architecture,
+        # change this to match the actual feature dimensions from the loaded weights.
         self.last_linear = nn.Linear(32, self.num_classes)
 
     def features(self, input_tensor: torch.Tensor) -> torch.Tensor:
