@@ -76,11 +76,18 @@ def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference
             - 'feat': shared features [N, feat_dim] on CPU
     """
     if batch_rgb.numel() == 0:
+        feat_dim = getattr(model.head_sha, "in_features", 32)
         return {
             'cls': torch.empty(0, 2, dtype=torch.float32),
             'prob': torch.empty(0, dtype=torch.float32),
-            'feat': torch.empty(0, 512, dtype=torch.float32)  # Typical feature dim
+            'feat': torch.empty(0, feat_dim, dtype=torch.float32)
         }
+
+    # Defensive validation
+    assert not model.training, "Model should be in eval mode for inference"
+    dev_model = next(model.parameters()).device
+    assert batch_rgb.device == dev_model, f"Batch on {batch_rgb.device}, model on {dev_model}"
+    assert batch_rgb.dtype == torch.float32, f"Expected float32 normalized input, got {batch_rgb.dtype}"
 
     with inference_guard():
         if inference:

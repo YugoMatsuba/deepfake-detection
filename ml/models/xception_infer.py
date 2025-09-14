@@ -38,19 +38,22 @@ class XceptionBackboneSkeleton(nn.Module):
         self.num_classes = config["num_classes"]
         self.mode = config["mode"]
 
-        # Simplified placeholder - real implementation needs full architecture
-        self.features_net = nn.Sequential(
-            nn.Conv2d(config["inc"], 32, 3, 2, 0, bias=False),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Flatten()
-        )
+        # Match DeepfakeBench Xception structure with explicit layers
+        self.conv1 = nn.Conv2d(config["inc"], 32, 3, 2, 0, bias=False)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.relu = nn.ReLU(inplace=True)
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.flatten = nn.Flatten()
         self.last_linear = nn.Linear(32, self.num_classes)
 
     def features(self, input_tensor: torch.Tensor) -> torch.Tensor:
-        """Extract features - simplified version."""
-        return self.features_net(input_tensor)
+        """Extract features - using explicit layers."""
+        x = self.conv1(input_tensor)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.pool(x)
+        x = self.flatten(x)
+        return x
 
     def classifier(self, features: torch.Tensor) -> torch.Tensor:
         """Classification head - simplified version."""
@@ -116,11 +119,18 @@ def predict_probs_xception(model: torch.nn.Module, batch: torch.Tensor) -> Dict[
             - 'feat': features [N, feat_dim] on CPU
     """
     if batch.numel() == 0:
+        feat_dim = getattr(model.last_linear, "in_features", 32)
         return {
             'cls': torch.empty(0, 2, dtype=torch.float32),
             'prob': torch.empty(0, dtype=torch.float32),
-            'feat': torch.empty(0, 512, dtype=torch.float32)  # Typical Xception feature dim
+            'feat': torch.empty(0, feat_dim, dtype=torch.float32)
         }
+
+    # Defensive validation
+    assert not model.training, "Model should be in eval mode for inference"
+    dev_model = next(model.parameters()).device
+    assert batch.device == dev_model, f"Batch on {batch.device}, model on {dev_model}"
+    assert batch.dtype == torch.float32, f"Expected float32 normalized input, got {batch.dtype}"
 
     with inference_guard():
         features = model.features(batch)  # [N, feat_dim]
