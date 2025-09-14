@@ -51,7 +51,7 @@ def detect_largest_face(detector, rgb_image, upsample_factor=1):
     return largest_face
 
 
-def align_and_crop_rgb(img_bgr, detector, predictor, outsize=(constants.IMG_SIZE, constants.IMG_SIZE), scale=constants.ALIGN_SCALE):
+def align_and_crop_rgb(img_rgb, detector, predictor, outsize=(constants.IMG_SIZE, constants.IMG_SIZE), scale=constants.ALIGN_SCALE):
     """
     Align and crop face following DeepfakeBench's exact methodology.
     
@@ -64,7 +64,7 @@ def align_and_crop_rgb(img_bgr, detector, predictor, outsize=(constants.IMG_SIZE
     6. SimilarityTransform estimation and warping
     
     Args:
-        img_bgr: Input image in BGR format (OpenCV standard)
+        img_rgb: Input image in RGB format
         detector: dlib face detector
         predictor: dlib 81-point shape predictor
         outsize: Output size tuple, default (256, 256)
@@ -73,8 +73,8 @@ def align_and_crop_rgb(img_bgr, detector, predictor, outsize=(constants.IMG_SIZE
     Returns:
         np.ndarray: RGB 256�256 aligned face crop, or None if no face detected
     """
-    # Step 1: Convert BGR -> RGB (dlib expects RGB)
-    rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    # Step 1: Use RGB input directly (already converted in video_io.py)
+    rgb = img_rgb
     
     # Step 2: Find largest face
     largest_face = detect_largest_face(detector, rgb, upsample_factor=1)
