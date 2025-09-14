@@ -19,7 +19,7 @@ KEEP_RGB_FOR_INFERENCE = True         # Aligned crops stay RGB (convert BGR only
 ALIGN_SCALE: float = 1.3              # scale parameter in img_align_crop
 ALIGN_OUTPUT_SIZE = (IMG_SIZE, IMG_SIZE)  # outsize=(256, 256)
 
-# 5-point template in 112×112 space (from DeepfakeBench preprocess.py)
+# 5-point template in 112ï¿½112 space (from DeepfakeBench preprocess.py)
 DST_5PTS_112 = np.array([
     [30.2946, 51.6963],  # left eye
     [65.5318, 51.5014],  # right eye

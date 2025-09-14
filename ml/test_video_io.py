@@ -22,7 +22,7 @@ from unittest.mock import Mock, patch
 from pathlib import Path
 
 # Import modules to test
-from video_io import (
+from ml.video_io import (
     _sample_frame_indices,
     load_video_32,
     VideoMeta,
@@ -30,7 +30,7 @@ from video_io import (
     VideoBatch,
     create_video_processor
 )
-from constants import FRAME_NUM
+from ml.constants import FRAME_NUM
 
 
 class TestFrameSampling:
@@ -131,7 +131,7 @@ class TestVideoProcessing:
             # Return a dummy 256x256x3 RGB crop
             return np.zeros((256, 256, 3), dtype=np.uint8)
 
-        with patch('video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
+        with patch('ml.video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
             result = load_video_32(video_path, mock_detector, mock_predictor, required=False)
 
         meta = result.meta
@@ -159,7 +159,7 @@ class TestVideoProcessing:
             # Return dummy crop
             return np.zeros((256, 256, 3), dtype=np.uint8)
 
-        with patch('video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
+        with patch('ml.video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
             load_video_32(video_path, mock_detector, mock_predictor, required=False)
 
         # Check that RGB conversion happened correctly
@@ -192,7 +192,7 @@ class TestVideoProcessing:
             else:
                 return None  # No face detected
 
-        with patch('video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
+        with patch('ml.video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
             result = load_video_32(video_path, mock_detector, mock_predictor, required=False)
 
         # Should have exactly 32 crops
@@ -231,7 +231,7 @@ class TestVideoProcessing:
         def mock_align_function(rgb_frame, detector, predictor, **kwargs):
             return np.zeros((256, 256, 3), dtype=np.uint8)
 
-        with patch('video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
+        with patch('ml.video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
             result = load_video_32(video_path, mock_detector, mock_predictor)
 
         # Check timestamps are calculated correctly
@@ -267,7 +267,7 @@ class TestVideoProcessing:
         def mock_align_function(rgb_frame, detector, predictor, **kwargs):
             return None
 
-        with patch('video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
+        with patch('ml.video_io.face_align_crop.align_and_crop_rgb', side_effect=mock_align_function):
             # Should raise with required=True
             with pytest.raises(ValueError, match="no faces found in any of the sampled frames"):
                 load_video_32(video_path, mock_detector, mock_predictor, required=True)
@@ -286,7 +286,7 @@ class TestIntegration:
         # This test will fail if dlib predictor file doesn't exist, which is expected
         # In a real environment, this would test the actual file path resolution
 
-        with patch('video_io.face_align_crop.create_dlib_detector_and_predictor') as mock_create:
+        with patch('ml.video_io.face_align_crop.create_dlib_detector_and_predictor') as mock_create:
             mock_detector = Mock()
             mock_predictor = Mock()
             mock_create.return_value = (mock_detector, mock_predictor)
