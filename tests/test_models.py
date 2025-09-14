@@ -5,6 +5,7 @@ import torch
 import pytest
 from collections import OrderedDict
 from unittest.mock import patch, MagicMock
+from types import SimpleNamespace
 
 from ml.models.utils import (
     strip_module_prefix,
@@ -149,12 +150,14 @@ class TestAdapterInterfaces:
         """Test Xception predict_probs interface."""
         # Create mock model
         mock_model = MagicMock()
-        mock_model.training = False  # Set eval mode for defensive validation
+        mock_model.training = False
+        mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
+        mock_model.last_linear = SimpleNamespace(in_features=32)  # matches skeleton feature dim
+
         mock_features = torch.randn(4, 32)  # Mock features matching skeleton dim
         mock_logits = torch.tensor([[0.1, 0.9], [0.7, 0.3], [0.4, 0.6], [0.2, 0.8]])
         mock_model.features.return_value = mock_features
         mock_model.classifier.return_value = mock_logits
-        mock_model.last_linear.in_features = 32  # Match skeleton feature dim
 
         batch = torch.randn(4, 3, 256, 256)
         result_dict = predict_probs_xception(mock_model, batch)
@@ -179,12 +182,14 @@ class TestAdapterInterfaces:
         """Test SPSL predict_probs interface."""
         # Create mock model
         mock_model = MagicMock()
-        mock_model.training = False  # Set eval mode for defensive validation
+        mock_model.training = False
+        mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
+        mock_model.last_linear = SimpleNamespace(in_features=32)  # matches skeleton feature dim
+
         mock_features = torch.randn(3, 32)  # Mock features matching skeleton dim
         mock_logits = torch.tensor([[0.2, 0.8], [0.6, 0.4], [0.3, 0.7]])
         mock_model.features.return_value = mock_features
         mock_model.classifier.return_value = mock_logits
-        mock_model.last_linear.in_features = 32  # Match skeleton feature dim
 
         batch_rgb = torch.randn(3, 3, 256, 256)
         result_dict = predict_probs_spsl(mock_model, batch_rgb)
@@ -210,12 +215,14 @@ class TestAdapterInterfaces:
         """Test UCF predict_probs interface."""
         # Create mock model
         mock_model = MagicMock()
-        mock_model.training = False  # Set eval mode for defensive validation
+        mock_model.training = False
+        mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
+        mock_model.head_sha = SimpleNamespace(in_features=32)  # matches skeleton feature dim
+
         mock_features = torch.randn(2, 32)  # Mock features matching skeleton dim
         mock_logits = torch.tensor([[0.4, 0.6], [0.8, 0.2]])
         mock_model.features_shared.return_value = mock_features
         mock_model.forward_shared_head.return_value = mock_logits
-        mock_model.head_sha.in_features = 32  # Match skeleton feature dim
 
         batch_rgb = torch.randn(2, 3, 256, 256)
         result_dict = predict_probs_ucf(mock_model, batch_rgb)
@@ -240,11 +247,12 @@ class TestAdapterInterfaces:
         """Test all adapters handle empty batches correctly."""
         empty_batch = torch.empty(0, 3, 256, 256)
         mock_model = MagicMock()
-        mock_model.training = False  # Set eval mode for defensive validation
+        mock_model.training = False
+        mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
 
         # Set up mock feature dimensions to match skeleton models
-        mock_model.last_linear.in_features = 32  # Xception and SPSL skeleton feature dim
-        mock_model.head_sha.in_features = 32     # UCF skeleton feature dim
+        mock_model.last_linear = SimpleNamespace(in_features=32)  # Xception and SPSL skeleton feature dim
+        mock_model.head_sha = SimpleNamespace(in_features=32)     # UCF skeleton feature dim
 
         # All should return empty dictionaries with correct shapes
         xception_result = predict_probs_xception(mock_model, empty_batch)
