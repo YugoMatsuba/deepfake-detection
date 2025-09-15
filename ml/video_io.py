@@ -4,7 +4,7 @@
 Video I/O module that replicates DeepfakeBench's exact preprocessing pipeline:
 
 1. Uniform frame sampling via np.linspace (matches preprocess.py fixed_num_frames mode)
-2. BGR�RGB conversion before any processing (per abstract_dataset.py)
+2. BGR→RGB conversion before any processing (per abstract_dataset.py)
 3. Face alignment using largest face + 5-point landmarks + scale=1.3
 4. Padding strategy: repeat last valid crop until exactly 32 frames
 5. Output: uint8 RGB crops ready for transforms.py normalization
@@ -87,7 +87,7 @@ def load_video_32(
 
     Replicates DeepfakeBench preprocessing pipeline:
     1. Uniform frame sampling (np.linspace with endpoint=True)
-    2. BGR�RGB conversion before processing
+    2. BGR→RGB conversion before processing
     3. Largest face detection + 5-point alignment (scale=1.3)
     4. Padding by repeating last valid crop
 
@@ -147,7 +147,7 @@ def load_video_32(
                 logger.warning(f"Failed to read frame {idx}")
                 continue
 
-            # Convert BGR�RGB before processing (per DeepfakeBench abstract_dataset.py)
+            # Convert BGR→RGB before processing (per DeepfakeBench abstract_dataset.py)
             rgb_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
 
             # Align and crop face using existing function
