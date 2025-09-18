@@ -14,8 +14,9 @@ from ml.models.utils import (
     softmax_fake
 )
 from ml.models.spsl_infer import compute_phase_channel
-from ml.models.xception_infer import predict_probs_xception, XceptionBackboneSkeleton
-from ml.models.spsl_infer import predict_probs_spsl, SPSLBackboneSkeleton
+from ml.models.xception_infer import predict_probs_xception
+from ml.models.xception_arch import Xception
+from ml.models.spsl_infer import predict_probs_spsl, load_spsl
 from ml.models.ucf_infer import predict_probs_ucf, UCFBackboneSkeleton
 
 
@@ -152,9 +153,10 @@ class TestAdapterInterfaces:
         mock_model = MagicMock()
         mock_model.training = False
         mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
-        mock_model.last_linear = SimpleNamespace(in_features=32)  # matches skeleton feature dim
+        mock_model.last_linear = SimpleNamespace(in_features=2048)  # matches real Xception feature dim
+        mock_model.mode = "original"  # Real Xception mode
 
-        mock_features = torch.randn(4, 32)  # Mock features matching skeleton dim
+        mock_features = torch.randn(4, 2048)  # Mock features matching real Xception dim
         mock_logits = torch.tensor([[0.1, 0.9], [0.7, 0.3], [0.4, 0.6], [0.2, 0.8]])
         mock_model.features.return_value = mock_features
         mock_model.classifier.return_value = mock_logits
@@ -172,7 +174,7 @@ class TestAdapterInterfaces:
 
         assert logits.shape == (4, 2)
         assert probs.shape == (4,)
-        assert features.shape == (4, 32)  # Match skeleton feature dim
+        assert features.shape == (4, 2048)  # Match real Xception feature dim
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         mock_model.features.assert_called_once_with(batch)
@@ -184,12 +186,14 @@ class TestAdapterInterfaces:
         mock_model = MagicMock()
         mock_model.training = False
         mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
-        mock_model.last_linear = SimpleNamespace(in_features=32)  # matches skeleton feature dim
+        mock_model.last_linear = SimpleNamespace(in_features=2048)  # SPSL uses original Xception backbone
 
-        mock_features = torch.randn(3, 32)  # Mock features matching skeleton dim
+        mock_features = torch.randn(3, 2048, 8, 8)  # Mock 4D features from backbone
         mock_logits = torch.tensor([[0.2, 0.8], [0.6, 0.4], [0.3, 0.7]])
+        mock_emb = torch.randn(3, 2048)  # Mock pooled embedding
         mock_model.features.return_value = mock_features
         mock_model.classifier.return_value = mock_logits
+        mock_model.last_emb = mock_emb  # Xception sets this in classifier()
 
         batch_rgb = torch.randn(3, 3, 256, 256)
         result_dict = predict_probs_spsl(mock_model, batch_rgb)
@@ -204,7 +208,7 @@ class TestAdapterInterfaces:
 
         assert logits.shape == (3, 2)
         assert probs.shape == (3,)
-        assert features.shape == (3, 32)  # Match skeleton feature dim
+        assert features.shape == (3, 2048)  # SPSL uses original Xception backbone (2048 features)
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         # Model should be called with 4-channel input (RGB + Phase)
@@ -217,9 +221,9 @@ class TestAdapterInterfaces:
         mock_model = MagicMock()
         mock_model.training = False
         mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
-        mock_model.head_sha = SimpleNamespace(in_features=32)  # matches skeleton feature dim
+        mock_model.head_sha = SimpleNamespace(in_features=256)  # UCF shared head expects 256-dim
 
-        mock_features = torch.randn(2, 32)  # Mock features matching skeleton dim
+        mock_features = torch.randn(2, 256)  # Mock shared features (256-dim)
         mock_logits = torch.tensor([[0.4, 0.6], [0.8, 0.2]])
         mock_model.features_shared.return_value = mock_features
         mock_model.forward_shared_head.return_value = mock_logits
@@ -237,7 +241,7 @@ class TestAdapterInterfaces:
 
         assert logits.shape == (2, 2)
         assert probs.shape == (2,)
-        assert features.shape == (2, 32)  # Match skeleton feature dim
+        assert features.shape == (2, 256)  # UCF shared features are 256-dim
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
         mock_model.features_shared.assert_called_once_with(batch_rgb)
@@ -250,37 +254,42 @@ class TestAdapterInterfaces:
         mock_model.training = False
         mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
 
-        # Set up mock feature dimensions to match skeleton models
-        mock_model.last_linear = SimpleNamespace(in_features=32)  # Xception and SPSL skeleton feature dim
-        mock_model.head_sha = SimpleNamespace(in_features=32)     # UCF skeleton feature dim
+        # Set up mock feature dimensions to match real models
+        mock_model.last_linear = SimpleNamespace(in_features=2048)  # Real Xception feature dim
+        mock_model.head_sha = SimpleNamespace(in_features=256)      # UCF shared head expects 256-dim input
+        mock_model.mode = "original"  # Real Xception mode
 
         # All should return empty dictionaries with correct shapes
         xception_result = predict_probs_xception(mock_model, empty_batch)
         assert isinstance(xception_result, dict)
         assert xception_result['cls'].shape == (0, 2)
         assert xception_result['prob'].shape == (0,)
-        assert xception_result['feat'].shape == (0, 32)  # Dynamic feature dim
+        assert xception_result['feat'].shape == (0, 2048)  # Real Xception feature dim
 
         spsl_result = predict_probs_spsl(mock_model, empty_batch)
         assert isinstance(spsl_result, dict)
         assert spsl_result['cls'].shape == (0, 2)
         assert spsl_result['prob'].shape == (0,)
-        assert spsl_result['feat'].shape == (0, 32)  # Dynamic feature dim
+        assert spsl_result['feat'].shape == (0, 2048)  # SPSL uses original Xception backbone (2048 features)
+        # Verify all outputs are on CPU
+        assert spsl_result['cls'].device.type == 'cpu'
+        assert spsl_result['prob'].device.type == 'cpu'
+        assert spsl_result['feat'].device.type == 'cpu'
 
         ucf_result = predict_probs_ucf(mock_model, empty_batch)
         assert isinstance(ucf_result, dict)
         assert ucf_result['cls'].shape == (0, 2)
         assert ucf_result['prob'].shape == (0,)
-        assert ucf_result['feat'].shape == (0, 32)  # Dynamic feature dim
+        assert ucf_result['feat'].shape == (0, 256)  # UCF shared features are 256-dim
 
 
-class TestSkeletonModels:
-    """Test skeleton model implementations."""
+class TestModelImplementations:
+    """Test model implementations (real Xception + skeleton SPSL/UCF)."""
 
-    def test_xception_skeleton_forward(self):
-        """Test Xception skeleton can forward pass."""
+    def test_xception_real_forward(self):
+        """Test real Xception architecture can forward pass."""
         config = {"mode": "original", "num_classes": 2, "inc": 3, "dropout": False}
-        model = XceptionBackboneSkeleton(config)
+        model = Xception(config)
         model.eval()
 
         batch = torch.randn(2, 3, 256, 256)
@@ -289,20 +298,64 @@ class TestSkeletonModels:
 
         assert logits.shape == (2, 2)  # [batch, num_classes]
         assert torch.isfinite(logits).all()
+        # Real Xception should have 2048 features in original mode
+        if len(features.shape) == 4:
+            # Features might still be spatial, so check after global avg pooling
+            import torch.nn.functional as F
+            pooled_features = F.adaptive_avg_pool2d(features, (1, 1)).view(features.size(0), -1)
+            assert pooled_features.shape == (2, 2048)
+        else:
+            assert features.shape == (2, 2048)
 
-    def test_spsl_skeleton_forward(self):
-        """Test SPSL skeleton can forward pass with 4-channel input."""
-        config = {"mode": "original", "num_classes": 2, "inc": 4, "dropout": False}
-        model = SPSLBackboneSkeleton(config)
+    def test_spsl_real_forward(self):
+        """Test SPSL with real Xception can forward pass with 4-channel input."""
+        model = load_spsl("", "cpu")  # No weights for testing
         model.eval()
 
-        # 4-channel input (RGB + Phase)
-        batch_4ch = torch.randn(2, 4, 256, 256)
-        features = model.features(batch_4ch)
-        logits = model.classifier(features)
+        # Test conv1 replacement worked
+        assert model.conv1.in_channels == 4, f"Expected 4 input channels, got {model.conv1.in_channels}"
+        assert model.conv1.bias is None, "Conv1 should be bias-free"
 
-        assert logits.shape == (2, 2)
-        assert torch.isfinite(logits).all()
+        # Test forward pass with dummy RGB input (adapter handles 3→4 channel conversion)
+        batch_rgb = torch.randn(2, 3, 256, 256)
+        result = predict_probs_spsl(model, batch_rgb)
+
+        assert result['cls'].shape == (2, 2)
+        assert result['prob'].shape == (2,)
+        assert result['feat'].shape == (2, 2048)  # Real Xception features in original mode
+        assert torch.isfinite(result['cls']).all()
+        assert torch.all(result['prob'] >= 0.0) and torch.all(result['prob'] <= 1.0)
+
+    def test_spsl_conv1_replacement(self):
+        """Test SPSL conv1 replacement follows exact DeepfakeBench pattern."""
+        from ml.models.spsl_infer import _replace_conv1_with_4ch
+        from ml.models.xception_arch import Xception
+
+        # Start with 3-channel Xception
+        config = {"mode": "original", "num_classes": 2, "inc": 3, "dropout": False}
+        model = Xception(config)
+
+        # Verify original state
+        assert model.conv1.in_channels == 3
+        original_weight = model.conv1.weight.data.clone()  # [32, 3, 3, 3]
+
+        # Apply replacement without checkpoint data
+        _replace_conv1_with_4ch(model, conv1_data=None)
+
+        # Verify replacement
+        assert model.conv1.in_channels == 4
+        assert model.conv1.bias is None
+        assert model.conv1.weight.shape == (32, 4, 3, 3)
+
+        # Test with checkpoint data (simulate DeepfakeBench pattern)
+        model2 = Xception(config)
+        conv1_data = torch.randn(32, 3, 3, 3)  # Simulated checkpoint
+        _replace_conv1_with_4ch(model2, conv1_data=conv1_data)
+
+        # Verify seeding pattern matches DeepfakeBench
+        expected_avg = conv1_data.mean(dim=1, keepdim=True)  # [32, 1, 3, 3]
+        expected_weight = expected_avg.repeat(1, 4, 1, 1)    # [32, 4, 3, 3]
+        assert torch.allclose(model2.conv1.weight.data, expected_weight)
 
     def test_ucf_skeleton_forward(self):
         """Test UCF skeleton can forward pass."""
@@ -341,3 +394,26 @@ class TestWeightLoadingPatterns:
         original_mean = original_conv1.mean(dim=1)
         for i in range(4):
             assert torch.allclose(new_conv1_weights[:, i], original_mean)
+
+    def test_spsl_phase_computation_robustness(self):
+        """Test SPSL phase computation handles edge cases properly."""
+        from ml.models.spsl_infer import compute_phase_channel
+
+        # Test normal case
+        batch = torch.randn(2, 3, 256, 256, dtype=torch.float32)
+        phase = compute_phase_channel(batch)
+        assert phase.shape == (2, 1, 256, 256)
+        assert phase.dtype == torch.float32
+        assert phase.device == batch.device
+        assert torch.isfinite(phase).all()
+
+        # Test empty batch
+        empty_batch = torch.empty(0, 3, 256, 256, dtype=torch.float32)
+        empty_phase = compute_phase_channel(empty_batch)
+        assert empty_phase.shape == (0, 1, 256, 256)
+        assert empty_phase.dtype == torch.float32
+
+        # Test deterministic
+        phase1 = compute_phase_channel(batch)
+        phase2 = compute_phase_channel(batch)
+        assert torch.allclose(phase1, phase2)
