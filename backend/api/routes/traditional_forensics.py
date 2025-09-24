@@ -3,6 +3,9 @@ from api.traditional_forensics_utils.frame_extraction import extract_frames
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
 from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
+from api.traditional_forensics_utils.cmfd_analysis import run_cmfd_analysis
+from api.traditional_forensics_utils.temporal_analysis import run_temporal_analysis
+
 
 bp_forensics = Blueprint("forensics", __name__)
 
@@ -90,3 +93,46 @@ def lbp_route():
         return jsonify(error=str(e)), 500
 
     return jsonify(result), 200
+
+# CMFD Analysis
+@bp_forensics.post("/cmfd_analysis")
+def cmfd_route():
+    data = request.get_json(silent=True) or {}
+    input_path = data.get("input_path")
+    if not input_path:
+        return jsonify(error="input_path_required"), 400
+
+    try:
+        result = run_cmfd_analysis(input_path)
+    except FileNotFoundError:
+        return jsonify(error="file_or_folder_not_found"), 404
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+    return jsonify(
+        message="CMFD analysis complete",
+        result=result
+    ), 200
+
+# --- Temporal Analysis ---
+@bp_forensics.post("/temporal_analysis")
+def temporal_route():
+
+    data = request.get_json(silent=True) or {}
+    video_path = data.get("video_path")
+    if not video_path:
+        return jsonify(error="video_path_required"), 400
+
+    try:
+        result = run_temporal_analysis(video_path)
+    except FileNotFoundError:
+        return jsonify(error="video_not_found"), 404
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+    return jsonify(
+        message="Temporal analysis complete",
+        result=result
+    ), 200
