@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from api.traditional_forensics_utils.frame_extraction import extract_frames
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
+from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
 
 bp_forensics = Blueprint("forensics", __name__)
 
@@ -74,3 +75,18 @@ def noise_route():
         return jsonify(error=str(e)), 500
 
     return jsonify(message="Noise analysis completed", confidence=confidence), 200
+
+# LBP Analysis
+@bp_forensics.post("/lbp_analysis")
+def lbp_route():
+    data = request.get_json(silent=True) or {}
+    input_path = data.get("input_path")
+    if not input_path:
+        return jsonify(error="input_path_required"), 400
+
+    try:
+        result = run_lbp_analysis(input_path)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+    return jsonify(result), 200
