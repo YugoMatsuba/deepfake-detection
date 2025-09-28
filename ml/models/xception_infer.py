@@ -1,11 +1,11 @@
 # xception_infer.py - DeepfakeBench-aligned Xception model adapter
 
 import logging
-from typing import Dict, Any
+from typing import Dict
 
 import torch
-import torch.nn as nn
 
+from .xception_arch import Xception
 from .utils import (
     map_location_for_device,
     strip_module_prefix,
@@ -20,89 +20,49 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-# TODO: This is a skeleton implementation
-# For a complete working adapter, we need to copy the full Xception architecture
-# from DeepfakeBench's training/networks/xception.py including all Block classes,
-# separable convolutions, and exact layer configurations.
-
-class XceptionBackboneSkeleton(nn.Module):
-    """
-    Skeleton Xception backbone for interface compatibility.
-
-    NOTE: This is incomplete! For real inference, copy the complete
-    architecture from DeepfakeBench training/networks/xception.py
-    """
-
-    def __init__(self, config: Dict[str, Any]):
-        super(XceptionBackboneSkeleton, self).__init__()
-        self.num_classes = config["num_classes"]
-        self.mode = config["mode"]
-
-        # Match DeepfakeBench Xception structure with explicit layers
-        self.conv1 = nn.Conv2d(config["inc"], 32, 3, 2, 0, bias=False)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.relu = nn.ReLU(inplace=True)
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.flatten = nn.Flatten()
-
-        # NOTE: Real DeepfakeBench Xception has 2048 features (or 512 with adjust_channel).
-        # This skeleton uses 32 features for simplicity. When implementing full architecture,
-        # change this to match the actual feature dimensions from the loaded weights.
-        self.last_linear = nn.Linear(32, self.num_classes)
-
-    def features(self, input_tensor: torch.Tensor) -> torch.Tensor:
-        """Extract features - using explicit layers."""
-        x = self.conv1(input_tensor)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.pool(x)
-        x = self.flatten(x)
-        return x
-
-    def classifier(self, features: torch.Tensor) -> torch.Tensor:
-        """Classification head - simplified version."""
-        return self.last_linear(features)
-
-
 def load_xception(weights_path: str, device: str) -> torch.nn.Module:
     """
     Load Xception model with DeepfakeBench-compatible weights.
 
-    WARNING: This is a skeleton implementation for interface compatibility.
-    For real model loading, implement complete XceptionBackbone with
-    full architecture from DeepfakeBench training/networks/xception.py
+    Uses exact DeepfakeBench Xception architecture from training/networks/xception.py.
+    Instantiation follows exact pattern from xception_detector.py build_backbone().
 
     Args:
         weights_path: Path to .pth checkpoint file
         device: Device string ("cpu" or "cuda")
 
     Returns:
-        Loaded model in eval mode (currently skeleton)
+        Loaded model in eval mode
     """
-    config = {
+    # Exact config from DeepfakeBench xception.yaml backbone_config
+    model_config = {
         "mode": "original",
         "num_classes": 2,
         "inc": 3,
         "dropout": False
     }
 
-    # Use skeleton for now - replace with full XceptionBackbone
-    model = XceptionBackboneSkeleton(config)
+    # Instantiate using real DeepfakeBench Xception architecture
+    model = Xception(model_config)
 
-    # Note: Actual weight loading would happen here with real architecture
-    # map_location = map_location_for_device(device)
-    # state_dict = torch.load(weights_path, map_location=map_location)
-    # state_dict = strip_module_prefix(state_dict)
-    # state_dict = fix_pointwise_separable_convs(state_dict)
-    # state_dict = drop_fc_keys(state_dict)
-    # model.load_state_dict(state_dict, strict=False)
+    # TODO: Weight loading will be implemented in PR4
+    # Following exact pattern from xception_detector.py lines 69-74:
+    # state_dict = torch.load(weights_path)
+    # for name, weights in state_dict.items():
+    #     if 'pointwise' in name:
+    #         state_dict[name] = weights.unsqueeze(-1).unsqueeze(-1)
+    # state_dict = {k:v for k, v in state_dict.items() if 'fc' not in k}
+    # model.load_state_dict(state_dict, False)
 
     model = ensure_eval(model).to(device)
 
-    # Assertion checks
+    # Validate architecture matches expected DeepfakeBench structure
     assert model.conv1.in_channels == 3, f"Xception conv1 should have 3 input channels, got {model.conv1.in_channels}"
+    assert hasattr(model, 'features'), "Xception should have features() method"
+    assert hasattr(model, 'classifier'), "Xception should have classifier() method"
+    assert model.num_classes == 2, f"Expected 2 classes, got {model.num_classes}"
 
-    logger.warning(f"Using skeleton Xception model - replace with full implementation")
+    logger.info("Loaded DeepfakeBench Xception architecture (no weights loaded yet)")
     return model
 
 
@@ -110,7 +70,11 @@ def predict_probs_xception(model: torch.nn.Module, batch: torch.Tensor) -> Dict[
     """
     Predict per-frame fake probabilities using Xception model.
 
-    Follows exact DeepfakeBench return format from xception_detector.py lines 108-117.
+    Follows exact DeepfakeBench pattern from xception_detector.py lines 108-117:
+    - features = backbone.features(data_dict['image'])
+    - pred = backbone.classifier(features)
+    - prob = torch.softmax(pred, dim=1)[:, 1]
+    - return {'cls': pred, 'prob': prob, 'feat': features}
 
     Args:
         model: Loaded Xception model in eval mode
@@ -123,7 +87,9 @@ def predict_probs_xception(model: torch.nn.Module, batch: torch.Tensor) -> Dict[
             - 'feat': features [N, feat_dim] on CPU
     """
     if batch.numel() == 0:
-        feat_dim = getattr(model.last_linear, "in_features", 32)
+        # Determine feature dimensions for empty batch
+        # Real Xception: 2048 for original mode, 512 for adjust_channel mode
+        feat_dim = 2048 if model.mode == "original" else 512
         return {
             'cls': torch.empty(0, 2, dtype=torch.float32),
             'prob': torch.empty(0, dtype=torch.float32),
@@ -140,13 +106,22 @@ def predict_probs_xception(model: torch.nn.Module, batch: torch.Tensor) -> Dict[
     assert batch.dtype == torch.float32, f"Expected float32 normalized input, got {batch.dtype}"
 
     with inference_guard():
-        features = model.features(batch)  # [N, feat_dim]
-        logits = model.classifier(features)  # [N, 2]
-        probs = softmax_fake(logits)  # [N]
+        # Use exact DeepfakeBench pattern from xception_detector.py
+        features = model.features(batch)        # [N, C, H, W] or [N, feat_dim] after pooling
+        pred = model.classifier(features)       # [N, 2] logits
+        prob = softmax_fake(pred)               # [N] fake probabilities (softmax[:,1])
 
-        # Return DeepfakeBench-format dictionary
+        # Ensure features are properly flattened for output
+        if len(features.shape) == 4:
+            # If features are still [N, C, H, W], they need to be pooled and flattened
+            # This should normally be handled by classifier(), but ensure consistency
+            import torch.nn.functional as F
+            features = F.adaptive_avg_pool2d(features, (1, 1))
+            features = features.view(features.size(0), -1)
+
+        # Return exact DeepfakeBench format
         return {
-            'cls': to_cpu(logits),
-            'prob': to_cpu(probs),
+            'cls': to_cpu(pred),
+            'prob': to_cpu(prob),
             'feat': to_cpu(features)
         }

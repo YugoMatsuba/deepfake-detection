@@ -21,6 +21,7 @@ from ml.models.xception_infer import load_xception, predict_probs_xception
 from ml.models.spsl_infer import load_spsl, predict_probs_spsl
 from ml.models.ucf_infer import load_ucf, predict_probs_ucf
 from ml.models.utils import hash_file
+from ml.schema import SCHEMA_VERSION
 
 # Model routing following DFB patterns
 MODEL_ROUTES = {
@@ -164,6 +165,7 @@ def _assemble_output(meta, frames, per_model_outputs: Dict[str, Dict],
 
     # Final output structure
     result = {
+        "schema_version": SCHEMA_VERSION,
         "video": {
             "path": meta.path,
             "fps": meta.fps,
@@ -184,6 +186,7 @@ def _assemble_output(meta, frames, per_model_outputs: Dict[str, Dict],
 def _assemble_empty_output(meta, stage: str, message: str) -> dict:
     """Assemble output for empty/failed videos."""
     return {
+        "schema_version": SCHEMA_VERSION,
         "video": {
             "path": meta.path if meta else "unknown",
             "fps": meta.fps if meta else 0.0,
