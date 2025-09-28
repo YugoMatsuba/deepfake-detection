@@ -252,8 +252,8 @@ export UCF_WEIGHTS=/path/to/ucf_best.pth
 ```
 
 ### Development Status:
-- ✅ **PR2 Current**: Schema validation, runner orchestration, SPSL implementation
-- 🚧 **PR3-PR6 Target**: Full weight loading, UCF dual encoders, production deployment
+- ✅ **Current**: Schema validation, runner orchestration, SPSL implementation
+- 🚧 **Target for end of sprint**: Full weight loading, UCF dual encoders, production deployment
 
 ### Docker Environment:
 ```dockerfile
@@ -335,23 +335,11 @@ UCF_WEIGHTS=/weights/ucf_best.pth
 
 ## 🧪 Testing
 
-### Backend Tests:
-```bash
-cd backend
-python -m pytest tests/ -v
-```
-
 ### ML Tests *(feature/ml branch)*:
 ```bash
 cd ml
 pytest tests/ -v
 # Tests run without .pth weights (architecture validation only)
-```
-
-### Frontend Tests:
-```bash
-cd frontend
-npm test
 ```
 
 ---
@@ -385,39 +373,8 @@ services:
 - **RAM**: 8GB+ (16GB+ recommended for ML)
 - **GPU**: NVIDIA GPU with CUDA 11.3+ support (ML inference)
 - **Storage**: SSD recommended for video processing
-- **Database**: PostgreSQL 13+ for production
 
----
 
-## 🗺️ Roadmap
-
-### Phase 1: Core Platform ✅
-- [x] Frontend UI with authentication
-- [x] Backend API with traditional forensics
-- [x] Video upload and frame extraction
-- [x] Basic analysis dashboard
-
-### Phase 2: ML Integration 🚧
-- [x] DeepfakeBench-aligned inference pipeline
-- [x] Schema validation and error handling
-- [ ] Full model weight loading (PR3-PR4)
-- [ ] Production Docker deployment (PR5-PR6)
-
-### Phase 3: Advanced Features 📋
-- [ ] Real-time analysis streaming
-- [ ] Advanced visualization tools
-- [ ] API rate limiting and scaling
-- [ ] Multi-user analysis workflows
-- [ ] Custom model training interface
-
-### Phase 4: Enterprise Features 📋
-- [ ] SSO integration
-- [ ] Audit logging and compliance
-- [ ] Batch processing capabilities
-- [ ] REST API for third-party integration
-- [ ] On-premise deployment options
-
----
 
 ## 📚 Research & Citations
 
@@ -426,36 +383,6 @@ This project implements methods from:
 - **Xception**: Deep Learning with Depthwise Separable Convolutions
 - **SPSL**: Spatial-Phase Shallow Learning for real-time deepfake detection
 - **UCF**: Uncovering Common Features in deepfake videos
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open Pull Request
-
-### Development Branches:
-- `main` - Stable production code
-- `feature/ml` - ML inference pipeline (ready for merge)
-- `feature/*` - Individual feature development
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## 🆘 Support
-
-For issues and questions:
-- 📧 Create GitHub Issues for bug reports
-- 💬 Use Discussions for questions and feature requests
-- 📖 Check the Wiki for detailed documentation
 
 ---
 
