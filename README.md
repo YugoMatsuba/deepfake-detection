@@ -1,6 +1,6 @@
 # Deepfake AI Forensics Tool
 
-A comprehensive video forensics platform that combines traditional computer vision techniques with cutting-edge machine learning models for deepfake detection and video authenticity analysis.
+A comprehensive video forensics platform that combines traditional computer vision techniques with cutting-edge machine learning models for deepfake detection and video authenticity analysis. This project is developed as part of the University of Melbourne IT Project capstone subject.
 
 ## 🏗️ Architecture Overview
 
