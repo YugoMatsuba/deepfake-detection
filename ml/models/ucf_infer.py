@@ -1,4 +1,13 @@
 # ucf_infer.py - DeepfakeBench-aligned UCF model adapter
+"""
+UCF (Uncovering Common Features) inference adapter using exact DeepfakeBench architecture.
+
+This adapter implements the inference-only path from DeepfakeBench's UCFDetector,
+using dual Xception encoders with shared-head classification.
+
+Reference:
+DeepfakeBench/training/detectors/ucf_detector.py lines 237-264 (inference=True branch)
+"""
 
 import logging
 from typing import Dict, Any
@@ -6,6 +15,7 @@ from typing import Dict, Any
 import torch
 import torch.nn as nn
 
+from .ucf_arch import UCFDetector
 from .utils import (
     map_location_for_device,
     strip_module_prefix,
@@ -20,44 +30,64 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-# TODO: This is a skeleton implementation
-class UCFBackboneSkeleton(nn.Module):
-    """Skeleton UCF backbone for interface compatibility."""
-
-    def __init__(self, config: Dict[str, Any]):
-        super(UCFBackboneSkeleton, self).__init__()
-        self.num_classes = config["num_classes"]
-        self.mode = config["mode"]  # Should be 'adjust_channel'
-
-        # Simplified placeholder - real UCF has dual Xception encoders
-        self.shared_features = nn.Sequential(
-            nn.Conv2d(config["inc"], 32, 3, 2, 0, bias=False),
-            nn.BatchNorm2d(32), nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten()
-        )
-
-        # NOTE: Real DeepfakeBench UCF uses Xception encoders with 256-dim shared features
-        # (512 encoder features split into 256 specific + 256 shared). This skeleton uses
-        # 32 features for simplicity. When implementing full architecture, change this to
-        # match the actual encoder feature dimensions (256 for shared head).
-        self.head_sha = nn.Linear(32, self.num_classes)
-
-    def features_shared(self, input_tensor: torch.Tensor) -> torch.Tensor:
-        return self.shared_features(input_tensor)
-
-    def forward_shared_head(self, shared_features: torch.Tensor) -> torch.Tensor:
-        return self.head_sha(shared_features)
-
-
 def load_ucf(weights_path: str, device: str) -> torch.nn.Module:
-    """Load UCF model with DeepfakeBench-compatible weights (skeleton)."""
+    """
+    Load UCF model with DeepfakeBench-compatible dual-encoder architecture.
+
+    Builds two Xception backbones with mode="adjust_channel" and shared-head inference.
+    Follows exact DeepfakeBench ucf.yaml configuration and ucf_detector.py architecture.
+
+    Args:
+        weights_path: Path to .pth checkpoint file (unused in PR3, weights loading in PR4)
+        device: Device string ("cpu" or "cuda")
+
+    Returns:
+        UCF model in eval mode ready for inference
+    """
+    # Exact config from DeepfakeBench ucf.yaml
     config = {
-        "mode": "adjust_channel",  # UCF uses adjust_channel mode
-        "num_classes": 2, "inc": 3, "dropout": False
+        "mode": "adjust_channel",       # Reduces Xception output to 512D
+        "num_classes": 2,               # Binary classification
+        "inc": 3,                       # RGB input channels
+        "dropout": False,               # No dropout in backbone
+        "encoder_feat_dim": 512,        # Feature dimension (adjust_channel mode)
+        "specific_task_number": 5,      # FF++ has 5 forgery types (for weight compatibility)
     }
-    model = UCFBackboneSkeleton(config)
+
+    # Build UCF detector with dual Xception encoders
+    model = UCFDetector(config)
+
+    # TODO: Weight loading sequence for PR4:
+    # 1. map_location = map_location_for_device(device)
+    # 2. state_dict = torch.load(weights_path, map_location=map_location)
+    # 3. state_dict = strip_module_prefix(state_dict)
+    # 4. state_dict = fix_pointwise_separable_convs(state_dict)
+    # 5. state_dict = drop_fc_keys(state_dict)
+    # 6. model.load_state_dict(state_dict, strict=False)
+
     model = ensure_eval(model).to(device)
-    logger.warning(f"Using skeleton UCF model - replace with full implementation")
+
+    # Validation assertions (fail fast on architecture mismatches)
+    assert not model.training, "UCF model must be in eval mode for inference"
+    assert model.encoder_feat_dim == 512, f"Expected encoder_feat_dim=512 (adjust_channel), got {model.encoder_feat_dim}"
+    assert model.half_fingerprint_dim == 256, f"Expected half_fingerprint_dim=256, got {model.half_fingerprint_dim}"
+    assert model.head_sha.mlp[-1].out_features == 2, f"Expected 2-class shared head, got {model.head_sha.mlp[-1].out_features}"
+    assert model.head_spe.mlp[-1].out_features == 5, f"Expected 5-class specific head, got {model.head_spe.mlp[-1].out_features}"
+    assert hasattr(model, 'shared_feat_dim'), "Model must expose shared_feat_dim for adapter"
+
+    # Validate architectural components exist
+    assert hasattr(model, 'block_spe'), "Model must have block_spe for weight compatibility"
+    assert hasattr(model, 'block_sha'), "Model must have block_sha"
+    assert hasattr(model, 'head_spe'), "Model must have head_spe for weight compatibility"
+    assert hasattr(model, 'head_sha'), "Model must have head_sha"
+
+    # Validate backbone configurations
+    for encoder_name in ['encoder_f', 'encoder_c']:
+        encoder = getattr(model, encoder_name)
+        assert encoder.mode == "adjust_channel", f"{encoder_name} should use adjust_channel mode, got {encoder.mode}"
+        assert encoder.num_classes == 2, f"{encoder_name} should have 2 classes, got {encoder.num_classes}"
+
+    logger.info("Loaded UCF with dual Xception encoders (adjust_channel mode, 512D features)")
     return model
 
 
@@ -65,8 +95,8 @@ def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference
     """
     Predict per-frame fake probabilities using UCF shared head only.
 
-    Based on ucf_detector.py lines 237-241: inference=True uses head_sha only.
-    Follows exact DeepfakeBench return format.
+    Follows exact DeepfakeBench pattern from ucf_detector.py lines 237-264.
+    Uses forgery encoder + shared-head inference path only.
 
     Args:
         model: Loaded UCF model in eval mode
@@ -77,10 +107,11 @@ def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference
         Dict with keys:
             - 'cls': shared head logits [N, 2] on CPU
             - 'prob': fake probabilities [N] on CPU
-            - 'feat': shared features [N, feat_dim] on CPU
+            - 'feat': shared features [N, shared_feat_dim] on CPU
     """
     if batch_rgb.numel() == 0:
-        feat_dim = getattr(model.head_sha, "in_features", 32)
+        # Empty batch: determine feature dimension from model
+        feat_dim = getattr(model, "shared_feat_dim", 256)  # Should be 256 for UCF
         return {
             'cls': torch.empty(0, 2, dtype=torch.float32),
             'prob': torch.empty(0, dtype=torch.float32),
@@ -99,21 +130,37 @@ def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference
     with inference_guard():
         if inference:
             # UCF inference path: shared features and shared head only
-            shared_features = model.features_shared(batch_rgb)
-            out_sha = model.forward_shared_head(shared_features)  # [N, 2] logits
-            probs = softmax_fake(out_sha)  # [N] fake probabilities
+            # Follows DeepfakeBench ucf_detector.py lines 237-264
+            data_dict = {'image': batch_rgb}
+            pred_dict = model.forward_inference(data_dict)
+
+            out_sha = pred_dict['cls']      # [N, 2] logits
+            sha_feat = pred_dict['feat']    # [N, 256] pooled features
+
+            # Apply softmax to get fake probabilities (DeepfakeBench line 241)
+            prob_sha = torch.softmax(out_sha, dim=1)[:, 1]  # [N] fake probabilities
 
             # Runtime hygiene checks
             assert out_sha.shape[1] == 2, f"UCF logits should be [N, 2], got {out_sha.shape}"
-            assert probs.ndim == 1 and probs.shape[0] == out_sha.shape[0]
-            assert not out_sha.requires_grad and not probs.requires_grad
+            assert prob_sha.ndim == 1 and prob_sha.shape[0] == out_sha.shape[0]
+            assert not out_sha.requires_grad and not prob_sha.requires_grad
             assert out_sha.device == batch_rgb.device
 
-            # Return DeepfakeBench-format dictionary
+            # Validate feature dimensions match expected shared_feat_dim
+            expected_feat_dim = getattr(model, "shared_feat_dim", 256)
+            assert sha_feat.shape == (batch_rgb.size(0), expected_feat_dim), \
+                f"Expected shared features [{batch_rgb.size(0)}, {expected_feat_dim}], got {sha_feat.shape}"
+
+            # Ensure all outputs are finite
+            assert torch.isfinite(out_sha).all(), "UCF logits contain non-finite values"
+            assert torch.isfinite(prob_sha).all(), "UCF probabilities contain non-finite values"
+            assert torch.isfinite(sha_feat).all(), "UCF features contain non-finite values"
+
+            # Return DeepfakeBench-format dictionary with CPU tensors
             return {
-                'cls': to_cpu(out_sha),
-                'prob': to_cpu(probs),
-                'feat': to_cpu(shared_features)
+                'cls': to_cpu(out_sha),      # [N, 2] logits
+                'prob': to_cpu(prob_sha),    # [N] fake probabilities
+                'feat': to_cpu(sha_feat)     # [N, shared_feat_dim] pooled features
             }
         else:
             raise NotImplementedError("UCF training mode not implemented in adapter")

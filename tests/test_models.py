@@ -17,7 +17,7 @@ from ml.models.spsl_infer import compute_phase_channel
 from ml.models.xception_infer import predict_probs_xception
 from ml.models.xception_arch import Xception
 from ml.models.spsl_infer import predict_probs_spsl, load_spsl
-from ml.models.ucf_infer import predict_probs_ucf, UCFBackboneSkeleton
+from ml.models.ucf_infer import predict_probs_ucf, load_ucf
 
 
 class TestModelUtils:
@@ -221,12 +221,14 @@ class TestAdapterInterfaces:
         mock_model = MagicMock()
         mock_model.training = False
         mock_model.parameters.return_value = iter([torch.nn.Parameter(torch.empty(0))])  # real param → real device
-        mock_model.head_sha = SimpleNamespace(in_features=256)  # UCF shared head expects 256-dim
+        mock_model.shared_feat_dim = 256  # UCF shared features are 256-dim
 
         mock_features = torch.randn(2, 256)  # Mock shared features (256-dim)
         mock_logits = torch.tensor([[0.4, 0.6], [0.8, 0.2]])
-        mock_model.features_shared.return_value = mock_features
-        mock_model.forward_shared_head.return_value = mock_logits
+
+        # Mock the forward_inference method that returns DeepfakeBench format
+        mock_pred_dict = {'cls': mock_logits, 'feat': mock_features}
+        mock_model.forward_inference.return_value = mock_pred_dict
 
         batch_rgb = torch.randn(2, 3, 256, 256)
         result_dict = predict_probs_ucf(mock_model, batch_rgb)
@@ -244,8 +246,12 @@ class TestAdapterInterfaces:
         assert features.shape == (2, 256)  # UCF shared features are 256-dim
         assert logits.device.type == "cpu" and probs.device.type == "cpu"
         assert torch.all(probs >= 0.0) and torch.all(probs <= 1.0)
-        mock_model.features_shared.assert_called_once_with(batch_rgb)
-        mock_model.forward_shared_head.assert_called_once_with(mock_features)
+
+        # Verify forward_inference was called with correct data_dict format
+        mock_model.forward_inference.assert_called_once()
+        call_args = mock_model.forward_inference.call_args[0][0]
+        assert 'image' in call_args
+        assert torch.equal(call_args['image'], batch_rgb)
 
     def test_empty_batch_handling(self):
         """Test all adapters handle empty batches correctly."""
@@ -357,18 +363,28 @@ class TestModelImplementations:
         expected_weight = expected_avg.repeat(1, 4, 1, 1)    # [32, 4, 3, 3]
         assert torch.allclose(model2.conv1.weight.data, expected_weight)
 
-    def test_ucf_skeleton_forward(self):
-        """Test UCF skeleton can forward pass."""
-        config = {"mode": "adjust_channel", "num_classes": 2, "inc": 3, "dropout": False}
-        model = UCFBackboneSkeleton(config)
+    def test_ucf_real_forward(self):
+        """Test UCF with real dual Xception encoders can forward pass."""
+        model = load_ucf("", "cpu")  # No weights for testing
         model.eval()
 
-        batch = torch.randn(2, 3, 256, 256)
-        shared_features = model.features_shared(batch)
-        logits = model.forward_shared_head(shared_features)
+        # Test architecture components
+        assert model.encoder_feat_dim == 512, f"Expected 512 features (adjust_channel), got {model.encoder_feat_dim}"
+        assert model.half_fingerprint_dim == 256, f"Expected 256 shared features, got {model.half_fingerprint_dim}"
+        assert hasattr(model, 'encoder_f'), "Missing forgery encoder"
+        assert hasattr(model, 'encoder_c'), "Missing content encoder"
+        assert hasattr(model, 'head_sha'), "Missing shared head"
+        assert hasattr(model, 'block_sha'), "Missing shared projection block"
 
-        assert logits.shape == (2, 2)
-        assert torch.isfinite(logits).all()
+        # Test forward pass with dummy RGB input
+        batch_rgb = torch.randn(2, 3, 256, 256)
+        result = predict_probs_ucf(model, batch_rgb)
+
+        assert result['cls'].shape == (2, 2)
+        assert result['prob'].shape == (2,)
+        assert result['feat'].shape == (2, 256)  # UCF shared features are 256-dim
+        assert torch.isfinite(result['cls']).all()
+        assert torch.all(result['prob'] >= 0.0) and torch.all(result['prob'] <= 1.0)
 
 
 class TestWeightLoadingPatterns:
