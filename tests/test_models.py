@@ -159,7 +159,12 @@ class TestAdapterInterfaces:
         mock_features = torch.randn(4, 2048)  # Mock features matching real Xception dim
         mock_logits = torch.tensor([[0.1, 0.9], [0.7, 0.3], [0.4, 0.6], [0.2, 0.8]])
         mock_model.features.return_value = mock_features
-        mock_model.classifier.return_value = mock_logits
+
+        # Mimic real Xception behavior: classifier sets last_emb
+        def _classifier_side_effect(x):
+            mock_model.last_emb = mock_features  # Real Xception.classifier() sets this
+            return mock_logits
+        mock_model.classifier.side_effect = _classifier_side_effect
 
         batch = torch.randn(4, 3, 256, 256)
         result_dict = predict_probs_xception(mock_model, batch)
@@ -263,6 +268,7 @@ class TestAdapterInterfaces:
         # Set up mock feature dimensions to match real models
         mock_model.last_linear = SimpleNamespace(in_features=2048)  # Real Xception feature dim
         mock_model.head_sha = SimpleNamespace(in_features=256)      # UCF shared head expects 256-dim input
+        mock_model.shared_feat_dim = 256  # UCF shared feature dimension
         mock_model.mode = "original"  # Real Xception mode
 
         # All should return empty dictionaries with correct shapes

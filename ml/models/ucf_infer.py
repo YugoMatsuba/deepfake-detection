@@ -10,6 +10,7 @@ DeepfakeBench/training/detectors/ucf_detector.py lines 237-264 (inference=True b
 """
 
 import logging
+import os
 from typing import Dict, Any
 
 import torch
@@ -17,10 +18,7 @@ import torch.nn as nn
 
 from .ucf_arch import UCFDetector
 from .utils import (
-    map_location_for_device,
-    strip_module_prefix,
-    fix_pointwise_separable_convs,
-    drop_fc_keys,
+    load_dfb_checkpoint,
     softmax_fake,
     inference_guard,
     to_cpu,
@@ -38,11 +36,11 @@ def load_ucf(weights_path: str, device: str) -> torch.nn.Module:
     Follows exact DeepfakeBench ucf.yaml configuration and ucf_detector.py architecture.
 
     Args:
-        weights_path: Path to .pth checkpoint file (unused in PR3, weights loading in PR4)
+        weights_path: Path to .pth checkpoint file (ImageNet xception-b5690688.pth)
         device: Device string ("cpu" or "cuda")
 
     Returns:
-        UCF model in eval mode ready for inference
+        UCF model in eval mode ready for inference, with weights_hash stored as model._weights_hash
     """
     # Exact config from DeepfakeBench ucf.yaml
     config = {
@@ -57,14 +55,33 @@ def load_ucf(weights_path: str, device: str) -> torch.nn.Module:
     # Build UCF detector with dual Xception encoders
     model = UCFDetector(config)
 
-    # TODO: Weight loading sequence for PR4:
-    # 1. map_location = map_location_for_device(device)
-    # 2. state_dict = torch.load(weights_path, map_location=map_location)
-    # 3. state_dict = strip_module_prefix(state_dict)
-    # 4. state_dict = fix_pointwise_separable_convs(state_dict)
-    # 5. state_dict = drop_fc_keys(state_dict)
-    # 6. model.load_state_dict(state_dict, strict=False)
+    # PR4: Load weights using centralized DFB checkpoint loader (if path provided)
+    # Follows ucf_detector.py lines 105-111 (build_backbone)
+    # NOTE: UCF loads ImageNet pretrained weights into BOTH encoder_f and encoder_c
+    if weights_path and os.path.isfile(weights_path):
+        report = load_dfb_checkpoint(
+            model,
+            weights_path,
+            device=device,
+            arch="ucf",
+            expected_num_classes=2
+        )
+        # Store weights hash for provenance (used by runner.py for JSON output)
+        model._weights_hash = report['weights_hash']
+        # Log detailed per-encoder loading info
+        logger.info(
+            f"Loaded UCF from {weights_path} (sha256={report['weights_hash'][:16]}...), "
+            f"total keys: {report['keys_loaded']}/{report['keys_total']*2} across dual encoders, "
+            f"pointwise fixes: {report['fixed_pointwise_count']}"
+        )
+        if report['notes']:
+            logger.debug(f"UCF loading details: {report['notes']}")
+    else:
+        # No weights loaded (for testing)
+        logger.info("UCF: no weights_path; dual encoders remain randomly initialized")
+        model._weights_hash = ""
 
+    # Move to device and set eval mode
     model = ensure_eval(model).to(device)
 
     # Validation assertions (fail fast on architecture mismatches)
@@ -87,7 +104,6 @@ def load_ucf(weights_path: str, device: str) -> torch.nn.Module:
         assert encoder.mode == "adjust_channel", f"{encoder_name} should use adjust_channel mode, got {encoder.mode}"
         assert encoder.num_classes == 2, f"{encoder_name} should have 2 classes, got {encoder.num_classes}"
 
-    logger.info("Loaded UCF with dual Xception encoders (adjust_channel mode, 512D features)")
     return model
 
 
@@ -138,7 +154,7 @@ def predict_probs_ucf(model: torch.nn.Module, batch_rgb: torch.Tensor, inference
             sha_feat = pred_dict['feat']    # [N, 256] pooled features
 
             # Apply softmax to get fake probabilities (DeepfakeBench line 241)
-            prob_sha = torch.softmax(out_sha, dim=1)[:, 1]  # [N] fake probabilities
+            prob_sha = softmax_fake(out_sha)  # [N] fake probabilities (standardized)
 
             # Runtime hygiene checks
             assert out_sha.shape[1] == 2, f"UCF logits should be [N, 2], got {out_sha.shape}"

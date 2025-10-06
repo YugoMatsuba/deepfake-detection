@@ -19,6 +19,7 @@ Key implementation details copied from DeepfakeBench:
 '''
 
 import logging
+import os
 from typing import Dict, Optional
 
 import torch
@@ -27,15 +28,16 @@ import torch.nn.functional as F
 
 from .xception_arch import Xception
 from .utils import (
-    map_location_for_device,
-    strip_module_prefix,
-    fix_pointwise_separable_convs,
-    drop_fc_keys,
+    load_dfb_checkpoint,
+    _spsl_replace_conv1_with_4ch,
     softmax_fake,
     inference_guard,
     to_cpu,
     ensure_eval
 )
+
+# Re-export for tests that import from spsl_infer
+_replace_conv1_with_4ch = _spsl_replace_conv1_with_4ch
 
 logger = logging.getLogger(__name__)
 
@@ -76,73 +78,72 @@ def compute_phase_channel(rgb_batch: torch.Tensor) -> torch.Tensor:
     return reconstructed_x
 
 
-def _replace_conv1_with_4ch(model: torch.nn.Module, conv1_data: Optional[torch.Tensor] = None) -> None:
-    """
-    Replace Xception conv1 (3-ch) with 4-channel version using exact DeepfakeBench pattern.
-
-    Based on spsl_detector.py lines 84-87:
-    backbone.conv1 = nn.Conv2d(4, 32, 3, 2, 0, bias=False)
-    avg_conv1_data = conv1_data.mean(dim=1, keepdim=True)  # average across RGB channels
-    backbone.conv1.weight.data = avg_conv1_data.repeat(1, 4, 1, 1)  # repeat across 4 channels
-
-    Args:
-        model: Xception model with original 3-channel conv1
-        conv1_data: Original conv1 weights [32, 3, 3, 3] from checkpoint, or None for default init
-    """
-    # Replace conv1 with 4-channel version (exact DFB pattern)
-    model.conv1 = nn.Conv2d(4, 32, 3, 2, 0, bias=False)
-
-    if conv1_data is not None:
-        # Seed new conv1 with averaged/tiled original weights (DFB pattern)
-        avg_conv1_data = conv1_data.mean(dim=1, keepdim=True)  # [32, 1, 3, 3]
-        model.conv1.weight.data = avg_conv1_data.repeat(1, 4, 1, 1)  # [32, 4, 3, 3]
-    # Else: use default PyTorch initialization for PR2 (no weights)
+# NOTE: _replace_conv1_with_4ch removed - now handled by centralized loader in utils.py
 
 
 def load_spsl(weights_path: str, device: str) -> torch.nn.Module:
     """
     Load SPSL model with DeepfakeBench-compatible weights.
 
-    Follows exact DeepfakeBench sequence from spsl_detector.py lines 64-89:
-    1. Build Xception backbone with original config (inc=3)
-    2. Load ImageNet pretrained weights and apply fixes
-    3. Replace conv1 with 4-channel version and seed from original weights
+    Follows EXACT DeepfakeBench sequence from spsl_detector.py lines 64-89:
+    1. Build Xception backbone with inc=3 (NOT inc=4!)
+    2. Load pretrained weights and fix pointwise/drop fc keys
+    3. POP conv1.weight from state_dict BEFORE loading
+    4. load_state_dict with strict=False
+    5. Replace conv1 with 4-ch version and seed from popped weights
 
     Args:
-        weights_path: Path to .pth checkpoint file (unused in PR2)
+        weights_path: Path to .pth checkpoint file (ImageNet xception-b5690688.pth)
         device: Device string ("cpu" or "cuda")
 
     Returns:
-        SPSL model ready for 4-channel inference
+        SPSL model ready for 4-channel inference, with weights_hash stored as model._weights_hash
     """
-    # Exact config from DeepfakeBench spsl.yaml with inc=3 (not inc=4!)
-    # The inc=4 in yaml is misleading - build starts with 3-ch then replaces conv1
+    # Exact config from DeepfakeBench spsl.yaml
+    # NOTE: spsl.yaml says inc=4, but build_backbone builds with inc=3 then replaces conv1!
     config = {"mode": "original", "num_classes": 2, "inc": 3, "dropout": False}
 
     # Build Xception backbone using exact DFB architecture from PR1
     model = Xception(config)
 
-    # TODO: Weight loading sequence for PR4:
-    # 1. map_location = map_location_for_device(device)
-    # 2. state_dict = torch.load(weights_path, map_location=map_location)
-    # 3. state_dict = strip_module_prefix(state_dict)
-    # 4. state_dict = fix_pointwise_separable_convs(state_dict)
-    # 5. state_dict = drop_fc_keys(state_dict)
-    # 6. conv1_data = state_dict.pop('conv1.weight')  # [32, 3, 3, 3] - CRITICAL!
-    # 7. model.load_state_dict(state_dict, strict=False)
-    # 8. _replace_conv1_with_4ch(model, conv1_data)  # DFB pattern
+    # PR4: Load weights using centralized DFB checkpoint loader (if path provided)
+    # CRITICAL: For SPSL, the loader handles conv1 popping and 4-ch replacement
+    # Follows spsl_detector.py lines 71-88
+    if weights_path and os.path.isfile(weights_path):
+        report = load_dfb_checkpoint(
+            model,
+            weights_path,
+            device=device,
+            arch="spsl",
+            expected_num_classes=2
+        )
+        # Store weights hash for provenance (used by runner.py for JSON output)
+        model._weights_hash = report['weights_hash']
+        seeded_msg = "seeded from checkpoint" if report['spsl_conv1_seeded'] else "default init (no conv1 in ckpt)"
+        logger.info(f"Loaded SPSL with {report['keys_loaded']}/{report['keys_total']} backbone weights, conv1 4-ch {seeded_msg}")
+    else:
+        # No weights loaded (for testing)
+        logger.info("SPSL: no weights_path; build 3-ch then replace conv1→4-ch with default init")
+        _spsl_replace_conv1_with_4ch(model, conv1_data=None)
+        model._weights_hash = ""
 
-    # For PR2: Replace conv1 without checkpoint weights
-    _replace_conv1_with_4ch(model, conv1_data=None)
-
+    # Move to device and set eval mode
     model = ensure_eval(model).to(device)
 
-    # Validation assertions (dev feedback)
-    assert model.conv1.in_channels == 4, f"SPSL conv1 should have 4 input channels, got {model.conv1.in_channels}"
+    # Validation assertions
+    assert model.conv1.in_channels == 4, f"SPSL conv1 should have 4 input channels after replacement, got {model.conv1.in_channels}"
     assert model.conv1.bias is None, "SPSL conv1 should be bias-free"
     assert model.mode == "original", f"Expected mode='original', got {model.mode}"
 
-    logger.info("Loaded SPSL with Xception backbone (conv1 replaced 3→4 channels)")
+    # PR5: Validate 2-class head with probe forward pass
+    with torch.no_grad():
+        _probe = torch.zeros(1, 4, 256, 256, device=device, dtype=torch.float32)  # 4-ch for SPSL
+        _feat = model.features(_probe)
+        _logits = model.classifier(_feat)
+        assert _logits.shape[-1] == 2, (
+            f"SPSL head must output 2 classes, got {_logits.shape[-1]}."
+        )
+
     return model
 
 
@@ -200,16 +201,20 @@ def predict_probs_spsl(model: torch.nn.Module, batch_rgb: torch.Tensor) -> Dict[
         features = model.features(batch_4ch)  # May be 4D feature map
         logits = model.classifier(features)   # [N, 2] and sets model.last_emb
 
-        # Dev feedback: Return 2048-D embedding, not 4D feature map
+        # Return 2048-D embedding from last_emb (set by classifier)
         emb = getattr(model, "last_emb", None)
         if emb is None:
             # Fallback: pool and flatten manually
             emb = F.adaptive_avg_pool2d(features, (1, 1)).flatten(1)
         assert emb.shape == (batch_rgb.size(0), 2048), f"Expected embedding [N, 2048], got {emb.shape}"  # mode="original"
 
-        # Dev feedback: softmax column 1 only (DFB line 129)
-        assert logits.shape[-1] == 2, f"Expected 2-class logits, got {logits.shape}"
-        prob = torch.softmax(logits, dim=1)[:, 1]  # Exact DFB pattern
+        # Use softmax_fake helper for consistency (exact DFB pattern)
+        prob = softmax_fake(logits)  # softmax[:,1] for "fake" class
+
+        # PR5: Runtime validation guards
+        assert prob.ndim == 1, f"prob must be 1-D, got shape {tuple(prob.shape)}"
+        assert torch.isfinite(prob).all(), "prob contains non-finite values"
+        assert (prob >= 0).all() and (prob <= 1).all(), "prob outside [0,1]"
 
         # Return exact DeepfakeBench format with CPU tensors
         return {

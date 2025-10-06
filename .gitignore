@@ -5,3 +5,32 @@ __pycache__/
 .pytest_cache/
 .vscode/
 venv/
+
+# ML temporary data (videos, outputs)
+ml/data/
+
+# Video data
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.flv
+
+# Image data
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+
+# Large datasets
+data/
+datasets/
+samples/
+
+# Logs and outputs
+*.log
+logs/
+outputs/
+results/

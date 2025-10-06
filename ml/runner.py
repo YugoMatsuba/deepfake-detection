@@ -45,19 +45,21 @@ def _select_device(device_arg: Optional[str]) -> str:
 
 
 def _resolve_weight_paths(weights: Optional[Dict[str, Optional[str]]]) -> Dict[str, Optional[str]]:
-    """Resolve weight paths from arguments and environment variables."""
-    env_weights = {
-        "xception": os.getenv("XCEPTION_WEIGHTS"),
-        "spsl": os.getenv("SPSL_WEIGHTS"),
-        "ucf": os.getenv("UCF_WEIGHTS"),
-    }
+    """Resolve weight paths from arguments, environment variables, and defaults."""
+    from ml.models.integration import DEFAULT_WEIGHTS
+
     result: Dict[str, Optional[str]] = {}
     w = weights or {}
     for name in ("xception", "spsl", "ucf"):
         val = w.get(name, None)
-        # None  -> use env fallback
-        # ""    -> explicit empty (disable/ignore)
-        result[name] = env_weights[name] if val is None else val
+        # Priority: CLI arg > env var > default path
+        if val is not None:
+            # Explicit CLI arg (including empty string to disable)
+            result[name] = val
+        else:
+            # Fall back to env var, then to default path from integration.py
+            env_val = os.getenv(f"{name.upper()}_WEIGHTS")
+            result[name] = env_val if env_val is not None else DEFAULT_WEIGHTS[name]
     return result
 
 
