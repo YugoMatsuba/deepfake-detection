@@ -18,6 +18,7 @@ from flask_cors import CORS
 # DB/session utilities come from api package (to be created)
 from api import init_engine, Base, engine as db_engine  # type: ignore
 from api.routes.auth import bp as auth_bp, User, AuditLog  # type: ignore
+from api.routes.traditional_forensics import bp_forensics
 
 DEFAULT_DB_URL = "sqlite:///instance/app.db"
 
@@ -62,6 +63,7 @@ def create_app() -> Flask:
 
     # --- Blueprints ---
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(bp_forensics, url_prefix="/api/forensics")
 
     # --- Healthcheck ---
     @app.get("/api/health")

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "d931ede6-fc67-441a-ba56-5dfe6659be20",
+    "path": "/Users/yugo/Desktop/itp-frontend/deepfake_AI/backend/instance/uploads/d931ede6-fc67-441a-ba56-5dfe6659be20.mp4",
+    "mimetype": "video/mp4",
+    "size_bytes": 1570024,
+    "original_name": "file_example_MP4_480_1_5MG.mp4"
+  },
+  {
+    "id": "fd8fb68e-24cc-47f9-8fdf-389967c57f60",
+    "path": "/Users/yugo/Desktop/itp-frontend/deepfake_AI/backend/instance/uploads/fd8fb68e-24cc-47f9-8fdf-389967c57f60.mp4",
+    "mimetype": "video/mp4",
+    "size_bytes": 1570024,
+    "original_name": "file_example_MP4_480_1_5MG.mp4"
+  },
+  {
+    "id": "30e20555-a291-42d0-bbc1-6258eb6a845e",
+    "path": "/Users/yugo/Desktop/itp-frontend/deepfake_AI/backend/instance/uploads/30e20555-a291-42d0-bbc1-6258eb6a845e.mp4",
+    "mimetype": "video/mp4",
+    "size_bytes": 1570024,
+    "original_name": "file_example_MP4_480_1_5MG.mp4"
+  },
+  {
+    "id": "65429207-079d-4b32-a615-37c4aaf38ad8",
+    "path": "/Users/yugo/Desktop/itp-frontend/deepfake_AI/backend/instance/uploads/65429207-079d-4b32-a615-37c4aaf38ad8.mp4",
+    "mimetype": "video/mp4",
+    "size_bytes": 1570024,
+    "original_name": "file_example_MP4_480_1_5MG.mp4"
+  },
+  {
+    "id": "2159e8c7-13e9-4503-bd82-3e57edd8357d",
+    "path": "/Users/yugo/Desktop/itp-frontend/deepfake_AI/backend/instance/uploads/2159e8c7-13e9-4503-bd82-3e57edd8357d.mp4",
+    "mimetype": "video/mp4",
+    "size_bytes": 1570024,
+    "original_name": "file_example_MP4_480_1_5MG.mp4"
+  }
+]

@@ -1,41 +1,439 @@
 # Deepfake AI Forensics Tool
 
-## Structure
-- `backend/`: Flask API (auth, analysis pipeline)
-- `frontend/`: React + Vite + Tailwind (UI)
+A comprehensive video forensics platform that combines traditional computer vision techniques with cutting-edge machine learning models for deepfake detection and video authenticity analysis. This project is developed as part of the University of Melbourne IT Project capstone subject.
 
-## Quickstart (Dev)
+## 🏗️ Architecture Overview
 
-### Backend
+The system consists of four main components:
+
+1. **🎨 Frontend** - React-based web interface for video upload and analysis visualization
+2. **🔧 Backend** - Flask API handling authentication, file management, and analysis orchestration
+3. **🔍 Traditional Forensics** - Classical computer vision techniques for tampering detection
+4. **🤖 ML Detection** - Deep learning models (Xception, SPSL, UCF) for advanced deepfake detection
+
+## 📁 Project Structure
+
+```
+├── frontend/           # React + Vite + Tailwind UI
+├── backend/            # Flask API + SQLite database
+├── ml/                 # ML inference pipeline (PyTorch + CUDA)
+└── tests/              # Test suites for all components
+```
+
+---
+
+## 🎨 Frontend Component
+
+**Technology Stack:** React + Vite + Tailwind CSS + shadcn/ui
+
+### Core Features:
+- **Authentication System**: Secure login/signup with session management
+- **Video Upload Interface**: Drag-and-drop file uploader with progress tracking
+- **Analysis Dashboard**: Real-time visualization of forensic analysis results
+- **Frame Viewer**: Interactive frame-by-frame analysis with anomaly highlighting
+- **Responsive Design**: Mobile-friendly interface using Tailwind CSS
+
+### Key Components:
+- `App.jsx` - Main application routing and layout
+- `AuthProvider.jsx` - Authentication context and state management
+- `FileUploader.jsx` - Multi-format video upload with validation
+- `FrameViewer.jsx` - Interactive video frame analysis viewer
+- `Analysis.jsx` - Results dashboard with multiple analysis methods
+- `Dashboard.jsx` - Main user interface after login
+
+### Routes:
+- `/` - Protected dashboard (requires authentication)
+- `/login` - User authentication
+- `/signup` - New user registration
+- `/upload` - Video file upload interface
+- `/analysis` - Analysis results and visualization
+- `/frame-viewer` - Detailed frame-by-frame inspection
+
+### Development:
+```bash
+cd frontend
+npm install
+npm run dev  # Runs on port 5173
+```
+
+---
+
+## 🔧 Backend Component
+
+**Technology Stack:** Flask + SQLAlchemy + SQLite (dev) / PostgreSQL (prod)
+
+### Core Features:
+- **RESTful API**: Clean API design with proper error handling
+- **Session-based Authentication**: Secure user sessions with CSRF protection
+- **File Management**: Video upload, storage, and metadata tracking
+- **Analysis Orchestration**: Coordinates traditional forensics and ML inference
+- **Database Management**: User accounts, analysis history, and audit logs
+
+### API Endpoints:
+
+#### Authentication (`/api/auth`)
+- `POST /login` - User authentication
+- `POST /logout` - Session termination
+- `GET /me` - Current user info
+
+#### Traditional Forensics (`/api/forensics`)
+- `POST /extract_frames` - Extract frames from uploaded video
+- `POST /ela_analysis` - Error Level Analysis for compression artifacts
+- `POST /noise_analysis` - Statistical noise pattern analysis
+- `POST /lbp_analysis` - Local Binary Pattern texture analysis
+- `POST /cmfd_analysis` - Copy-Move Forgery Detection
+- `POST /temporal_analysis` - Temporal consistency analysis
+
+#### Video Management
+- `POST /api/upload` - Video file upload and validation
+- `GET /api/videos` - List user's uploaded videos
+
+### Configuration:
+- **Database**: SQLite (dev) with planned PostgreSQL migration
+- **CORS**: Configured for frontend development at localhost:5173
+- **Security**: Environment-based secret keys and session configuration
+- **File Storage**: Local filesystem with configurable upload directory
+
+### Development:
 ```bash
 cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python app.py
+python app.py  # Runs on port 5050
 ```
-Backend runs on port 5050 (configurable via `PORT` env).
 
-### Frontend
+---
+
+## 🔍 Traditional Forensics Component
+
+**Technology Stack:** OpenCV + PIL + NumPy + scikit-image
+
+### Analysis Methods:
+
+#### 1. **Error Level Analysis (ELA)**
+- **Purpose**: Detects JPEG compression inconsistencies
+- **Method**: Compares original vs. recompressed images to find editing artifacts
+- **Output**: ELA heatmap images + anomaly scores
+- **Use Case**: Identifies areas that have been digitally manipulated
+
+#### 2. **Noise Analysis**
+- **Purpose**: Analyzes statistical noise patterns across video frames
+- **Method**: Computes noise variance, SNR, and pattern consistency
+- **Output**: Noise level metrics and temporal consistency scores
+- **Use Case**: Detects frame insertion, replacement, or generation artifacts
+
+#### 3. **Local Binary Pattern (LBP) Analysis**
+- **Purpose**: Examines texture patterns for manipulation detection
+- **Method**: Computes LBP histograms and texture uniformity metrics
+- **Output**: Texture consistency scores and pattern analysis
+- **Use Case**: Identifies texture inconsistencies from face swapping or generation
+
+#### 4. **Copy-Move Forgery Detection (CMFD)**
+- **Purpose**: Detects duplicated or moved regions within frames
+- **Method**: SIFT feature matching to find copied areas
+- **Output**: Similarity maps highlighting duplicated regions
+- **Use Case**: Identifies copy-paste manipulations and object removal
+
+#### 5. **Temporal Analysis**
+- **Purpose**: Analyzes frame-to-frame consistency over time
+- **Method**: Optical flow, frame differencing, and motion analysis
+- **Output**: Temporal consistency metrics and anomaly detection
+- **Use Case**: Detects frame insertion, deletion, or temporal manipulations
+
+#### 6. **Frame Extraction**
+- **Purpose**: Extracts individual frames from video files
+- **Method**: OpenCV-based video processing with metadata preservation
+- **Output**: Individual frame images with temporal information
+- **Use Case**: Prepares video data for frame-level analysis
+
+### Integration:
+All traditional forensics methods are exposed through the Flask API and can be chained together for comprehensive analysis. Results are aggregated and presented through the frontend dashboard.
+
+---
+
+## 🤖 ML Deepfake Detection Component
+
+**Technology Stack:** PyTorch 1.12.1 + CUDA 11.3 + OpenCV + dlib + Docker
+
+The ML module provides a production-ready deep learning pipeline for advanced deepfake detection, following **DeepfakeBench** standards for research reproducibility.
+
+### Architecture:
+- **DeepfakeBench Alignment**: Exact preprocessing and model architectures from the academic benchmark
+- **Three Model Ensemble**: Xception, SPSL, and UCF detectors for comprehensive analysis
+- **Docker-based Deployment**: CUDA-enabled containers for GPU acceleration
+- **Structured Output**: JSON schema with validation and provenance tracking
+
+### Model Components:
+
+#### 1. **Xception Model** (`ml/models/xception_infer.py`)
+- **Architecture**: DeepfakeBench-aligned Xception CNN
+- **Input**: RGB face crops (256×256 pixels)
+- **Output**: Per-frame deepfake probabilities
+- **Specialty**: Spatial artifact detection in generated faces
+
+#### 2. **SPSL Model** (`ml/models/spsl_infer.py`)
+- **Architecture**: Spatial-Phase Shallow Learning with 4-channel input
+- **Input**: RGB + FFT phase channel (256×256 pixels)
+- **Output**: Enhanced deepfake detection with frequency domain analysis
+- **Specialty**: Frequency artifact detection in generated content
+
+#### 3. **UCF Model** (`ml/models/ucf_infer.py`)
+- **Architecture**: Uncovering Common Features with dual encoders
+- **Input**: RGB frames with shared feature extraction
+- **Output**: Common manipulation pattern detection
+- **Specialty**: Cross-dataset generalization and shared forgery features
+
+### Pipeline Components:
+
+#### Video Processing (`ml/video_io.py`)
+- **Frame Sampling**: Uniform 32-frame sampling via `np.linspace`
+- **Face Detection**: dlib 81-point landmark detection
+- **Face Alignment**: 5-point similarity transform with scale=1.3
+- **Padding Strategy**: Repeat last valid crop for videos <32 frames
+
+#### Preprocessing (`ml/transforms.py`)
+- **Normalization**: DeepfakeBench standard (mean=0.5, std=0.5)
+- **Tensor Conversion**: RGB uint8 → float32 normalized tensors
+- **Batch Processing**: Efficient GPU memory management
+
+#### Schema Validation (`ml/schema.py`)
+- **TypedDict Contracts**: Structured output with validation
+- **Version Control**: Schema versioning for API compatibility
+- **Error Handling**: Graceful failure with structured error envelopes
+- **Provenance Tracking**: Weight file hashing and timing metadata
+
+### Quick Start (Dev Container)
+
+The ML module runs in a containerized environment for dependency isolation and GPU support.
+
+**1. Open in VS Code Dev Container:**
+   - Open project in VS Code
+   - Command palette: "Dev Containers: Reopen in Container"
+   - Container builds from `ml/Dockerfile` (CUDA 11.3 + PyTorch 1.12.1)
+
+**2. Run Inference:**
+```bash
+cd /workspaces/deepfake_AI/ml
+
+# Analyze a video with all three models
+python runner.py data/your_video.mp4 \
+  --models xception,spsl,ucf \
+  --json-out results.json
+
+# Or use default weights (auto-detected from ml/weights/)
+python runner.py data/your_video.mp4
+```
+
+### CLI Options:
+- `video` (positional): Path to input video
+- `--models`: Comma-separated list (default: all three)
+- `--json-out`: Output JSON path (default: stdout)
+- `--device`: `cuda` or `cpu` (auto-detects GPU)
+- `--xception-weights`, `--spsl-weights`, `--ucf-weights`: Override weight paths
+- `--no-hash`: Skip SHA-256 hashing of weights
+
+### Directory Structure:
+```
+ml/
+├── weights/                     # Pretrained model checkpoints (committed)
+│   ├── xception_best.pth       # 84MB - Xception detector
+│   ├── spsl_best.pth           # 84MB - SPSL detector
+│   └── ucf_best.pth            # 179MB - UCF detector
+├── dlib/                        # Face detection models (committed)
+│   └── shape_predictor_81_face_landmarks.dat  # 19MB
+├── data/                        # Input videos / output JSON (gitignored)
+├── models/                      # Model architectures & inference adapters
+├── runner.py                    # Main inference orchestrator
+├── video_io.py                  # Video decode + face alignment
+├── transforms.py                # Preprocessing (normalize, SPSL phase)
+└── schema.py                    # JSON output schema
+```
+
+### Input/Output:
+
+**Input:**
+- Place videos in `ml/data/` or specify any path
+- Supported formats: `.mp4`, `.avi`, `.mov`, `.mkv`
+
+**Output:**
+Structured JSON with per-model scores and per-frame probabilities (schema v1.0.0)
+
+### Environment Variables (Optional):
+```bash
+export XCEPTION_WEIGHTS=/custom/path/xception.pth
+export SPSL_WEIGHTS=/custom/path/spsl.pth
+export UCF_WEIGHTS=/custom/path/ucf.pth
+```
+
+### Output Format:
+```json
+{
+  "schema_version": "1.0.0",
+  "video": {
+    "path": "input.mp4",
+    "fps": 30.0,
+    "frame_count": 900,
+    "duration_sec": 30.0
+  },
+  "frames": [
+    {"index": 0, "time": 0.0},
+    {"index": 29, "time": 0.97}
+  ],
+  "models": [
+    {
+      "name": "Xception",
+      "score": 0.847,
+      "frames": [
+        {"index": 0, "time": 0.0, "score": 0.834},
+        {"index": 29, "time": 0.97, "score": 0.861}
+      ],
+      "weights_hash": "sha256:3a1e5f..."
+    }
+  ],
+  "timing_ms": {
+    "decode_align": 1250.0,
+    "normalize": 45.2,
+    "load_models": 890.1,
+    "inference_total": 2340.8
+  },
+  "error": null
+}
+```
+
+### Testing:
+
+Run tests inside the dev container:
+```bash
+cd /workspaces/deepfake_AI
+pytest tests/test_checkpoint_loader_pr4.py -v
+pytest tests/test_pr5.py -v
+pytest tests/ -v  # Run all ML tests
+```
+
+Tests validate architecture compatibility without requiring weight files.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites:
+- **Node.js 18+** (frontend)
+- **Python 3.9+** (backend & ML)
+- **Docker** (ML inference, optional)
+- **CUDA 11.3+** (ML GPU acceleration, optional)
+
+### Development Setup:
+
+1. **Clone Repository**:
+```bash
+git clone <repository-url>
+cd deepfake_AI
+```
+
+2. **Backend Setup**:
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python app.py  # Runs on port 5050
+```
+
+3. **Frontend Setup**:
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev  # Runs on port 5173
 ```
-Frontend runs on port 5173 by default, with `/api` requests proxied to backend.
 
-### Login
-- Username: `admin`
-- Password: `testpass123`
+4. **ML Inference** (Dev Container):
+```bash
+# Open in VS Code, then reopen in dev container
+cd /workspaces/deepfake_AI/ml
+python runner.py data/sample.mp4  # Run inference
+pytest tests/ -v  # Run test suite
+```
 
-## Environment Variables
+### Default Credentials:
+- **Username**: `admin`
+- **Password**: `testpass123`
 
-See `.env.example` for configuration options.
+---
 
-## Demo
+## 🔐 Environment Configuration
 
-This is intended to be a sprint 1 demo just to get familiar with the tech stack. Features are:
-- Session-based auth
-- Environment configuration  
-- SPA architecture with React Router
-- Frontend to backend integration
-- sqlite db (to be moved to Postgres for prod)
+Create `.env` files for configuration:
+
+### Backend `.env`:
+```bash
+SECRET_KEY=your-production-secret-key
+DATABASE_URL=postgresql://user:pass@localhost/deepfake_db
+ENVIRONMENT=production
+CORS_ORIGINS=https://your-frontend-domain.com
+```
+
+### ML `.env`:
+```bash
+ML_WEIGHTS_DIR=/path/to/model/weights
+ML_DLIB_DIR=/path/to/dlib/models
+ML_DATA_DIR=/path/to/input/videos
+XCEPTION_WEIGHTS=/weights/xception_best.pth
+SPSL_WEIGHTS=/weights/spsl_best.pth
+UCF_WEIGHTS=/weights/ucf_best.pth
+```
+
+---
+
+## 🧪 Testing
+
+### ML Tests *(feature/ml branch)*:
+```bash
+cd ml
+pytest tests/ -v
+# Tests run without .pth weights (architecture validation only)
+```
+
+---
+
+## 🏭 Production Deployment
+
+### Docker Compose (Recommended):
+```yaml
+version: '3.8'
+services:
+  frontend:
+    build: ./frontend
+    ports: ["80:80"]
+
+  backend:
+    build: ./backend
+    environment:
+      - DATABASE_URL=postgresql://...
+      - ENVIRONMENT=production
+
+  ml-inference:
+    build: ./ml
+    runtime: nvidia
+    volumes:
+      - ./weights:/ml/weights
+      - ./dlib:/ml/dlib
+```
+
+### Infrastructure Requirements:
+- **CPU**: 4+ cores for API handling
+- **RAM**: 8GB+ (16GB+ recommended for ML)
+- **GPU**: NVIDIA GPU with CUDA 11.3+ support (ML inference)
+- **Storage**: SSD recommended for video processing
+
+
+
+## 📚 Research & Citations
+
+This project implements methods from:
+- **DeepfakeBench**: A Comprehensive Benchmark of Deepfake Detection (NeurIPS 2023)
+- **Xception**: Deep Learning with Depthwise Separable Convolutions
+- **SPSL**: Spatial-Phase Shallow Learning for real-time deepfake detection
+- **UCF**: Uncovering Common Features in deepfake videos
+
+---
+
+*Built with ❤️ for video forensics and authenticity verification*
