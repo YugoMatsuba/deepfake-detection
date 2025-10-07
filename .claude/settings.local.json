@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/finnmead/Projects/it_proj/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

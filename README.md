@@ -9,14 +9,14 @@ The system consists of four main components:
 1. **🎨 Frontend** - React-based web interface for video upload and analysis visualization
 2. **🔧 Backend** - Flask API handling authentication, file management, and analysis orchestration
 3. **🔍 Traditional Forensics** - Classical computer vision techniques for tampering detection
-4. **🤖 ML Branch** - Deep learning models for advanced deepfake detection *(in development)*
+4. **🤖 ML Detection** - Deep learning models (Xception, SPSL, UCF) for advanced deepfake detection
 
 ## 📁 Project Structure
 
 ```
 ├── frontend/           # React + Vite + Tailwind UI
 ├── backend/            # Flask API + SQLite database
-├── ml/                 # ML inference pipeline (feature/ml branch)
+├── ml/                 # ML inference pipeline (PyTorch + CUDA)
 └── tests/              # Test suites for all components
 ```
 
@@ -151,11 +151,11 @@ All traditional forensics methods are exposed through the Flask API and can be c
 
 ---
 
-## 🤖 ML Branch Component *(Feature Branch - Not Yet Merged)*
+## 🤖 ML Deepfake Detection Component
 
-**Technology Stack:** PyTorch + OpenCV + dlib + Docker
+**Technology Stack:** PyTorch 1.12.1 + CUDA 11.3 + OpenCV + dlib + Docker
 
-The ML branch contains a sophisticated deep learning pipeline for advanced deepfake detection, following **DeepfakeBench** standards for research reproducibility.
+The ML module provides a production-ready deep learning pipeline for advanced deepfake detection, following **DeepfakeBench** standards for research reproducibility.
 
 ### Architecture:
 - **DeepfakeBench Alignment**: Exact preprocessing and model architectures from the academic benchmark
@@ -202,18 +202,94 @@ The ML branch contains a sophisticated deep learning pipeline for advanced deepf
 - **Error Handling**: Graceful failure with structured error envelopes
 - **Provenance Tracking**: Weight file hashing and timing metadata
 
-### CLI Interface:
+### ⚠️ Important: Git LFS Required
+
+This module uses **Git LFS** for storing large model weights (~382MB total).
+
+**First-time setup (one-time):**
 ```bash
-# Run inference on video with all models
-python ml/runner.py video.mp4 \
+# Install Git LFS
+brew install git-lfs        # macOS
+# OR: apt-get install git-lfs  # Linux
+# OR: https://git-lfs.github.com/  # Windows
+
+# Enable LFS
+git lfs install
+
+# Download weight files
+git lfs pull
+```
+
+**Verify weights downloaded:**
+```bash
+ls -lh ml/weights/ucf_best.pth
+# Should show ~179MB, not 133 bytes
+```
+
+If you see small file sizes (~100 bytes), you have LFS pointer files instead of actual weights. Run `git lfs pull`.
+
+### Quick Start (Dev Container)
+
+The ML module runs in a containerized environment for dependency isolation and GPU support.
+
+**1. Open in VS Code Dev Container:**
+   - Open project in VS Code
+   - Command palette: "Dev Containers: Reopen in Container"
+   - Container builds from `ml/Dockerfile` (CUDA 11.3 + PyTorch 1.12.1)
+   - **Git LFS automatically pulls weights** in dev container
+
+**2. Run Inference:**
+```bash
+cd /workspaces/deepfake_AI/ml
+
+# Analyze a video with all three models
+python runner.py data/your_video.mp4 \
   --models xception,spsl,ucf \
-  --device cuda \
   --json-out results.json
 
-# Environment-based weight configuration
-export XCEPTION_WEIGHTS=/path/to/xception_best.pth
-export SPSL_WEIGHTS=/path/to/spsl_best.pth
-export UCF_WEIGHTS=/path/to/ucf_best.pth
+# Or use default weights (auto-detected from ml/weights/)
+python runner.py data/your_video.mp4
+```
+
+### CLI Options:
+- `video` (positional): Path to input video
+- `--models`: Comma-separated list (default: all three)
+- `--json-out`: Output JSON path (default: stdout)
+- `--device`: `cuda` or `cpu` (auto-detects GPU)
+- `--xception-weights`, `--spsl-weights`, `--ucf-weights`: Override weight paths
+- `--no-hash`: Skip SHA-256 hashing of weights
+
+### Directory Structure:
+```
+ml/
+├── weights/                     # Pretrained model checkpoints (committed)
+│   ├── xception_best.pth       # 84MB - Xception detector
+│   ├── spsl_best.pth           # 84MB - SPSL detector
+│   └── ucf_best.pth            # 179MB - UCF detector
+├── dlib/                        # Face detection models (committed)
+│   └── shape_predictor_81_face_landmarks.dat  # 19MB
+├── data/                        # Input videos / output JSON (gitignored)
+├── models/                      # Model architectures & inference adapters
+├── runner.py                    # Main inference orchestrator
+├── video_io.py                  # Video decode + face alignment
+├── transforms.py                # Preprocessing (normalize, SPSL phase)
+└── schema.py                    # JSON output schema
+```
+
+### Input/Output:
+
+**Input:**
+- Place videos in `ml/data/` or specify any path
+- Supported formats: `.mp4`, `.avi`, `.mov`, `.mkv`
+
+**Output:**
+Structured JSON with per-model scores and per-frame probabilities (schema v1.0.0)
+
+### Environment Variables (Optional):
+```bash
+export XCEPTION_WEIGHTS=/custom/path/xception.pth
+export SPSL_WEIGHTS=/custom/path/spsl.pth
+export UCF_WEIGHTS=/custom/path/ucf.pth
 ```
 
 ### Output Format:
@@ -251,16 +327,17 @@ export UCF_WEIGHTS=/path/to/ucf_best.pth
 }
 ```
 
-### Development Status:
-- ✅ **Current**: Schema validation, runner orchestration, SPSL implementation
-- 🚧 **Target for end of sprint**: Full weight loading, UCF dual encoders, production deployment
+### Testing:
 
-### Docker Environment:
-```dockerfile
-FROM nvidia/cuda:11.3.1-cudnn8-runtime-ubuntu20.04
-# PyTorch 1.12.1+cu113, OpenCV headless, dlib 19.24.0
-# Mount points: /ml/weights, /ml/dlib, /ml/data
+Run tests inside the dev container:
+```bash
+cd /workspaces/deepfake_AI
+pytest tests/test_checkpoint_loader_pr4.py -v
+pytest tests/test_pr5.py -v
+pytest tests/ -v  # Run all ML tests
 ```
+
+Tests validate architecture compatibility without requiring weight files.
 
 ---
 
@@ -295,11 +372,11 @@ npm install
 npm run dev  # Runs on port 5173
 ```
 
-4. **ML Development** *(feature/ml branch)*:
+4. **ML Inference** (Dev Container):
 ```bash
-git checkout feature/ml
-cd ml
-# See ml/plan for detailed setup instructions
+# Open in VS Code, then reopen in dev container
+cd /workspaces/deepfake_AI/ml
+python runner.py data/sample.mp4  # Run inference
 pytest tests/ -v  # Run test suite
 ```
 
