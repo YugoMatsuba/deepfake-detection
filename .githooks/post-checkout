@@ -1,0 +1,35 @@
+#!/bin/bash
+# Post-checkout hook to warn if Git LFS is not installed
+
+# Check if Git LFS is installed
+if ! command -v git-lfs &> /dev/null; then
+    echo "=========================================="
+    echo "⚠️  WARNING: Git LFS not installed!"
+    echo "=========================================="
+    echo ""
+    echo "ML weight files require Git LFS."
+    echo ""
+    echo "Install Git LFS:"
+    echo "  macOS:   brew install git-lfs && git lfs install"
+    echo "  Linux:   apt-get install git-lfs && git lfs install"
+    echo "  Windows: https://git-lfs.github.com/"
+    echo ""
+    echo "Then run: git lfs pull"
+    echo "=========================================="
+    exit 0
+fi
+
+# Check if LFS files are actually downloaded (not pointer files)
+if [ -f "ml/weights/ucf_best.pth" ]; then
+    SIZE=$(wc -c < ml/weights/ucf_best.pth 2>/dev/null || echo 0)
+    if [ "$SIZE" -lt 1000000 ]; then
+        echo "=========================================="
+        echo "⚠️  ML weight files are LFS pointers!"
+        echo "=========================================="
+        echo ""
+        echo "Run: git lfs pull"
+        echo ""
+        echo "This will download ~382MB of model weights."
+        echo "=========================================="
+    fi
+fi

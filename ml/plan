@@ -1,0 +1,102 @@
+Implementation Plan (PR2 current, PR6 target notes where relevant)
+
+Dockerfile
+Base image: nvidia/cuda:11.3.1-cudnn8-runtime-ubuntu20.04
+Python: 3.9 via apt; pip pinned to 22.3.1.
+PyTorch stack: torch==1.12.1+cu113, torchvision==0.13.1+cu113 (from the cu113 wheels).
+CV/IO stack: opencv-python-headless==4.6.0.66, dlib==19.24.0, numpy==1.21.6, pillow==9.5.0, tqdm==4.64.1.
+Notes:
+  • Use **headless** OpenCV (no GUI deps).
+  • No torchaudio; no PyTorchVideo (UCF here is frame-based).
+  • Create mount points /app/weights, /app/dlib, /app/data.
+  • Copy code at build or bind-mount in dev; entrypoint is a shell, the run command invokes runner.py.
+
+runner.py
+System orchestrator; provides CLI and callable API.
+
+CLI (actual flags):
+  positional: video_path
+  --models xception,spsl,ucf
+  --device {cuda,cuda:0,cpu} (auto if omitted)
+  --xception-weights /path/to/xception_best.pth
+  --spsl-weights /path/to/spsl_best.pth
+  --ucf-weights /path/to/ucf_best.pth
+  --json-out out.json
+  --no-hash (skip SHA-256 weight hashing)
+  --strict  (raise instead of error JSON)
+Weight path precedence: **CLI → per-model env var → constants.get_weights_dir()**.
+Device selection: _select_device(arg) → "cuda" if torch.cuda.is_available() else "cpu". No AMP/autocast in PR2.
+
+Video Loading & Sampling:
+  • Open via cv2.VideoCapture.
+  • Sample exactly 32 indices with **np.linspace(0, frame_count-1, 32, endpoint=True, dtype=int)**.
+  • Keep per-frame **FrameInfo {index, timestamp_sec}**.
+  • If <32 aligned faces are found, **pad by repeating the last valid crop** to reach 32.
+
+Face Detection & Alignment:
+  • dlib frontal detector + 81-pt predictor (path from constants.get_dlib_predictor_path()).
+  • Extract 5 pts via **get_five_keypoints_81(...)** and align with **ALIGN_SCALE=1.3** to **IMG_SIZE=256** using **DST_5PTS_112**.
+  • Keep images **RGB throughout** (convert to BGR only for debug saves).
+
+Batch Preparation (transforms.py):
+  • **preprocess_crops(crops_rgb, device)** → float32 tensor **[N,3,256,256]** in **[-1,1]**
+    (ToTensor → Normalize mean=std=0.5 per channel).
+
+Model Inference (models/*_infer.py):
+  • **Xception**
+    load_xception(...), **predict_probs_xception(model, batch)** →
+    `{'cls':[N,2], 'prob':[N], 'feat':[N,2048]}`
+  • **SPSL** (RGB+phase; conv1 3→4 with mean-tile init)
+    load_spsl(...), **predict_probs_spsl(model, batch_rgb)** →
+    `{'cls':[N,2], 'prob':[N], 'feat':[N,2048]}`
+  • **UCF**
+    PR2: skeleton (feat=32). Target PR3–PR6: dual encoders + shared head, **feat=256**.
+    **predict_probs_ucf(model, batch_rgb, inference=True)** →
+    `{'cls':[N,2], 'prob':[N], 'feat':[N,256]}` (target spec; current returns 32-dim feat).
+Inference runs under torch.no_grad(); no autocast in PR2.
+
+Aggregation:
+  • Per model: mean of 32 per-frame probabilities → **model.score**.
+  • Frames arrays are always length 32 and align with top-level frames.
+
+Output Formatting (schema.py):
+  Top-level:
+    `{'schema_version':'1.0.0','video':VideoMetaOut,'frames':[FrameRef×32],'models':[ModelOut×K],'timing_ms':TimingOut,'error':ErrorOut|null}`
+  ModelOut:
+    `{'name': 'Xception'|'SPSL'|'UCF', 'score': float|null, 'frames':[FrameScore×32], 'weights_hash': str|null}`
+  Notes: weights_hash present unless **--no-hash**; stdlib **TypedDict** (no pydantic).
+
+video_io.py
+  • Exact uniform sampling via np.linspace(..., endpoint=True, dtype=int).
+  • Returns VideoBatch: {crops_rgb, frames(32×{index,timestamp_sec}), meta}.
+  • Robust error envelopes on decode failures.
+
+face_align_crop.py
+  • get_five_keypoints_81(...); align_and_crop_rgb(..., outsize=(256,256), scale=1.3).
+  • Largest-face selection; returns aligned **RGB** crops.
+
+transforms.py
+  • preprocess_crops(...) = ToTensor → Normalize(0.5/0.5/0.5) → stack → .to(device).
+  • Output tensor shape/value range documented above.
+
+schema.py
+  • **TypedDict** implementation only (stdlib).
+  • SCHEMA_VERSION="1.0.0"; invariants: 32 frames; model.frames aligned with top-level frames; scores in [0,1]; model.score == mean(frames[].score).
+  • timing_ms fields: decode_align, normalize, load_models, inference_total.
+  • error: null | {stage, message} (unless --strict).
+
+models/xception_infer.py
+  • Adapter returning {'cls','prob','feat(2048)'}; weight loading placeholder in PR2.
+
+models/spsl_infer.py
+  • Conv1 3→4 replacement (mean-tile of RGB weights), internal FFT-phase concat; returns {'cls','prob','feat(2048)'}.
+
+models/ucf_infer.py
+  • PR2 skeleton; PR3–PR6 to land dual encoders + shared head; returns {'cls','prob','feat'}, target feat=256.
+
+Artifacts & Environment
+  Weight filenames (defaults): xception_best.pth, spsl_best.pth, ucf_best.pth
+  Env vars: XCEPTION_WEIGHTS, SPSL_WEIGHTS, UCF_WEIGHTS, ML_WEIGHTS_DIR, ML_DLIB_DIR, ML_DATA_DIR
+
+Performance Timings (timing_ms)
+  decode_align, normalize, load_models, inference_total (best-effort; optional for BI dashboards).
