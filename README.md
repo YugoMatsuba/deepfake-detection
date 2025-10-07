@@ -202,6 +202,32 @@ The ML module provides a production-ready deep learning pipeline for advanced de
 - **Error Handling**: Graceful failure with structured error envelopes
 - **Provenance Tracking**: Weight file hashing and timing metadata
 
+### ⚠️ Important: Git LFS Required
+
+This module uses **Git LFS** for storing large model weights (~382MB total).
+
+**First-time setup (one-time):**
+```bash
+# Install Git LFS
+brew install git-lfs        # macOS
+# OR: apt-get install git-lfs  # Linux
+# OR: https://git-lfs.github.com/  # Windows
+
+# Enable LFS
+git lfs install
+
+# Download weight files
+git lfs pull
+```
+
+**Verify weights downloaded:**
+```bash
+ls -lh ml/weights/ucf_best.pth
+# Should show ~179MB, not 133 bytes
+```
+
+If you see small file sizes (~100 bytes), you have LFS pointer files instead of actual weights. Run `git lfs pull`.
+
 ### Quick Start (Dev Container)
 
 The ML module runs in a containerized environment for dependency isolation and GPU support.
@@ -210,6 +236,7 @@ The ML module runs in a containerized environment for dependency isolation and G
    - Open project in VS Code
    - Command palette: "Dev Containers: Reopen in Container"
    - Container builds from `ml/Dockerfile` (CUDA 11.3 + PyTorch 1.12.1)
+   - **Git LFS automatically pulls weights** in dev container
 
 **2. Run Inference:**
 ```bash

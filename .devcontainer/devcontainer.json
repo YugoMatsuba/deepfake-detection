@@ -14,7 +14,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "pip3 install --user -r requirements.txt",
+	"postCreateCommand": "git lfs install && git lfs pull",
 
 	// Configure tool-specific properties.
 	// "customizations": {},
