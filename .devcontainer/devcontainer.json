@@ -4,6 +4,7 @@
 	"name": "Deepfake Detection",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"build": {
+		"context": "..",
 		"dockerfile": "../ml/Dockerfile"
 	},
 
@@ -14,7 +15,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "git lfs install && git lfs pull",
+	"postCreateCommand": "git lfs update --force && git lfs install --force && git lfs fetch --all && git lfs checkout",
 
 	// Configure tool-specific properties.
 	// "customizations": {},
