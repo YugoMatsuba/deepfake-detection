@@ -4,8 +4,8 @@
 	"name": "Deepfake Detection",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"build": {
-		"dockerfile": "../ml/Dockerfile" 
-	}
+		"dockerfile": "../ml/Dockerfile"
+	},
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
