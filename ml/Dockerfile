@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # System dependencies kept minimal
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git build-essential cmake libgl1 libglib2.0-0 ca-certificates \
+    git git-lfs build-essential cmake libgl1 libglib2.0-0 ca-certificates \
     python3.9 python3.9-distutils python3.9-dev python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
