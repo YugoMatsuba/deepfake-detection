@@ -323,11 +323,13 @@ def main():
     if args.models:
         models = [m.strip() for m in args.models.split(",")]
 
-    # Build weights dict
+    # Build weights dict with defaults from constants
+    from ml.constants import get_weights_dir, DEFAULT_WEIGHTS
+    weights_dir = get_weights_dir()
     weights = {
-        "xception": args.xception_weights,
-        "spsl": args.spsl_weights,
-        "ucf": args.ucf_weights,
+        "xception": args.xception_weights or os.path.join(weights_dir, DEFAULT_WEIGHTS["xception"]),
+        "spsl": args.spsl_weights or os.path.join(weights_dir, DEFAULT_WEIGHTS["spsl"]),
+        "ucf": args.ucf_weights or os.path.join(weights_dir, DEFAULT_WEIGHTS["ucf"]),
     }
 
     # Run inference

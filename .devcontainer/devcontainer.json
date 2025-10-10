@@ -1,7 +1,15 @@
 {
-  "name": "Deepfake Detection",
-  "dockerFile": "../ml/Dockerfile",
-  "context": "..",
+  "name": "Deepfake Detection (CPU)",
+  "build": {
+    "context": "${localWorkspaceFolder}",
+    "dockerfile": "${localWorkspaceFolder}/Dockerfile",
+    "args": {
+      "DEVICE": "cpu"
+    },
+    "options": ["--platform=linux/amd64"]
+  },
+  "runArgs": ["--platform=linux/amd64"],
   "postCreateCommand": "git lfs update --force && git lfs install --force && git lfs fetch --all && git lfs checkout",
-  "remoteUser": "root"
+  "remoteUser": "root",
+  "forwardPorts": [5050]
 }
