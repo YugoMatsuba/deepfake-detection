@@ -1,14 +1,22 @@
+from flask import Flask, jsonify
 import cv2
+from flask_cors import CORS
 
-# Path to your video
-video_path = "uploads/rickroll.mp4"
+app = Flask(__name__)
+CORS(app)
 
-cap = cv2.VideoCapture(video_path)
+@app.route("/frame_rate", methods=["GET"])
+def get_frame_rate():
+    video_path = "uploads/test_video.mp4"  # Or dynamically set this
+    cap = cv2.VideoCapture(video_path)
 
-if not cap.isOpened():
-    print("Error: Could not open video.")
-else:
+    if not cap.isOpened():
+        return jsonify({"error": "Could not open video"}), 400
+
     fps = cap.get(cv2.CAP_PROP_FPS)
-    print(f"Frame rate: {fps} frames per second")
+    cap.release()
 
-cap.release()
+    return jsonify({"frame_rate": fps})
+    
+if __name__ == "__main__":
+    app.run(debug=True)

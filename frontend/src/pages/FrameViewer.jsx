@@ -6,9 +6,10 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
-  const [frameRate] = useState(25);
+const [frameRate, setFrameRate] = useState(null);
   const [deepfakeIndex, setDeepfakeIndex] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [durationFrames, setDurationFrames] = useState(0);
 
   // Tracks which marker is hovered
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -25,6 +26,24 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
 
   // Get meta for a frame (safe)
   const getMeta = (frame) => (frame != null ? deepfakeMeta?.[frame] || null : null);
+
+  useEffect(() => {
+  const fetchFrameRate = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/frame_rate");
+      const data = await response.json();
+      if (data.frame_rate) {
+        setFrameRate(data.frame_rate);
+        console.log("Fetched frame rate:", data.frame_rate);
+      }
+    } catch (error) {
+      console.error("Error fetching frame rate:", error);
+    }
+  };
+
+  fetchFrameRate();
+}, []);
+
 
   // Average anomaly score across frames that have a score
   const getAverageAnomaly = () => {
@@ -86,6 +105,7 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   };
 
   const nextFrame = () => {
+     if (!frameRate) return;
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = Math.min(video.currentTime + 1 / frameRate, video.duration);
@@ -123,6 +143,8 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
     if (prevDeepfakeIndex !== -1) {
       const video = videoRef.current;
       video.currentTime = deepfakeFrames[prevDeepfakeIndex] / frameRate;
+
+     
       setCurrentFrame(deepfakeFrames[prevDeepfakeIndex]);
       setDeepfakeIndex(prevDeepfakeIndex);
     }
@@ -138,24 +160,31 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
     setIsPlaying(false);
   };
 
-  const handleTimeUpdate = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    setCurrentFrame(Math.floor(video.currentTime * frameRate));
-  };
+  const [currentTime, setCurrentTime] = useState(0);
 
+const handleTimeUpdate = () => {
+  const video = videoRef.current;
+  if (!video) return;
+  setCurrentTime(video.currentTime);
+  if (frameRate) setCurrentFrame(Math.floor(video.currentTime * frameRate));
+};
   const handleLoadedMetadata = () => {
-    const video = videoRef.current;
-    if (video) {
-      setDuration(Math.floor(video.duration * frameRate));
-    }
-  };
+  const video = videoRef.current;
+  if (!video) return;
+  setDuration(video.duration);
+};
+
+useEffect(() => {
+  if (frameRate && duration) {
+    setDurationFrames(Math.floor(duration * frameRate));
+  }
+}, [frameRate, duration]);
 
   // Helper: compute left % safely (handles duration === 0)
   const pctLeft = (frame) => {
-    if (!duration) return 0;
-    return (frame / duration) * 100;
-  };
+  if (!durationFrames) return 0;
+  return (frame / durationFrames) * 100;
+};
 
   // Tooltip anchor frame
   const hoveredFrame =
@@ -192,7 +221,7 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
             {/* Current progress */}
             <div
               className="absolute top-0 left-0 h-4 bg-blue-500 rounded-lg"
-              style={{ width: `${duration ? (currentFrame / duration) * 100 : 0}%` }}
+              style={{ width: `${durationFrames ? (currentFrame / durationFrames) * 100 : 0}%` }}
             />
 
             {/* Deepfake markers */}
@@ -273,6 +302,10 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
                 {deepfakeFrames[deepfakeIndex] || "None"}
               </p>
             )}
+            <p>
+                <span className="font-medium">Frame Rate:</span>{" "}
+                {frameRate ? frameRate.toFixed(2) : "Loading..."} fps
+              </p>
           </div>
         </CardContent>
       </Card>
