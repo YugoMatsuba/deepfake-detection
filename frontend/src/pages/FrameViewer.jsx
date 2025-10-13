@@ -6,10 +6,16 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
-const [frameRate, setFrameRate] = useState(null);
+  const [frameRate, setFrameRate] = useState(null);
   const [deepfakeIndex, setDeepfakeIndex] = useState(0);
   const [duration, setDuration] = useState(0);
   const [durationFrames, setDurationFrames] = useState(0);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const[isAnalysing, setIsAnalysing] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState(null); 
+  const [analysisPopupOpen, setAnalysisPopupOpen] = useState(false);
+
+
 
   // Tracks which marker is hovered
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -202,10 +208,60 @@ useEffect(() => {
       ? `Flagged at frame ${hoveredFrame}.`
       : "";
 
+  const analyzeFrame = async (analysisType) => {
+  const video = videoRef.current;
+  if (!video) return;
+
+  setIsAnalysing(true);
+  setAnalysisResult(null);
+
+  try {
+    // Capture the current frame
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const frameData = canvas.toDataURL("image/jpeg");
+
+    // Send to backend
+    const response = await fetch("http://localhost:5050/api/forensics/analyze_frame", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frame_data: frameData, analysis_type: analysisType, frame_number: currentFrame }),
+    });
+
+    const text = await response.text(); // Read as text first for debugging
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      console.error("Invalid JSON from server:", text);
+      throw new Error("Invalid JSON returned by backend");
+    }
+
+    if (!response.ok) {
+      throw new Error(result.error || "Analysis failed");
+    }
+
+    console.log(`${analysisType} result:`, result);
+    setAnalysisResult(result);
+  } catch (error) {
+    console.error("Error analyzing frame:", error);
+    alert(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
+  } finally {
+    setIsAnalysing(false);
+  }
+};
+
+
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
+
+      <div className="flex flex-col items-center flex-1 space-y-1 p-3">
+
       <Card className="w-full max-w-3xl shadow-lg rounded-2xl">
-        <CardContent className="flex flex-col items-center space-y-4 p-6">
+        <CardContent className="flex flex-col items-center space-y-4 p-3">
           <video
             ref={videoRef}
             src={videoSrc}
@@ -223,6 +279,20 @@ useEffect(() => {
               className="absolute top-0 left-0 h-4 bg-blue-500 rounded-lg"
               style={{ width: `${durationFrames ? (currentFrame / durationFrames) * 100 : 0}%` }}
             />
+
+            
+            <div className="flex flex-col items-center mt-4 space-y-2">
+  
+  {/* Display results */}
+  {analysisResult && (
+    <div className="mt-4 p-3 bg-gray-100 rounded-lg w-full max-w-lg">
+      <h4 className="font-semibold mb-2">Analysis Result</h4>
+      <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+        {JSON.stringify(analysisResult, null, 2)}
+      </pre>
+    </div>
+  )}
+</div>
 
             {/* Deepfake markers */}
             {deepfakeFrames.map((frame, index) => (
@@ -310,6 +380,23 @@ useEffect(() => {
         </CardContent>
       </Card>
 
+<Card className="w-full max-w-3xl shadow-lg rounded-2xl">
+    <CardContent className="flex justify-center gap-4 p-0">
+      {["ela", "noise", "lbp"].map((method) => (
+        <Button
+          key={method}
+          variant="default"
+          size="sm"
+          disabled={isAnalysing}
+          onClick={() => analyzeFrame(method)}
+        >
+          {isAnalysing ? `Analyzing...` : `${method.toUpperCase()}`}
+        </Button>
+      ))}
+    </CardContent>
+  </Card>
+
+</div>
         {/* RIGHT: Details panel */}
         {isDetailsOpen && (
           <Card className="w-[360px] shrink-0 shadow-lg rounded-2xl gap-">
@@ -325,6 +412,8 @@ useEffect(() => {
                   Close
                 </Button>
               </div>
+
+              
 
               {/* Anomaly vs Average */}
               <section>
@@ -363,6 +452,8 @@ useEffect(() => {
                   );
                 })()}
               </section>
+
+              
 
               {/* Forensic methods */}
               <section>
@@ -413,6 +504,9 @@ useEffect(() => {
             </CardContent>
           </Card>
         )}
+
+        
+
       </div>
   );
 };

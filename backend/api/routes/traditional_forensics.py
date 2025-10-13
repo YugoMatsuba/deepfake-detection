@@ -1,4 +1,7 @@
 from flask import Blueprint, request, jsonify
+import os
+import tempfile
+import base64
 from api.traditional_forensics_utils.frame_extraction import extract_frames
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
@@ -136,3 +139,54 @@ def temporal_route():
         message="Temporal analysis complete",
         result=result
     ), 200
+
+
+
+@bp_forensics.post("/analyze_frame")
+def analyze_frame_route():
+    """
+    POST /api/forensics/analyze_frame
+    Body: { "frame_data": "data:image/jpeg;base64,...", "analysis_type": "lbp",
+     "frame_number": 42 }
+    """
+    data = request.get_json(silent=True) or {}
+    frame_data = data.get("frame_data")
+    analysis_type = data.get("analysis_type", "lbp")
+    frame_number = data.get("frame_number")
+
+    if not frame_data:
+        return jsonify(error="frame_data_required"), 400
+
+    try:
+        # Remove the base64 header if present
+        if "," in frame_data:
+            frame_data = frame_data.split(",")[1]
+        img_data = base64.b64decode(frame_data)
+
+        # Save to temp file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        temp_file.write(img_data)
+        temp_file.close()
+        temp_path = temp_file.name
+
+        # Run selected analysis
+        if analysis_type == "lbp":
+            result = run_lbp_analysis(temp_path)
+        elif analysis_type == "ela":
+            result = run_ela(temp_path)
+        elif analysis_type == "noise":
+            result = run_noise_analysis(temp_path)
+        elif analysis_type == "cmfd":
+            result = run_cmfd_analysis(temp_path)
+        else:
+            os.remove(temp_path)
+            return jsonify(error="unsupported_analysis_type"), 400
+
+        os.remove(temp_path)
+
+    except Exception as e:
+        print(f"Error during frame analysis: {e}")  # 👈 this helps debug in console
+        return jsonify(error=str(e)), 500
+
+    return jsonify(message="Frame analysis complete", frame_number = frame_number, result=result), 200
+

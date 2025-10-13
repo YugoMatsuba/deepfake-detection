@@ -7,7 +7,7 @@ CORS(app)
 
 @app.route("/frame_rate", methods=["GET"])
 def get_frame_rate():
-    video_path = "uploads/test_video.mp4"  # Or dynamically set this
+    video_path = "uploads/rickroll.mp4"  # Or dynamically set this
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
