@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { Button } from "./Button";
 import { Card, CardContent } from "./Card";
 
-const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {} }) => {
+const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -15,6 +15,45 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {} }) => {
 
   // Timer used to delay hiding the tooltip
   const hideTimerRef = useRef(null);
+
+  // Side panel state
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [detailsFrame, setDetailsFrame] = useState(null);
+
+  // ============================================
+  // ========== FRAME ANALYSIS DETAILS ==========
+
+  // Get meta for a frame (safe)
+  const getMeta = (frame) => (frame != null ? deepfakeMeta?.[frame] || null : null);
+
+  // Average anomaly score across frames that have a score
+  const getAverageAnomaly = () => {
+    const entries = Object.values(deepfakeMeta || {}).filter(
+      (m) => typeof m?.anomalyScore === "number"
+    );
+    if (!entries.length) return null;
+    const sum = entries.reduce((acc, m) => acc + m.anomalyScore, 0);
+    return sum / entries.length; // 0..1
+  };
+
+  // Extract “details” for the currently selected frame
+  const details = (() => {
+    const meta = getMeta(detailsFrame);
+    return {
+      anomalyScore: typeof meta?.anomalyScore === "number" ? meta.anomalyScore : null, // 0..1
+      methods: {
+        ela: typeof meta?.methods?.ela === "number" ? meta.methods.ela : null,
+        noise: typeof meta?.methods?.noise === "number" ? meta.methods.noise : null,
+        lbp: typeof meta?.methods?.lbp === "number" ? meta.methods.lbp : null,
+      },
+      temporalLabels: Array.isArray(meta?.temporalLabels) ? meta.temporalLabels : [],
+    };
+  })();
+
+
+
+  // ============================================
+
 
   const clearHideTimer = () => {
     if (hideTimerRef.current) {
@@ -135,7 +174,7 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {} }) => {
       : "";
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-50">
+    <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
       <Card className="w-full max-w-3xl shadow-lg rounded-2xl">
         <CardContent className="flex flex-col items-center space-y-4 p-6">
           <video
@@ -185,7 +224,8 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {} }) => {
                     size="sm"
                     className="mt-2 bg-[#1E88E5] text-white hover:bg-[#114f85] hover:text-[#cccccc] transition-colors"
                     onClick={() => {
-                      // Wire this to a modal/side panel later
+                      setDetailsFrame(hoveredFrame);
+                      setIsDetailsOpen(true);
                     }}
                   >
                     More Details
@@ -236,7 +276,111 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {} }) => {
           </div>
         </CardContent>
       </Card>
-    </div>
+
+        {/* RIGHT: Details panel */}
+        {isDetailsOpen && (
+          <Card className="w-[360px] shrink-0 shadow-lg rounded-2xl gap-">
+            <CardContent className="p-5 space-y-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Frame Details</h3>
+                  <p className="text-xs text-gray-500">
+                    Frame {detailsFrame != null ? detailsFrame : "—"}
+                  </p>
+                </div>
+                <Button variant="secondary" className="bg-white" onClick={() => setIsDetailsOpen(false)}>
+                  Close
+                </Button>
+              </div>
+
+              {/* Anomaly vs Average */}
+              <section>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Anomaly Score</h4>
+                {(() => {
+                  const avg = getAverageAnomaly();
+                  const cur = details.anomalyScore;
+                  if (cur == null) {
+                    return <p className="text-sm text-gray-500">No anomaly score available.</p>;
+                  }
+                  const pct = Math.round(cur * 100);
+                  const avgPct = avg != null ? Math.round(avg * 100) : null;
+                  const delta = avg != null ? pct - avgPct : null;
+                  return (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{pct}%</span>
+                        {avgPct != null && (
+                          <span className="text-gray-500">
+                            avg {avgPct}%{" "}
+                            {delta != null && (
+                              <span className={delta >= 0 ? "text-red-600" : "text-green-600"}>
+                                ({delta >= 0 ? "+" : ""}{delta}%)
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500"
+                          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+              </section>
+
+              {/* Forensic methods */}
+              <section>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Forensic Methods</h4>
+                <div className="space-y-3">
+                  {[
+                    { key: "ela", label: "ELA Analysis", value: details.methods.ela },
+                    { key: "noise", label: "Noise Analysis", value: details.methods.noise },
+                    { key: "lbp", label: "LBP Analysis", value: details.methods.lbp },
+                  ].map(({ key, label, value }) => (
+                    <div key={key}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{label}</span>
+                        <span className="text-gray-600">
+                          {typeof value === "number" ? `${Math.round(value * 100)}%` : "N/A"}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gray-700"
+                          style={{
+                            width: `${
+                              typeof value === "number"
+                                ? Math.min(100, Math.max(0, Math.round(value * 100)))
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* Temporal labels */}
+              <section>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Temporal Consistency</h4>
+                {details.temporalLabels.length ? (
+                  <ul className="list-disc pl-5 space-y-1 text-sm text-gray-800">
+                    {details.temporalLabels.map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-500">No temporal anomalies reported.</p>
+                )}
+              </section>
+            </CardContent>
+          </Card>
+        )}
+      </div>
   );
 };
 
