@@ -1,0 +1,67 @@
+# Git repository
+.git
+.gitignore
+.gitattributes
+
+# Python cache and bytecode
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+**/*.egg-info
+**/.eggs
+
+# Virtual environments
+venv
+backend/venv
+env
+.venv
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Frontend build artifacts and dependencies
+frontend/dist
+frontend/node_modules
+frontend/.vite
+node_modules
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing and coverage
+.coverage
+htmlcov
+.pytest_cache
+.tox
+
+# Documentation build
+docs/_build
+site
+
+# Temporary files
+*.log
+*.tmp
+tmp/
+temp/
+
+# ML model artifacts (mounted at runtime)
+ml/weights/*.pth
+ml/dlib/*.dat
+ml/data/*
+
+# Database files (mounted at runtime)
+instance/
+*.db
+*.sqlite
+
+# Uploads directory (mounted at runtime)
+backend/uploads/

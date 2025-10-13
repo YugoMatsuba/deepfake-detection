@@ -1,0 +1,56 @@
+# Unified requirements for ML inference + Backend API
+# Python 3.9 base (PyTorch 1.12.1 compatibility requirement)
+#
+# IMPORTANT: PyTorch and torchvision are installed separately in the Dockerfile
+# to support both CPU and CUDA builds via pip index URL selection.
+#
+# torch==1.12.1 (cpu or +cu113 depending on DEVICE build arg)
+# torchvision==0.13.1 (cpu or +cu113 depending on DEVICE build arg)
+
+# =============================================================================
+# ML Dependencies (inference only)
+# =============================================================================
+
+# Core numerical/image processing (constrained by PyTorch 1.12.1)
+numpy==1.21.6
+pillow==9.5.0
+opencv-python-headless==4.6.0.66
+scipy==1.9.3
+scikit-image==0.19.2
+
+# ML-specific libraries
+dlib==19.24.0
+imutils==0.5.4
+imageio==2.9.0
+
+# Utilities
+tqdm==4.64.1
+pydantic==1.10.15
+
+# =============================================================================
+# Backend API Dependencies
+# =============================================================================
+
+# Flask web framework
+Flask==3.0.3
+Flask-Cors==4.0.1
+
+# Database ORM and migrations
+SQLAlchemy==2.0.36
+alembic==1.13.2
+
+# Authentication and security
+argon2-cffi==23.1.0
+
+# Environment configuration
+python-dotenv==1.0.1
+
+# =============================================================================
+# Notes on Version Constraints
+# =============================================================================
+# - Python 3.9: Required for PyTorch 1.12.1+cu113 compatibility
+# - numpy 1.21.6: PyTorch 1.12.1 constraint (backend originally used 2.2.6)
+# - opencv 4.6.0.66-headless: ML constraint, headless variant for containers
+# - pillow 9.5.0: Conservative choice for PyTorch compatibility
+# - scipy 1.9.3: Compatible with numpy 1.21.6
+# - scikit-image 0.19.2: Compatible with older scipy/numpy versions
