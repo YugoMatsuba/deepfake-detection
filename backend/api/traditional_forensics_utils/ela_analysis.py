@@ -1,21 +1,21 @@
 import os
+import base64
+from io import BytesIO
 from PIL import Image, ImageChops, ImageEnhance
 import numpy as np
-import csv
 
-def compute_ela(image_path, output_folder="ela_frames", resave_quality=90):
+def compute_ela_base64(image_path, resave_quality=90):
     """
-    Compute the ELA image and anomaly score.
-    Saves the ELA image and returns anomaly score.
+    Compute ELA image and anomaly score.
+    Returns PIL ELA image and anomaly score.
     """
-    os.makedirs(output_folder, exist_ok=True)
-
     original = Image.open(image_path).convert("RGB")
 
-    # Save compressed JPEG
-    temp_path = "temp_ela.jpg"
-    original.save(temp_path, quality=resave_quality)
-    compressed = Image.open(temp_path)
+    # Save compressed JPEG in memory
+    buffer = BytesIO()
+    original.save(buffer, format="JPEG", quality=resave_quality)
+    buffer.seek(0)
+    compressed = Image.open(buffer)
 
     # Difference
     ela_image = ImageChops.difference(original, compressed)
@@ -26,82 +26,76 @@ def compute_ela(image_path, output_folder="ela_frames", resave_quality=90):
     scale = 255.0 / max_diff if max_diff != 0 else 1
     ela_image = ImageEnhance.Brightness(ela_image).enhance(scale)
 
-    # Save ELA image
-    ela_filename = os.path.basename(image_path).replace(".", "_ela.")
-    ela_output_path = os.path.join(output_folder, ela_filename)
-    ela_image.save(ela_output_path)
-
-    # Score
+    # Compute anomaly score
     ela_np = np.array(ela_image)
-    anomaly_score = ela_np.std()
+    score = ela_np.std()
 
-    return anomaly_score
+    # Convert to Base64 with MIME prefix
+    buffer2 = BytesIO()
+    ela_image.save(buffer2, format="JPEG", quality=85)
+    ela_base64 = base64.b64encode(buffer2.getvalue()).decode("utf-8")
+    ela_base64 = f"data:image/jpeg;base64,{ela_base64}"
+
+    return score, ela_base64
 
 
-def run_ela(input_path, output_dir="reports", top_percent=10):
+def run_ela(input_path, top_percent=10):
     """
-    Run ELA on a single image OR a folder of frames.
-    Saves reports to CSV and returns results as JSON-friendly dict.
+    Run ELA on a single image or folder.
+    Returns top frames as JSON with Base64-encoded ELA images.
     """
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Case 1: Folder
+    # Collect frames
     if os.path.isdir(input_path):
-        frame_files = [f for f in os.listdir(input_path) if f.lower().endswith((".jpg", ".png"))]
-        frame_files = [os.path.join(input_path, f) for f in frame_files]
+        frame_files = [f for f in os.listdir(input_path)
+                       if f.lower().endswith((".jpg", ".png"))]
         if not frame_files:
             raise ValueError("No frames found in folder")
+        frame_paths = [os.path.join(input_path, f) for f in frame_files]
 
-    # Case 2: Single image
     elif os.path.isfile(input_path) and input_path.lower().endswith((".jpg", ".png")):
-        frame_files = [input_path]
+        frame_paths = [input_path]
 
     else:
         raise FileNotFoundError(f"Invalid path: {input_path}")
 
+    # Compute ELA scores
     results = []
-    for frame in frame_files:
-        score = compute_ela(frame)
-        results.append((os.path.basename(frame), score))
+    for path in frame_paths:
+        score, ela_base64 = compute_ela_base64(path)
+        results.append((os.path.basename(path), score, ela_base64))
 
-    # --- Single frame case ---
+    # Single frame case
     if len(results) == 1:
-        frame, score = results[0]
+        frame, score, ela_base64 = results[0]
         return {
             "mode": "single_frame",
             "frame": frame,
-            "score": score
+            "score": float(score),
+            "ela_image_base64": ela_base64
         }
 
-    # --- Multi-frame case ---
-    scores_only = [s for _, s in results]
+    # Multi-frame case
+    scores_only = [s for _, s, _ in results]
     mean_score = np.mean(scores_only)
     std_score = np.std(scores_only) + 1e-6
-    normalized_results = [(f, max((s - mean_score) / std_score, 0)) for f, s in results]
+    normalized_results = [(f, max((s - mean_score) / std_score, 0), b64)
+                          for f, s, b64 in results]
 
-    results_sorted = sorted(normalized_results, key=lambda x: x[1], reverse=True)
+    # Sort and pick top frames
+    normalized_results.sort(key=lambda x: x[1], reverse=True)
+    top_count = max(1, int(len(normalized_results) * top_percent / 100))
+    top_frames = normalized_results[:top_count]
 
-    # Save all frames CSV
-    all_csv_path = os.path.join(output_dir, "ela_all_frames.csv")
-    with open(all_csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Frame", "AnomalyScore"])
-        writer.writerows(results_sorted)
-
-    # Top X% frames
-    top_count = max(1, int(len(results_sorted) * top_percent / 100))
-    top_frames = results_sorted[:top_count]
-
-    top_csv_path = os.path.join(output_dir, "ela_top_frames.csv")
-    with open(top_csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Frame", "AnomalyScore"])
-        writer.writerows(top_frames)
-
+    # Return JSON-ready dict
     return {
         "mode": "multi_frame",
-        "all_frames_count": len(results_sorted),
-        "top_frames": top_frames,
-        "csv_all": all_csv_path,
-        "csv_top": top_csv_path
+        "top_percent": top_percent,
+        "top_frames": [
+            {
+                "frame": f,
+                "score": float(s),
+                "ela_image_base64": b64
+            }
+            for f, s, b64 in top_frames
+        ]
     }
