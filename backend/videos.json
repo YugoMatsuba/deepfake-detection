@@ -33,5 +33,12 @@
     "mimetype": "video/mp4",
     "size_bytes": 1570024,
     "original_name": "file_example_MP4_480_1_5MG.mp4"
+  },
+  {
+    "id": "cb4ed7fc-8539-42ac-affd-4db4e185aef6",
+    "path": "D:\\UNIMELB SUBJECTS\\Y3\\S1\\IT Project\\main\\deepfake_AI\\backend\\instance\\uploads\\cb4ed7fc-8539-42ac-affd-4db4e185aef6.mp4",
+    "mimetype": "video/mp4",
+    "size_bytes": 344240,
+    "original_name": "Video_250408224514.mp4"
   }
 ]
