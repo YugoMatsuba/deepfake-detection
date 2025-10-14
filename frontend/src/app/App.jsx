@@ -7,6 +7,7 @@ import SignUp from '../pages/SignUp.jsx';
 import Analysis from '../pages/Analysis.jsx';
 import Upload from '../pages/Upload.jsx';
 import FrameViewer from '../pages/FrameViewer.jsx';
+import FrameViewerPage from '../pages/FrameViewerRetrieval.jsx';
 
 export default function App() {
   return (
@@ -25,8 +26,7 @@ export default function App() {
           />
           <Route path="/upload" element={<Upload />} />
           <Route path="/analysis" element={<Analysis />}/>
-          <Route path="/frame-viewer" element={<FrameViewer videoSrc="./public/videos/rickroll.mp4"
-          deepfakeFrames={[30, 75, 120, 180]}/>}/>
+          <Route path="/frame-viewer" element={<FrameViewerPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

@@ -4,6 +4,7 @@ import uuid, json
 from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request, send_file
 from werkzeug.utils import secure_filename
+from flask_cors import cross_origin
 
 
 video_bp = Blueprint("video", __name__)
@@ -73,7 +74,6 @@ def _delete_video(file_id: str) -> bool:
     return True
 # -----------------------------------------
 
-
 @video_bp.post("/videos")
 def upload_video():
     """
@@ -94,9 +94,28 @@ def upload_video():
 
 
 @video_bp.get("/videos/<file_id>")
+@cross_origin()
 def get_video(file_id):
     path = _find_path(file_id)
     if not path:
         return jsonify(error="Not found"), 404
     return send_file(path)
+
+@video_bp.get("/videos/all")
+def get_all_videos():
+    """
+    Return all uploaded video metadata from videos.json.
+    """
+    store = _meta_store_path()
+    if not store.exists():
+        return jsonify([])  # empty array if no videos
+
+    try:
+        data = json.loads(store.read_text())
+        if not isinstance(data, list):
+            data = []
+    except Exception:
+        data = []
+
+    return jsonify(data)
 

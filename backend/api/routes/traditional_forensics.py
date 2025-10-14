@@ -146,8 +146,7 @@ def temporal_route():
 def analyze_frame_route():
     """
     POST /api/forensics/analyze_frame
-    Body: { "frame_data": "data:image/jpeg;base64,...", "analysis_type": "lbp",
-     "frame_number": 42 }
+    Body: { "frame_data": "data:image/jpeg;base64,...", "analysis_type": "lbp", "frame_number": 123 }
     """
     data = request.get_json(silent=True) or {}
     frame_data = data.get("frame_data")
@@ -158,7 +157,7 @@ def analyze_frame_route():
         return jsonify(error="frame_data_required"), 400
 
     try:
-        # Remove the base64 header if present
+        # Remove base64 header if present
         if "," in frame_data:
             frame_data = frame_data.split(",")[1]
         img_data = base64.b64decode(frame_data)
@@ -184,9 +183,19 @@ def analyze_frame_route():
 
         os.remove(temp_path)
 
+        # ✅ Extract confidence/score if the result is a dict
+        if isinstance(result, dict):
+            score = result.get("score") or result.get("confidence") or result.get("value")
+        else:
+            score = result
+
     except Exception as e:
-        print(f"Error during frame analysis: {e}")  # 👈 this helps debug in console
+        print(f"Error during frame analysis: {e}")
         return jsonify(error=str(e)), 500
 
-    return jsonify(message="Frame analysis complete", frame_number = frame_number, result=result, analysis_type=analysis_type), 200
-
+    # ✅ Return simplified JSON with only score
+    return jsonify({
+        "frame_number": frame_number,
+        "analysis_type": analysis_type,
+        "score": score
+    }), 200

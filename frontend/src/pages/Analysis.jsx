@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+
 
 // Just a random varialbe to make sure the code works
 let fakeVideoPercentage = 82;

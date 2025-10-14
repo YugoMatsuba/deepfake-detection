@@ -283,6 +283,8 @@ const getColor = (type, value) => {
           <video
             ref={videoRef}
             src={videoSrc}
+            crossOrigin="anonymous"
+            controls
             width="640"
             height="360"
             onTimeUpdate={handleTimeUpdate}
@@ -323,20 +325,20 @@ const getColor = (type, value) => {
         Frame {analysisResult.frame_number ?? "N/A"}
       </p>
 
-      <p className={`text-2xl font-bold mb-4 ${
-        getColor(analysisResult.analysis_type, analysisResult.result?.confidence ?? analysisResult.result?.score)
-      }`}>
-        {(() => {
-          const inner = analysisResult?.result || {};
-          if (inner.confidence !== undefined) {
-            return `${(inner.confidence * 100).toFixed(2)}%`;
-          } else if (inner.score !== undefined) {
-            return `${inner.score.toFixed(2)}`;
-          } else {
-            return "No score or confidence available";
-          }
-        })()}
-      </p>
+      <p
+  className={`text-2xl font-bold mb-4 ${
+    getColor(analysisResult.analysis_type, analysisResult.score)
+  }`}
+>
+  {analysisResult.score !== undefined ? (
+    analysisResult.analysis_type === "ela"
+      ? analysisResult.score.toFixed(2) // raw value for ELA
+      : `${(analysisResult.score * 100).toFixed(2)}%` // percentage for Noise & LBP
+  ) : (
+    "No score available"
+  )}
+</p>
+
 
       <Button
         className="w-full bg-[#1E88E5] text-white hover:bg-[#114f85]"
@@ -351,6 +353,7 @@ const getColor = (type, value) => {
     </div>
   </div>
 )}
+
 
 
   
