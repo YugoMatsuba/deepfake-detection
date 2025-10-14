@@ -9,6 +9,7 @@ import { uploadVideo } from "../api/videos"; // POST /api/videos
 export default function FileUploader() {
   // store selected files for the list UI
   const [files, setFiles] = useState([]);
+  const [uploadedVideos, setUploadedVideos] = useState([]);
   // checkbox states
   const [options, setOptions] = useState({
     option1: false,
@@ -18,16 +19,17 @@ export default function FileUploader() {
 
   // silently stage upload in the background after selection
   const onDrop = useCallback(async (droppedFiles) => {
-    setFiles(droppedFiles);
-    if (droppedFiles && droppedFiles.length > 0) {
-      try {
-        await uploadVideo(droppedFiles[0]); // backend stores metadata; no console.log
-      } catch {
-        // swallow errors silently for now (keep UI unchanged)
-        // consider showing a toast or error banner later
-      }
+  setFiles(droppedFiles);
+
+  if (droppedFiles && droppedFiles.length > 0) {
+    try {
+      const meta = await uploadVideo(droppedFiles[0]);
+      setUploadedVideos((prev) => [...prev, meta]); // store metadata
+    } catch (err) {
+      console.error("Upload failed", err);
     }
-  }, []);
+  }
+}, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -48,7 +50,10 @@ export default function FileUploader() {
     : <p className="text-gray-600 font-semibold">Drag images or videos here, or click to select</p>;
 
   const navigate = useNavigate();
-  const handleGoToAnalysis = () => navigate("/analysis");
+  const handleGoToAnalysis = () => {
+  const videoIds = uploadedVideos.map((v) => v.id);
+  navigate("/analysis", { state: { videoIds, options } });
+};
 
   return (
     <div className="px-3">
