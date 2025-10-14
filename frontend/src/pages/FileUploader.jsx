@@ -15,6 +15,7 @@ export default function FileUploader() {
     option1: false,
     option2: false,
     option3: false,
+    option4: false,
   });
 
   // silently stage upload in the background after selection
@@ -110,6 +111,16 @@ export default function FileUploader() {
                 className="w-4 h-4"
               />
               <span className="font-semibold">Noise Analysis</span>
+            </label>
+            <label className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                name="option4"
+                checked={options.option4}
+                onChange={handleCheckboxChange}
+                className="w-4 h-4"
+              />
+              <span className="font-semibold">LBP Analysis</span>
             </label>
           </div>
         </Card>

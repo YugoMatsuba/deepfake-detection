@@ -1,9 +1,12 @@
+import { useNavigate } from "react-router-dom";
+
 // Just a random varialbe to make sure the code works
 let fakeVideoPercentage = 82;
 import {useLocation, useNavigate} from 'react-router-dom'
 
 // Basic button styling configurations
 const baseButton = "justify-center items-center mt-[15px] text-[17px] font-semibold px-10 py-3.5 rounded-lg shadow"
+
 
 export default function Analysis() {
     const location = useLocation();

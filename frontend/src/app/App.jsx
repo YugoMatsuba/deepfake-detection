@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './AuthProvider.jsx';
 import { ProtectedRoute } from './ProtectedRoute.jsx';
 import Login from '../pages/Login.jsx';
-import Dashboard from '../pages/Dashboard.jsx';
 import SignUp from '../pages/SignUp.jsx';
 import Analysis from '../pages/Analysis.jsx';
 import Upload from '../pages/Upload.jsx';
@@ -21,7 +20,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 {/* <Upload /> */}
-                <Dashboard />
               </ProtectedRoute>
             }
           />

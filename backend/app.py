@@ -44,7 +44,7 @@ def create_app() -> Flask:
     # For dev Vite at http://localhost:5173. Tighten for prod.
     frontend_origins = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173"  # default dev FE origins
+        "http://localhost:5173,http://127.0.0.1:5173 "  # default dev FE origins
     )
     origins_list = [o.strip() for o in frontend_origins.split(",") if o.strip()]
     
