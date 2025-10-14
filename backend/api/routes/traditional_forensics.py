@@ -188,5 +188,5 @@ def analyze_frame_route():
         print(f"Error during frame analysis: {e}")  # 👈 this helps debug in console
         return jsonify(error=str(e)), 500
 
-    return jsonify(message="Frame analysis complete", frame_number = frame_number, result=result), 200
+    return jsonify(message="Frame analysis complete", frame_number = frame_number, result=result, analysis_type=analysis_type), 200
 

@@ -254,6 +254,24 @@ useEffect(() => {
   }
 };
 
+// Determine color class based on analysis type and value
+const getColor = (type, value) => {
+  if (type === 'ela') {
+    // For ELA: lower = better (green)
+    if (value < 20) return 'text-green-600';
+    if (value < 50) return 'text-yellow-500';
+    return 'text-red-600';
+  } else {
+    // For Noise & LBP: higher = better (green)
+    if (value > 0.8) return 'text-green-600';
+    if (value > 0.5) return 'text-yellow-500';
+    return 'text-red-600';
+  }
+};
+
+
+
+
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
@@ -281,17 +299,62 @@ useEffect(() => {
             />
 
             
-            <div className="flex flex-col items-center mt-4 space-y-2">
+  <div className="flex flex-col items-center mt-4 space-y-2">
   
   {/* Display results */}
   {analysisResult && (
-    <div className="mt-4 p-3 bg-gray-100 rounded-lg w-full max-w-lg">
-      <h4 className="font-semibold mb-2">Analysis Result</h4>
-      <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-        {JSON.stringify(analysisResult, null, 2)}
-      </pre>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="relative w-[400px] max-w-[90%] bg-white rounded-2xl shadow-lg p-5">
+
+      {/* Close button */}
+      <button
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-lg font-bold"
+        onClick={() => setAnalysisResult(null)}
+      >
+        ✕
+      </button>
+
+      {/* Analysis content */}
+      <h4 className="font-semibold mb-2 text-gray-800">
+        {analysisResult.analysis_type?.toUpperCase() || "Analysis"} Result
+      </h4>
+
+      <p className="text-sm text-gray-600 mb-1">
+        Frame {analysisResult.frame_number ?? "N/A"}
+      </p>
+
+      <p className={`text-2xl font-bold mb-4 ${
+        getColor(analysisResult.analysis_type, analysisResult.result?.confidence ?? analysisResult.result?.score)
+      }`}>
+        {(() => {
+          const inner = analysisResult?.result || {};
+          if (inner.confidence !== undefined) {
+            return `${(inner.confidence * 100).toFixed(2)}%`;
+          } else if (inner.score !== undefined) {
+            return `${inner.score.toFixed(2)}`;
+          } else {
+            return "No score or confidence available";
+          }
+        })()}
+      </p>
+
+      <Button
+        className="w-full bg-[#1E88E5] text-white hover:bg-[#114f85]"
+        onClick={() => {
+          setDetailsFrame(currentFrame);
+          setIsDetailsOpen(true);
+          setAnalysisResult(null); // close popup
+        }}
+      >
+        More Details
+      </Button>
     </div>
-  )}
+  </div>
+)}
+
+
+  
+
 </div>
 
             {/* Deepfake markers */}
