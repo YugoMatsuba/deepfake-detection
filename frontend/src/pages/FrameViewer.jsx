@@ -12,6 +12,7 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   const [durationFrames, setDurationFrames] = useState(0);
   const [analysisResult, setAnalysisResult] = useState(null);
   const[isAnalysing, setIsAnalysing] = useState(false);
+  const [overlayResult, setOverlayResult] = useState(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null); 
   const [analysisPopupOpen, setAnalysisPopupOpen] = useState(false);
 
@@ -212,6 +213,12 @@ useEffect(() => {
   const video = videoRef.current;
   if (!video) return;
 
+  // Pause the video immediately
+  if (!video.paused) {
+    video.pause();
+    setIsPlaying(false);
+  }
+
   setIsAnalysing(true);
   setAnalysisResult(null);
 
@@ -246,6 +253,7 @@ useEffect(() => {
 
     console.log(`${analysisType} result:`, result);
     setAnalysisResult(result);
+    setOverlayResult(result);
   } catch (error) {
     console.error("Error analyzing frame:", error);
     alert(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
@@ -280,6 +288,7 @@ const getColor = (type, value) => {
 
       <Card className="w-full max-w-3xl shadow-lg rounded-2xl">
         <CardContent className="flex flex-col items-center space-y-4 p-3">
+          <div className="relative w-full max-w-3xl">
           <video
             ref={videoRef}
             src={videoSrc}
@@ -291,6 +300,18 @@ const getColor = (type, value) => {
             onLoadedMetadata={handleLoadedMetadata}
             className="rounded-lg border border-gray-300"
           />
+
+          {/* Overlay image for ELA, LBP, or Noise */}
+          {overlayResult?.image_file && (
+          <img
+            src={`http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`}
+            alt={`${overlayResult.analysis_type?.toUpperCase()} overlay`}
+            className="absolute top-0 left-0 w-full h-full object-cover opacity-100 pointer-events-none rounded-lg"
+          />
+        )}
+
+
+          </div>
 
           {/* === TIMELINE BAR === */}
           <div className="relative w-full h-4 bg-gray-200 rounded-lg">
@@ -338,6 +359,16 @@ const getColor = (type, value) => {
     "No score available"
   )}
 </p>
+
+{analysisResult.image_file && (
+        <img
+          src={`http://localhost:5050/${analysisResult.image_file.replace(/\\/g, "/")}`}
+          alt={`${analysisResult.analysis_type?.toUpperCase()} overlay`}
+          className="w-full rounded-lg mb-4"
+        />
+      )}
+
+
 
 
       <Button
@@ -412,7 +443,11 @@ const getColor = (type, value) => {
             </Button>
 
             <div className="flex flex-col items-center gap-2">
-              <Button variant="default" onClick={togglePlay}>
+              <Button variant="default" onClick={() => {
+      togglePlay();            // play/pause video
+      // optionally clear overlay popup only if you want:
+      setOverlayResult(null);
+    }}>
                 {isPlaying ? "Pause" : "Play"}
               </Button>
               <Button variant="destructive" onClick={restartVideo}>

@@ -186,8 +186,10 @@ def analyze_frame_route():
         # ✅ Extract confidence/score if the result is a dict
         if isinstance(result, dict):
             score = result.get("score") or result.get("confidence") or result.get("value")
+            image_file = result.get("lbp_image") or result.get("ela_image") or result.get("residual")
         else:
             score = result
+            image_file = None
 
     except Exception as e:
         print(f"Error during frame analysis: {e}")
@@ -197,5 +199,6 @@ def analyze_frame_route():
     return jsonify({
         "frame_number": frame_number,
         "analysis_type": analysis_type,
-        "score": score
+        "score": score,
+        "image_file": image_file
     }), 200

@@ -12,7 +12,7 @@ Responsibilities (no business logic here):
 from __future__ import annotations
 import os
 from pathlib import Path
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
 # DB/session utilities come from api package (to be created)
@@ -73,8 +73,24 @@ def create_app() -> Flask:
     @app.get("/api/health")
     def health():
         return jsonify(ok=True)
+    
+
+    @app.route("/ela_frames/<path:filename>")
+    def serve_ela(filename):
+        return send_from_directory("ela_frames", filename)
+
+    @app.route("/lbp_frames/<path:filename>")
+    def serve_lbp(filename):
+        return send_from_directory("lbp_frames", filename)
+
+    @app.route("/noise_frames/<path:filename>")
+    def serve_noise(filename):
+        return send_from_directory("noise_frames", filename)
 
     return app
+
+
+
 
 
 # For `python app.py` dev runs

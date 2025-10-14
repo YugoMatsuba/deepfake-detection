@@ -20,13 +20,14 @@ def compute_lbp(frame_path, output_folder="lbp_frames", P=8, R=1):
     # Save LBP image (normalized to 0-255)
     lbp_img = Image.fromarray(np.uint8((lbp / lbp.max()) * 255))
     lbp_filename = os.path.basename(frame_path).replace(".", "_lbp.")
+    lbp_output_path = os.path.join(output_folder, lbp_filename)
     lbp_img.save(os.path.join(output_folder, lbp_filename))
     
     # Anomaly score = std deviation of LBP histogram
     n_bins = int(lbp.max() + 1)
     hist, _ = np.histogram(lbp.ravel(), bins=n_bins, range=(0, n_bins), density=True)
     score = np.std(hist)
-    return score
+    return score, lbp_output_path
 
 
 def run_lbp_analysis(input_path, reports_folder="reports", top_percent=10):
@@ -55,14 +56,14 @@ def run_lbp_analysis(input_path, reports_folder="reports", top_percent=10):
 
     results = []
     for path in frame_paths:
-        score = compute_lbp(path)  # Saves LBP image
-        results.append((os.path.basename(path), score))
+        score, lbp_path = compute_lbp(path)  # Saves LBP image
+        results.append((os.path.basename(path), score, lbp_path))
 
     # If only one frame → just return scaled confidence
     if len(results) == 1:
-        _, score = results[0]
+        _, score, lbp_path = results[0]
         confidence = np.tanh(score * 10)  # heuristic scaling
-        return {"confidence": float(confidence)}
+        return {"confidence": float(confidence), "lbp_image": lbp_path}
 
     # Z-score normalization
     scores_only = [s for _, s in results]

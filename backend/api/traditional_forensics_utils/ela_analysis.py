@@ -35,7 +35,7 @@ def compute_ela(image_path, output_folder="ela_frames", resave_quality=90):
     ela_np = np.array(ela_image)
     anomaly_score = ela_np.std()
 
-    return anomaly_score
+    return anomaly_score, ela_output_path
 
 
 def run_ela(input_path, output_dir="reports", top_percent=10):
@@ -61,16 +61,17 @@ def run_ela(input_path, output_dir="reports", top_percent=10):
 
     results = []
     for frame in frame_files:
-        score = compute_ela(frame)
-        results.append((os.path.basename(frame), score))
+        score, image_path = compute_ela(frame)
+        results.append((os.path.basename(frame), score, image_path))
 
     # --- Single frame case ---
     if len(results) == 1:
-        frame, score = results[0]
+        frame, score, image_path = results[0]
         return {
             "mode": "single_frame",
             "frame": frame,
-            "score": score
+            "score": score,
+            "ela_image": image_path
         }
 
     # --- Multi-frame case ---
