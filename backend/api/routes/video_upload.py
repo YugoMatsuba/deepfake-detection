@@ -2,8 +2,9 @@
 from __future__ import annotations
 import uuid, json
 from pathlib import Path
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, send_file
 from werkzeug.utils import secure_filename
+
 
 video_bp = Blueprint("video", __name__)
 
@@ -90,4 +91,12 @@ def upload_video():
 
     _append_metadata(meta)
     return jsonify({"ok": True, "id": meta["id"]}), 201
+
+
+@video_bp.get("/videos/<file_id>")
+def get_video(file_id):
+    path = _find_path(file_id)
+    if not path:
+        return jsonify(error="Not found"), 404
+    return send_file(path)
 
