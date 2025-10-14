@@ -1,6 +1,5 @@
 import base64
 import tempfile
-import os
 
 def save_base64_frame(base64_str):
     """

@@ -20,6 +20,7 @@ from api import init_engine, Base, engine as db_engine  # type: ignore
 from api.routes.auth import bp as auth_bp, User, AuditLog  # type: ignore
 from api.routes.traditional_forensics import bp_forensics
 from api.routes.video_upload import video_bp
+from api.routes.framerate import frame_rate_bp
 
 DEFAULT_DB_URL = "sqlite:///instance/app.db"
 
@@ -66,6 +67,7 @@ def create_app() -> Flask:
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(bp_forensics, url_prefix="/api/forensics")
     app.register_blueprint(video_bp, url_prefix="/api")
+    app.register_blueprint(frame_rate_bp, url_prefix="/api")
 
     # --- Healthcheck ---
     @app.get("/api/health")

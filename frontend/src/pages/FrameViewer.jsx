@@ -36,7 +36,7 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   useEffect(() => {
   const fetchFrameRate = async () => {
     try {
-      const response = await fetch("http://localhost:5000/frame_rate");
+      const response = await fetch("http://localhost:5050/api/framerate");
       const data = await response.json();
       if (data.frame_rate) {
         setFrameRate(data.frame_rate);
