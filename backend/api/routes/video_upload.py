@@ -1,9 +1,25 @@
 # backend/api/routes/video_upload.py
+"""
+Video upload endpoint that creates Analysis records.
+
+Flow:
+1. Receive multipart/form-data upload
+2. Save to /data/analyses/{analysis_id}/video.{ext}
+3. Compute SHA-256 hash
+4. Probe video metadata (ffprobe → OpenCV fallback)
+5. Create Analysis row with status="created"
+6. Return {analysis_id, video_sha256, meta}
+"""
 from __future__ import annotations
-import uuid, json
+import tempfile
 from pathlib import Path
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from werkzeug.utils import secure_filename
+
+from api import get_db
+from api.auth_utils import require_login
+from models import Analysis
+from storage import save_video_for_analysis, probe_video_metadata, DATA_ROOT
 
 video_bp = Blueprint("video", __name__)
 
@@ -11,83 +27,79 @@ ALLOWED_MIME = {
     "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "video/avi"
 }
 
-# ---------------- helpers ----------------
-def _uploads_dir() -> Path:
-    # where the actual files live
-    p = Path(current_app.instance_path) / "uploads"
-    p.mkdir(parents=True, exist_ok=True)
-    return p
-
-def _meta_store_path() -> Path:
-    """
-    Store metadata at backend/videos.json (app root), not in instance/.
-    """
-    store = Path(current_app.root_path) / "videos.json"
-    store.parent.mkdir(parents=True, exist_ok=True)  # parent is app root; safe no-op
-    return store
-
-def _append_metadata(meta: dict) -> None:
-    """Append meta to backend/videos.json (stored as a JSON array)."""
-    store = _meta_store_path()
-    if store.exists():
-        try:
-            data = json.loads(store.read_text())
-            if not isinstance(data, list):
-                data = []
-        except Exception:
-            data = []
-    else:
-        data = []
-    data.append(meta)
-    store.write_text(json.dumps(data, indent=2))
-
-def _save_video(file_storage) -> dict:
-    if not file_storage or file_storage.filename == "":
-        raise ValueError("Empty filename")
-    if file_storage.mimetype not in ALLOWED_MIME:
-        raise ValueError(f"Unsupported mimetype {file_storage.mimetype}")
-
-    file_id = str(uuid.uuid4())
-    ext = Path(secure_filename(file_storage.filename)).suffix or ".mp4"
-    out = _uploads_dir() / f"{file_id}{ext}"
-    file_storage.save(out)
-    return {
-        "id": file_id,
-        "path": str(out),  # absolute server path to the saved file
-        "mimetype": file_storage.mimetype,
-        "size_bytes": out.stat().st_size,
-        "original_name": secure_filename(file_storage.filename),
-    }
-
-def _find_path(file_id: str) -> Path | None:
-    for p in _uploads_dir().glob(f"{file_id}.*"):
-        return p
-    return None
-
-def _delete_video(file_id: str) -> bool:
-    p = _find_path(file_id)
-    if not p:
-        return False
-    p.unlink(missing_ok=True)
-    return True
-# -----------------------------------------
-
 
 @video_bp.post("/videos")
+@require_login
 def upload_video():
     """
-    Expects multipart/form-data, field name 'file'.
-    Saves file to instance/uploads/ and appends metadata to backend/videos.json.
-    Returns a minimal ack (no sensitive path to client).
+    Upload video and create Analysis record.
+
+    Expects:
+    - multipart/form-data with 'file' field
+    - Session must contain user_id (enforced by @require_login)
+
+    Returns:
+    - 201: {analysis_id, video_sha256, meta: {fps, frame_count, width, height}}
+    - 400: validation errors
+    - 401: unauthorized (no session)
     """
     if "file" not in request.files:
         return jsonify(error="No file part"), 400
 
-    try:
-        meta = _save_video(request.files["file"])
-    except ValueError as e:
-        return jsonify(error=str(e)), 400
+    file = request.files["file"]
 
-    _append_metadata(meta)
-    return jsonify({"ok": True, "id": meta["id"]}), 201
+    if not file or file.filename == "":
+        return jsonify(error="Empty filename"), 400
 
+    if file.mimetype not in ALLOWED_MIME:
+        return jsonify(error=f"Unsupported mimetype: {file.mimetype}"), 400
+
+    # Get secure extension
+    ext = Path(secure_filename(file.filename)).suffix or ".mp4"
+
+    # Use context manager for DB session
+    with get_db() as db:
+        try:
+            analysis = Analysis(
+                user_id=session["user_id"],
+                status="created",
+                video_path="",  # Will be updated after save
+                video_sha256="",  # Will be updated after save
+            )
+            db.add(analysis)
+            db.flush()  # Get analysis.id without committing
+
+            # Save uploaded file to temporary location first
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                file.save(tmp.name)
+                tmp_path = Path(tmp.name)
+
+            # Move to final location and compute SHA-256
+            video_path, sha256 = save_video_for_analysis(tmp_path, ext, analysis.id)
+
+            # Probe metadata
+            meta = probe_video_metadata(video_path)
+
+            # Update Analysis record
+            analysis.video_path = str(video_path)
+            analysis.video_sha256 = sha256
+            analysis.meta_json = meta
+
+            # Commit happens automatically in context manager
+            return jsonify({
+                "analysis_id": analysis.id,
+                "video_sha256": sha256,
+                "meta": meta
+            }), 201
+
+        except Exception as e:
+            # Rollback happens automatically in context manager
+            # Clean up video file if it exists
+            try:
+                video_dir = DATA_ROOT / analysis.id
+                if video_dir.exists():
+                    import shutil
+                    shutil.rmtree(video_dir)
+            except:
+                pass
+            return jsonify(error=f"Upload failed: {str(e)}"), 500

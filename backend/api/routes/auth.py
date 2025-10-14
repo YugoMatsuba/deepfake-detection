@@ -55,27 +55,13 @@ from sqlalchemy.orm import Mapped, mapped_column, Session
 
 from api import Base, get_db, hash_password, verify_password  # type: ignore
 
+# Import models from consolidated models.py (now managed by Alembic)
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from models import User, AuditLog
+
 bp = Blueprint("auth", __name__)
-
-# --- Minimal models colocated for now (move to models/ later) ---
-
-class User(Base):
-    __tablename__ = "users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(16), default="investigator")  # "investigator" | "admin"
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
-class AuditLog(Base):
-    __tablename__ = "audit_logs"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
-    event: Mapped[str] = mapped_column(String(32))  # "login" | "logout" | "login_failed"
-    ip: Mapped[Optional[str]] = mapped_column(String(64))
-    user_agent: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 # --- Helpers (no business logic; just parsing/skeletons) ---

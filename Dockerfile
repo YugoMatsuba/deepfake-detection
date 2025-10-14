@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libjpeg62-turbo-dev \
     ca-certificates \
+    ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspaces/deepfake_AI
@@ -93,6 +94,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libjpeg62-turbo-dev \
     ca-certificates \
+    ffmpeg \
     python3.9 \
     python3.9-distutils \
     python3.9-dev \

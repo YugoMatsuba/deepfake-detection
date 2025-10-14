@@ -14,11 +14,16 @@ import os
 from pathlib import Path
 from flask import Flask, jsonify
 from flask_cors import CORS
+from flask_compress import Compress
 
-# DB/session utilities come from api package (to be created)
+# DB/session utilities come from api package
 from api import init_engine, Base, engine as db_engine  # type: ignore
-from api.routes.auth import bp as auth_bp, User, AuditLog  # type: ignore
+from api.routes.auth import bp as auth_bp  # type: ignore
 from api.routes.traditional_forensics import bp_forensics
+from api.routes.video_upload import video_bp
+from api.routes.analysis import analysis_bp
+# Models now in consolidated models.py (managed by Alembic)
+from models import User, AuditLog, Analysis
 
 DEFAULT_DB_URL = "sqlite:///instance/app.db"
 
@@ -28,6 +33,7 @@ def create_app() -> Flask:
     # --- Config ---
     # TODO: set a real secret in production (.env)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-insecure")
+    app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
     db_url = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
     # Ensure instance dir exists for SQLite file
@@ -35,9 +41,11 @@ def create_app() -> Flask:
 
     # --- DB init ---
     init_engine(db_url=db_url)
-    
-    # TEMP: create tables if missing (replace with Alembic later)
-    Base.metadata.create_all(bind=db_engine())
+
+    # Tables now managed by Alembic migrations (run: alembic upgrade head)
+    # For local dev bootstrap only, set DB_BOOTSTRAP=1 to auto-create tables
+    if os.getenv("DB_BOOTSTRAP", "0") == "1":
+        Base.metadata.create_all(bind=db_engine())
 
     # --- CORS (dev only) ---
     # For dev Vite at http://localhost:5173. Tighten for prod.
@@ -61,9 +69,14 @@ def create_app() -> Flask:
         SESSION_COOKIE_SECURE=is_prod,   # flips on under HTTPS/nginx
     )
 
+    # --- Compression (gzip) ---
+    Compress(app)
+
     # --- Blueprints ---
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(bp_forensics, url_prefix="/api/forensics")
+    app.register_blueprint(video_bp, url_prefix="/api")
+    app.register_blueprint(analysis_bp, url_prefix="/api")
 
     # --- Healthcheck ---
     @app.get("/api/health")
