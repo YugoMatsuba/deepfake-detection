@@ -1,11 +1,40 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FrameViewer from './FrameViewer';
+import { useAnalysis } from '../app/AnalysisProvider';
 
 export default function FrameViewerPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { analysisId, fps } = location.state || {};
+  const { analysisResult } = useAnalysis();
+  const state = location.state || {};
+
+  const analysisId = state.analysisId || analysisResult?.analysis_id;
+  const fps =
+    state.fps ??
+    analysisResult?.ml_video?.fps ??
+    null;
+
+  const mlFramesRaw = state.mlFrames ?? analysisResult?.ml_frames ?? [];
+  const mlModels = state.mlModels ?? analysisResult?.ml ?? {};
+  const traditionalResults = state.traditional ?? analysisResult?.traditional ?? {};
+
+  const flaggedFrameIndices = useMemo(() => {
+    if (!Array.isArray(mlFramesRaw)) {
+      return [];
+    }
+    return mlFramesRaw
+      .map((frame) => {
+        if (typeof frame === "number") {
+          return frame;
+        }
+        if (frame && typeof frame.index === "number") {
+          return frame.index;
+        }
+        return null;
+      })
+      .filter((idx) => typeof idx === "number");
+  }, [mlFramesRaw]);
 
   useEffect(() => {
     if (!analysisId) {
@@ -26,6 +55,9 @@ export default function FrameViewerPage() {
       <FrameViewer
         videoSrc={videoSrc}
         initialFrameRate={fps}
+        deepfakeFrames={flaggedFrameIndices}
+        deepfakeMeta={mlModels}
+        traditionalResults={traditionalResults}
       />
     </div>
   );

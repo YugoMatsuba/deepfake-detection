@@ -101,58 +101,94 @@ def run_traditional_forensics(video_path: str, modules: list[str]) -> dict[str, 
 def _transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     """Transform ELA result to API response format."""
     if raw_result.get("mode") == "single_frame":
-        return {
+        frame_entry = {
+            "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
             "overlay": raw_result.get("ela_image_base64", "")
+        }
+        return {
+            "score": frame_entry["score"],
+            "frames": [frame_entry]
         }
 
     # Multi-frame: use first top frame as representative
     top_frames = raw_result.get("top_frames", [])
     if top_frames:
-        first = top_frames[0]
+        frame_list = [
+            {
+                "frame": frame.get("frame"),
+                "score": frame.get("score", 0.0),
+                "overlay": frame.get("ela_image_base64", "")
+            }
+            for frame in top_frames
+        ]
         return {
-            "score": first.get("score", 0.0),
-            "overlay": first.get("ela_image_base64", "")
+            "score": frame_list[0]["score"],
+            "frames": frame_list
         }
 
-    return {"score": 0.0, "overlay": ""}
+    return {"score": 0.0, "frames": []}
 
 
 def _transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     """Transform noise result to API response format."""
     if raw_result.get("mode") == "single_frame":
-        return {
+        frame_entry = {
+            "frame": raw_result.get("frame"),
             "confidence": raw_result.get("confidence", 0.0),
             "overlay": raw_result.get("residual_image_base64", "")
+        }
+        return {
+            "confidence": frame_entry["confidence"],
+            "frames": [frame_entry]
         }
 
     # Multi-frame: use first top frame
     top_frames = raw_result.get("top_frames", [])
     if top_frames:
-        first = top_frames[0]
+        frame_list = [
+            {
+                "frame": frame.get("frame"),
+                "confidence": frame.get("score", 0.0),
+                "overlay": frame.get("residual_image_base64", "")
+            }
+            for frame in top_frames
+        ]
         return {
-            "confidence": first.get("score", 0.0),
-            "overlay": first.get("residual_image_base64", "")
+            "confidence": frame_list[0]["confidence"],
+            "frames": frame_list
         }
 
-    return {"confidence": 0.0, "overlay": ""}
+    return {"confidence": 0.0, "frames": []}
 
 
 def _transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     """Transform LBP result to API response format."""
     if raw_result.get("mode") == "single_frame":
-        return {
+        frame_entry = {
+            "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
             "overlay": raw_result.get("lbp_image_base64", "")
+        }
+        return {
+            "score": frame_entry["score"],
+            "frames": [frame_entry]
         }
 
     # Multi-frame: use first top frame
     top_frames = raw_result.get("top_frames", [])
     if top_frames:
-        first = top_frames[0]
+        frame_list = [
+            {
+                "frame": frame.get("frame"),
+                "score": frame.get("normalized_score", frame.get("score", 0.0)),
+                "overlay": frame.get("lbp_image_base64", "")
+            }
+            for frame in top_frames
+        ]
         return {
-            "score": first.get("normalized_score", 0.0),
-            "overlay": first.get("lbp_image_base64", "")
+            "score": frame_list[0]["score"],
+            "frames": frame_list
         }
 
-    return {"score": 0.0, "overlay": ""}
+    return {"score": 0.0, "frames": []}

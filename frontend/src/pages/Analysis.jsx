@@ -7,11 +7,15 @@ const baseButton = "justify-center items-center mt-[15px] text-[17px] font-semib
 
 export default function Analysis() {
   const navigate = useNavigate();
-  const { analysisId, selectedModules } = useAnalysis();
+  const {
+    analysisId,
+    selectedModules,
+    analysisResult,
+    setAnalysisResult
+  } = useAnalysis();
   const [status, setStatus] = useState('idle'); // 'idle' | 'running' | 'success' | 'error'
   const [fakeVideoPercentage, setFakeVideoPercentage] = useState(null);
   const [error, setError] = useState(null);
-  const [analysisData, setAnalysisData] = useState(null);
 
   useEffect(() => {
     if (!analysisId) {
@@ -23,7 +27,7 @@ export default function Analysis() {
   const handleStartAnalysis = async () => {
     setStatus('running');
     setError(null);
-    setAnalysisData(null);
+    setAnalysisResult(null);
 
     try {
       const response = await startAnalysis(
@@ -40,7 +44,7 @@ export default function Analysis() {
         : 0;
 
       setFakeVideoPercentage(avgScore);
-      setAnalysisData(response);
+      setAnalysisResult(response);
       setStatus('success');
     } catch (err) {
       setError(err.message || 'Analysis failed');
@@ -123,13 +127,14 @@ export default function Analysis() {
           onClick={() => navigate('/frame-viewer', {
             state: {
               analysisId,
-              fps: analysisData?.ml_video?.fps ?? null,
-              mlFrames: analysisData?.ml_frames ?? [],
-              mlModels: analysisData?.ml ?? {}
+              fps: analysisResult?.ml_video?.fps ?? null,
+              mlFrames: analysisResult?.ml_frames ?? [],
+              mlModels: analysisResult?.ml ?? {},
+              traditional: analysisResult?.traditional ?? {}
             }
           })}
           className={`${baseButton} bg-[#1E88E5] text-white hover:bg-[#114f85] hover:text-[#cccccc] transition-colors`}
-          disabled={!analysisData}
+          disabled={!analysisResult}
         >
           Yes
         </button>
