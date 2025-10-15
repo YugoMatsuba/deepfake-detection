@@ -236,5 +236,12 @@
     "mimetype": "video/mp4",
     "size_bytes": 344095,
     "original_name": "rickroll.mp4"
+  },
+  {
+    "id": "270a31b9-05d4-4332-a868-6feb1b00619d",
+    "path": "D:\\UNIMELB SUBJECTS\\Y3\\S1\\IT Project\\main\\deepfake_AI\\backend\\instance\\uploads\\270a31b9-05d4-4332-a868-6feb1b00619d.mp4",
+    "mimetype": "video/mp4",
+    "size_bytes": 344095,
+    "original_name": "rickroll.mp4"
   }
 ]

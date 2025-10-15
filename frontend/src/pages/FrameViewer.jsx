@@ -11,6 +11,17 @@ const FrameViewer = ({
   analysisId,
   onTraditionalResultsUpdate = () => {},
 }) => {
+
+   useEffect(() => {
+    console.log("FrameViewer props:");
+    console.log("videoSrc:", videoSrc);
+    console.log("initialFrameRate:", initialFrameRate);
+    console.log("deepfakeFrames:", deepfakeFrames);
+    console.log("deepfakeMeta:", deepfakeMeta);
+    console.log("traditionalResults:", traditionalResults);
+    console.log("analysisId:", analysisId);
+  }, [videoSrc, initialFrameRate, deepfakeFrames, deepfakeMeta, traditionalResults, analysisId]);
+
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -27,6 +38,12 @@ const FrameViewer = ({
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(null);
   const [traditionalData, setTraditionalData] = useState(traditionalResults || {});
+  const [markerType, setMarkerType] = useState("ml");
+  const [isTooltipHovered, setIsTooltipHovered] = useState(false); 
+  const [selectedMarkerType, setSelectedMarkerType] = useState(null);
+  const [showAllMarkers, setShowAllMarkers] = useState(false);
+
+
 
 
 
@@ -117,18 +134,21 @@ useEffect(() => {
   };
 
   // Extract “details” for the currently selected frame
-  const details = (() => {
-    const meta = getMeta(detailsFrame);
-    return {
-      anomalyScore: typeof meta?.anomalyScore === "number" ? meta.anomalyScore : null, // 0..1
-      methods: {
-        ela: typeof meta?.methods?.ela === "number" ? meta.methods.ela : null,
-        noise: typeof meta?.methods?.noise === "number" ? meta.methods.noise : null,
-        lbp: typeof meta?.methods?.lbp === "number" ? meta.methods.lbp : null,
-      },
-      temporalLabels: Array.isArray(meta?.temporalLabels) ? meta.temporalLabels : [],
-    };
-  })();
+ const details = (() => {
+  const meta = getMeta(detailsFrame); // ML meta
+  const methods = ["ela", "noise", "lbp"].reduce((acc, type) => {
+    const frames = traditionalData?.[type]?.frames || [];
+    const frameData = frames.find(f => (f.frame_number ?? f.frame) === detailsFrame);
+    acc[type] = frameData?.score ?? frameData?.confidence ?? null;
+    return acc;
+  }, {});
+
+  return {
+    anomalyScore: typeof meta?.anomalyScore === "number" ? meta.anomalyScore : null,
+    methods,
+    temporalLabels: Array.isArray(meta?.temporalLabels) ? meta.temporalLabels : [],
+  };
+})();
 
 
 
@@ -142,13 +162,12 @@ useEffect(() => {
     }
   };
 
-  const scheduleHideTooltip = () => {
-    clearHideTimer();
-    hideTimerRef.current = setTimeout(() => {
-      setHoveredIndex(null);
-      hideTimerRef.current = null;
-    }, 500); // 0.5s in miliseconds
-  };
+  const hideTooltip = () => {
+  clearHideTimer();
+  setHoveredIndex(null);
+
+};
+
 
   useEffect(() => {
     return () => clearHideTimer();
@@ -256,19 +275,27 @@ useEffect(() => {
 };
 
   // Tooltip anchor frame
-  const hoveredFrame =
-    hoveredIndex !== null &&
-    hoveredIndex >= 0 &&
-    hoveredIndex < deepfakeFrames.length
-      ? deepfakeFrames[hoveredIndex]
-      : null;
+  const hoveredFrame = (() => {
+  if (hoveredIndex === null) return null;
+
+  if (markerType === "ml") {
+    return deepfakeFrames[hoveredIndex] ?? null;
+  }
+
+  // For other types
+  const frames = traditionalData?.[markerType]?.frames;
+  if (!frames || hoveredIndex < 0 || hoveredIndex >= frames.length) return null;
+
+  return frames[hoveredIndex].frame_number ?? frames[hoveredIndex].frame;
+})();
+
 
   // Tooltip text: from deepfakeMeta if available, else a fallback
   const hoveredSummary =
     hoveredFrame != null && deepfakeMeta && deepfakeMeta[hoveredFrame]?.summary
       ? deepfakeMeta[hoveredFrame].summary
       : hoveredFrame != null
-      ? `Flagged at frame ${hoveredFrame}.`
+      ? `Flagged at frame ${hoveredFrame}`
       : "";
 
   const mergeFrames = (existing = [], additions = []) => {
@@ -467,6 +494,31 @@ const getColor = (type, value) => {
             })()}
           </div>
 
+          <div className="flex justify-center gap-2 mb-2 flex-wrap">
+  <Button
+    size="sm"
+    variant={showAllMarkers ? "default" : "secondary"}
+    onClick={() => setShowAllMarkers(!showAllMarkers)}
+  >
+    ALL
+  </Button>
+
+  {["ml", "ela", "noise", "lbp"].map((type) => (
+    <Button
+      key={type}
+      size="sm"
+      variant={!showAllMarkers && markerType === type ? "default" : "secondary"}
+      onClick={() => {
+        setMarkerType(type);
+        setShowAllMarkers(false); // disable show all when a single marker is selected
+      }}
+    >
+      {type.toUpperCase()}
+    </Button>
+  ))}
+</div>
+
+
           {/* === TIMELINE BAR === */}
           <div className="relative w-full h-4 bg-gray-200 rounded-lg">
             {/* Current progress */}
@@ -506,12 +558,13 @@ const getColor = (type, value) => {
   }`}
 >
   {analysisResult.score !== undefined ? (
-    analysisResult.analysis_type === "ela"
-      ? analysisResult.score.toFixed(2) // raw value for ELA
-      : `${(analysisResult.score * 100).toFixed(2)}%` // percentage for Noise & LBP
-  ) : (
-    "No score available"
-  )}
+  analysisResult.analysis_type === "ela" || analysisResult.analysis_type === "lbp"
+    ? analysisResult.score.toFixed(2) // raw value for ELA and LBP
+    : `${(analysisResult.score * 100).toFixed(2)}%` // percentage only for Noise
+) : (
+  "No score available"
+)}
+
 </p>
 
       {(() => {
@@ -557,48 +610,101 @@ const getColor = (type, value) => {
 
 </div>
 
-            {/* Deepfake markers */}
-            {deepfakeFrames.map((frame, index) => (
-              <div
-                key={index}
-                className="absolute top-0 h-4 w-1 bg-red-500"
-                style={{ left: `${pctLeft(frame)}%` }}
-                onMouseEnter={() => {
-                  clearHideTimer();
-                  setHoveredIndex(index); // immediate switch
-                }}
-                onMouseLeave={scheduleHideTooltip} // 1s grace
-              />
-            ))}
+{/* Timeline markers */}
+{(showAllMarkers ? ["ml", "ela", "noise", "lbp"] : [markerType]).map((type) => {
+  if (type === "ml") {
+    return deepfakeFrames.map((frame, index) => (
+      <div
+        key={`df-${index}`}
+        className="absolute top-0 h-4 w-1 bg-red-500"
+        style={{ left: `${pctLeft(frame)}%` }}
+        onMouseEnter={() => setHoveredIndex(index)}
+        onMouseLeave={() => { if (!isTooltipHovered) setHoveredIndex(null); }}
+        onDoubleClick={() => {
+          setIsDetailsOpen(true);
+          setDetailsFrame(frame);
+          setSelectedMarkerType("ml");
+        }}
+      />
+    ));
+  } else {
+    return traditionalData?.[type]?.frames?.map((frame, idx) => {
+      const frameNum = frame.frame_number ?? frame.frame;
+      if (frameNum == null) return null;
 
-            {/* Hover tooltip */}
-            {hoveredFrame != null && (
-              <div
-                className="absolute -top-28 z-30"
-                style={{ left: `${pctLeft(hoveredFrame)}%`, transform: "translateX(-50%)" }}
-                onMouseEnter={clearHideTimer}      // keep open while hovered
-                onMouseLeave={scheduleHideTooltip} // close after 1s when leaving
-              >
-                {/* Tooltip card */}
-                <div className="flex flex-col items-center justify-center relative w-64 rounded-xl border border-gray-300 bg-white p-3 shadow-lg">
-                  <p className="text-sm text-gray-800 leading-snug">{hoveredSummary}</p>
-                  <Button
-                    size="sm"
-                    className="mt-2 bg-[#1E88E5] text-white hover:bg-[#114f85] hover:text-[#cccccc] transition-colors"
-                    onClick={() => {
-                      setDetailsFrame(hoveredFrame);
-                      setIsDetailsOpen(true);
-                    }}
-                  >
-                    More Details
-                  </Button>
+      const showFrame = frame.flagged || typeof frame.score === "number" || typeof frame.confidence === "number";
+      if (!showFrame) return null;
 
-                  {/* Arrow */}
-                  <div className="absolute left-1/2 top-full -translate-x-1/2 -mt-2 w-3 h-3 rotate-45 bg-white border-r border-b border-gray-300" />
-                </div>
-              </div>
-            )}
-          </div>
+      return (
+        <div
+          key={`${type}-${idx}`}
+          className="absolute top-0 h-4 w-1 rounded-sm"
+          style={{
+            left: `${pctLeft(frameNum)}%`,
+            backgroundColor:
+              type === "ela" ? "#4B0082" :
+              type === "noise" ? "#facc15" : "#10b981",
+          }}
+          onMouseEnter={() => {
+            clearHideTimer();
+            setHoveredIndex(idx);
+            setDetailsFrame(frameNum);
+            setSelectedMarkerType(type);
+          }}
+          onMouseLeave={hideTooltip}
+          onDoubleClick={() => {
+            setIsDetailsOpen(true);
+            setDetailsFrame(frameNum);
+            setSelectedMarkerType(type);
+          }}
+        />
+      );
+    });
+  }
+})}
+
+
+
+  
+
+  
+{/* Hover tooltip */}
+{hoveredFrame != null && (
+  <div
+    className="absolute -top-28 z-30"
+    style={{
+      left: `${pctLeft(hoveredFrame)}%`,
+      transform: "translateX(-50%)",
+    }}
+    onMouseEnter={() => setIsTooltipHovered(true)}
+    onMouseLeave={() => {
+      setIsTooltipHovered(false);
+      setHoveredIndex(null); // hide when mouse leaves the tooltip
+    }}
+    onDoubleClick={() => {
+      setIsDetailsOpen(true);
+      setDetailsFrame(hoveredFrame);
+    }}
+  >
+    <div className="flex flex-col items-center justify-center relative w-64 rounded-xl border border-gray-300 bg-white p-3 shadow-lg">
+      
+      {/* Title: ML, ELA, Noise, or LBP */}
+      <h4 className="text-center text-sm font-semibold mb-1">
+        {markerType.toUpperCase()}
+      </h4>
+
+      {/* Summary */}
+      <p className="text-sm text-gray-800 leading-snug">
+        {deepfakeMeta?.[hoveredFrame]?.summary || `Flagged at frame ${hoveredFrame}`}
+      </p>
+
+      {/* Tooltip arrow */}
+      <div className="absolute left-1/2 top-full -translate-x-1/2 -mt-2 w-3 h-3 rotate-45 bg-white border-r border-b border-gray-300" />
+    </div>
+  </div>
+)}
+
+</div>
 
           <div className="flex justify-center gap-12">
             <Button variant="secondary" className="bg-white" onClick={prevDeepfake}>
@@ -665,112 +771,84 @@ const getColor = (type, value) => {
 
 </div>
         {/* RIGHT: Details panel */}
-        {isDetailsOpen && (
-          <Card className="w-[360px] shrink-0 shadow-lg rounded-2xl gap-">
-            <CardContent className="p-5 space-y-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">Frame Details</h3>
-                  <p className="text-xs text-gray-500">
-                    Frame {detailsFrame != null ? detailsFrame : "—"}
-                  </p>
-                </div>
-                <Button variant="secondary" className="bg-white" onClick={() => setIsDetailsOpen(false)}>
-                  Close
-                </Button>
-              </div>
+        {isDetailsOpen && detailsFrame != null && (
+  <Card className="w-[360px] shrink-0 shadow-lg rounded-2xl">
+    <CardContent className="p-5 space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Frame Details</h3>
+          <p className="text-xs text-gray-500">
+            Frame {detailsFrame != null ? detailsFrame : "—"}
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          className="bg-white"
+          onClick={() => setIsDetailsOpen(false)}
+        >
+          Close
+        </Button>
+      </div>
 
-              
+      {/* ML Detection */}
+{selectedMarkerType === "ml" && detailsFrame != null && (
+  <section>
+    <h4 className="text-sm font-medium text-gray-700 mb-2">ML Detection Score</h4>
+    {(() => {
+      const flaggedFrames = Object.entries(deepfakeMeta || {}).map(([modelName, modelData]) => {
+        const frame = modelData.frames?.find(f => f.index === detailsFrame);
+        if (!frame || typeof frame.score !== "number") return null;
+        return {
+          model: modelName,
+          index: frame.index,
+          score: frame.score,
+          time: frame.time
+        };
+      }).filter(Boolean);
 
-              {/* Anomaly vs Average */}
-              <section>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Anomaly Score</h4>
-                {(() => {
-                  const avg = getAverageAnomaly();
-                  const cur = details.anomalyScore;
-                  if (cur == null) {
-                    return <p className="text-sm text-gray-500">No anomaly score available.</p>;
-                  }
-                  const pct = Math.round(cur * 100);
-                  const avgPct = avg != null ? Math.round(avg * 100) : null;
-                  const delta = avg != null ? pct - avgPct : null;
-                  return (
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{pct}%</span>
-                        {avgPct != null && (
-                          <span className="text-gray-500">
-                            avg {avgPct}%{" "}
-                            {delta != null && (
-                              <span className={delta >= 0 ? "text-red-600" : "text-green-600"}>
-                                ({delta >= 0 ? "+" : ""}{delta}%)
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-500"
-                          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
-              </section>
+      if (flaggedFrames.length === 0) {
+        return <p className="text-sm text-gray-500">No ML score available for this frame.</p>;
+      }
 
-              
+      return flaggedFrames.map(f => (
+        <div key={`${f.model}-${f.index}`} className="flex items-center justify-between text-sm">
+          <span>{f.model.toUpperCase()} — {f.time.toFixed(2)}s</span>
+          <span className="font-bold text-blue-600">{Math.round(f.score * 100)}%</span>
+        </div>
+      ));
+    })()}
+  </section>
+)}
 
-              {/* Forensic methods */}
-              <section>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Forensic Methods</h4>
-                <div className="space-y-3">
-                  {[
-                    { key: "ela", label: "ELA Analysis", value: details.methods.ela },
-                    { key: "noise", label: "Noise Analysis", value: details.methods.noise },
-                    { key: "lbp", label: "LBP Analysis", value: details.methods.lbp },
-                  ].map(({ key, label, value }) => (
-                    <div key={key}>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>{label}</span>
-                        <span className="text-gray-600">
-                          {typeof value === "number" ? `${Math.round(value * 100)}%` : "N/A"}
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gray-700"
-                          style={{
-                            width: `${
-                              typeof value === "number"
-                                ? Math.min(100, Math.max(0, Math.round(value * 100)))
-                                : 0
-                            }%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
+{/* Forensic Methods */}
+{(["ela", "noise", "lbp"].filter(t => showAllMarkers || t === selectedMarkerType)).map((type) => {
+  const value = details.methods[type];
+  if (typeof value !== "number") return <p key={type} className="text-sm text-gray-500">No score available for {type.toUpperCase()}.</p>;
 
-              {/* Temporal labels */}
-              <section>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Temporal Consistency</h4>
-                {details.temporalLabels.length ? (
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-gray-800">
-                    {details.temporalLabels.map((t, i) => (
-                      <li key={i}>{t}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-500">No temporal anomalies reported.</p>
-                )}
-              </section>
-            </CardContent>
-          </Card>
-        )}
+  const isPercentage = type === "noise";
+  const displayValue = isPercentage ? `${Math.round(value * 100)}%` : value.toFixed(2);
+  const barWidth = isPercentage ? Math.min(100, Math.max(0, Math.round(value * 100))) : Math.min(100, Math.max(0, value * 100));
+
+  return (
+    <div key={type} className="mb-3">
+      <div className="flex items-center justify-between text-sm">
+        <span>{type.toUpperCase()} Analysis</span>
+        <span className="text-gray-600">{displayValue}</span>
+      </div>
+      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-full bg-gray-700" style={{ width: `${barWidth}%` }} />
+      </div>
+    </div>
+  );
+})}
+
+
+    </CardContent>
+  </Card>
+)}
+
+
 
         
 
