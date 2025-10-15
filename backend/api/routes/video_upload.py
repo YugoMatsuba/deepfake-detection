@@ -13,7 +13,8 @@ Flow:
 from __future__ import annotations
 import tempfile
 from pathlib import Path
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, session, send_file
+from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 
 from api import get_db
@@ -103,3 +104,26 @@ def upload_video():
             except:
                 pass
             return jsonify(error=f"Upload failed: {str(e)}"), 500
+
+
+@video_bp.get("/videos/<analysis_id>")
+@cross_origin()
+def get_video(analysis_id: str):
+    """
+    Serve video file for a given analysis.
+
+    Used by frame viewer to stream video content.
+    Does NOT require authentication (public video serving).
+    """
+    # Find video file in analysis directory
+    video_dir = DATA_ROOT / analysis_id
+    if not video_dir.exists():
+        return jsonify(error="Analysis not found"), 404
+
+    # Find video file (any extension)
+    video_files = list(video_dir.glob("video.*"))
+    if not video_files:
+        return jsonify(error="Video file not found"), 404
+
+    video_path = video_files[0]
+    return send_file(video_path, mimetype="video/mp4")
