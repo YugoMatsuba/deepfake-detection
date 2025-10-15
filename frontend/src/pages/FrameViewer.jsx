@@ -7,7 +7,9 @@ const FrameViewer = ({
   initialFrameRate = null,
   deepfakeFrames = [],
   deepfakeMeta = {},
-  traditionalResults = {}
+  traditionalResults = {},
+  analysisId,
+  onTraditionalResultsUpdate = () => {},
 }) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -24,6 +26,7 @@ const FrameViewer = ({
   const [videoUrl, setVideoUrl] = useState(null);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(null);
+  const [traditionalData, setTraditionalData] = useState(traditionalResults || {});
 
 
 
@@ -43,11 +46,15 @@ const FrameViewer = ({
   // Get meta for a frame (safe)
   const getMeta = (frame) => (frame != null ? deepfakeMeta?.[frame] || null : null);
 
-  useEffect(() => {
-    if (initialFrameRate) {
-      setFrameRate(initialFrameRate);
-    }
-  }, [initialFrameRate]);
+useEffect(() => {
+  if (initialFrameRate) {
+    setFrameRate(initialFrameRate);
+  }
+}, [initialFrameRate]);
+
+useEffect(() => {
+  setTraditionalData(traditionalResults || {});
+}, [traditionalResults]);
 
   useEffect(() => {
     let abort = false;
@@ -264,58 +271,129 @@ useEffect(() => {
       ? `Flagged at frame ${hoveredFrame}.`
       : "";
 
-  const analyzeFrame = async (analysisType) => {
-  const video = videoRef.current;
-  if (!video) return;
-
-  // Pause the video immediately
-  if (!video.paused) {
-    video.pause();
-    setIsPlaying(false);
-  }
-
-  setIsAnalysing(true);
-  setAnalysisResult(null);
-
-  try {
-    // Capture the current frame
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const frameData = canvas.toDataURL("image/jpeg");
-
-    // Send to backend
-    const response = await fetch("http://localhost:5050/api/forensics/analyze_frame", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ frame_data: frameData, analysis_type: analysisType, frame_number: currentFrame }),
+  const mergeFrames = (existing = [], additions = []) => {
+    const byKey = new Map();
+    [...existing, ...additions].forEach((frame) => {
+      if (!frame) {
+        return;
+      }
+      const key =
+        typeof frame.frame_number === "number"
+          ? `idx_${frame.frame_number}`
+          : frame.frame ?? JSON.stringify(frame);
+      const existingEntry = byKey.get(key) || {};
+      byKey.set(key, { ...existingEntry, ...frame });
     });
+    return Array.from(byKey.values()).sort((a, b) => {
+      const aNum = typeof a.frame_number === "number" ? a.frame_number : Number.POSITIVE_INFINITY;
+      const bNum = typeof b.frame_number === "number" ? b.frame_number : Number.POSITIVE_INFINITY;
+      if (aNum !== bNum) {
+        return aNum - bNum;
+      }
+      const aFrame = a.frame ?? "";
+      const bFrame = b.frame ?? "";
+      return aFrame.localeCompare(bFrame);
+    });
+  };
 
-    const text = await response.text(); // Read as text first for debugging
-    let result;
+  const analyzeFrame = async (analysisType) => {
+    if (!analysisId) {
+      alert("Analysis ID not found. Please restart the analysis flow.");
+      return;
+    }
+
+    const video = videoRef.current;
+    if (video && !video.paused) {
+      video.pause();
+      setIsPlaying(false);
+    }
+
+    const targetFrame = Number.isFinite(currentFrame) ? currentFrame : 0;
+
+    setIsAnalysing(true);
+    setAnalysisResult(null);
+
     try {
-      result = JSON.parse(text);
-    } catch {
-      console.error("Invalid JSON from server:", text);
-      throw new Error("Invalid JSON returned by backend");
-    }
+      const response = await fetch(
+        `http://localhost:5050/api/analyses/${analysisId}/frames/${targetFrame}/forensics`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ methods: [analysisType] }),
+        }
+      );
 
-    if (!response.ok) {
-      throw new Error(result.error || "Analysis failed");
-    }
+      const result = await response.json();
 
-    console.log(`${analysisType} result:`, result);
-    setAnalysisResult(result);
-    setOverlayResult(result);
-  } catch (error) {
-    console.error("Error analyzing frame:", error);
-    alert(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
-  } finally {
-    setIsAnalysing(false);
-  }
-};
+      if (!response.ok) {
+        throw new Error(result.error || "Analysis failed");
+      }
+
+      const methodResult = result?.results?.[analysisType];
+      if (!methodResult) {
+        throw new Error("Backend returned no data for the requested analysis.");
+      }
+
+      const normalizedFrames = (methodResult.frames || []).map((frame) => ({
+        ...frame,
+        frame_number:
+          typeof frame?.frame_number === "number"
+            ? frame.frame_number
+            : result.frame_number,
+      }));
+
+      const existingMethod = traditionalData?.[analysisType] || {};
+      const mergedFrames = mergeFrames(existingMethod.frames || [], normalizedFrames);
+
+      const updatedMethod = {
+        ...existingMethod,
+        ...methodResult,
+        frames: mergedFrames,
+      };
+
+      const updatedTraditional = {
+        ...traditionalData,
+        [analysisType]: updatedMethod,
+      };
+
+      setTraditionalData(updatedTraditional);
+      onTraditionalResultsUpdate(updatedTraditional);
+
+      const primaryFrame =
+        mergedFrames.find((frame) => frame.frame_number === result.frame_number) ||
+        mergedFrames[mergedFrames.length - 1] ||
+        null;
+
+      const overlayData = primaryFrame?.overlay ?? null;
+      const primaryScore =
+        methodResult.score ??
+        methodResult.confidence ??
+        primaryFrame?.score ??
+        primaryFrame?.confidence ??
+        null;
+
+      setAnalysisResult({
+        analysis_type: analysisType,
+        frame_number: result.frame_number,
+        score: primaryScore,
+        confidence:
+          methodResult.confidence ?? primaryFrame?.confidence ?? null,
+        overlay: overlayData,
+      });
+
+      setOverlayResult(
+        overlayData
+          ? { analysis_type: analysisType, overlay: overlayData }
+          : null
+      );
+    } catch (error) {
+      console.error("Error analyzing frame:", error);
+      alert(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
+    } finally {
+      setIsAnalysing(false);
+    }
+  };
 
 // Determine color class based on analysis type and value
 const getColor = (type, value) => {
@@ -368,13 +446,25 @@ const getColor = (type, value) => {
             )}
 
             {/* Overlay image for ELA, LBP, or Noise */}
-            {overlayResult?.image_file && (
-              <img
-                src={`http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`}
-                alt={`${overlayResult.analysis_type?.toUpperCase()} overlay`}
-                className="absolute top-0 left-0 w-full h-full object-cover opacity-100 pointer-events-none rounded-lg"
-              />
-            )}
+            {(() => {
+              const overlaySrc = overlayResult?.overlay
+                ? overlayResult.overlay
+                : overlayResult?.image_file
+                ? `http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`
+                : null;
+
+              if (!overlaySrc) {
+                return null;
+              }
+
+              return (
+                <img
+                  src={overlaySrc}
+                  alt={`${overlayResult.analysis_type?.toUpperCase() || "Analysis"} overlay`}
+                  className="absolute top-0 left-0 w-full h-full object-cover opacity-100 pointer-events-none rounded-lg"
+                />
+              );
+            })()}
           </div>
 
           {/* === TIMELINE BAR === */}
@@ -424,13 +514,25 @@ const getColor = (type, value) => {
   )}
 </p>
 
-{analysisResult.image_file && (
-        <img
-          src={`http://localhost:5050/${analysisResult.image_file.replace(/\\/g, "/")}`}
-          alt={`${analysisResult.analysis_type?.toUpperCase()} overlay`}
-          className="w-full rounded-lg mb-4"
-        />
-      )}
+      {(() => {
+        const overlaySrc = analysisResult.overlay
+          ? analysisResult.overlay
+          : analysisResult.image_file
+          ? `http://localhost:5050/${analysisResult.image_file.replace(/\\/g, "/")}`
+          : null;
+
+        if (!overlaySrc) {
+          return null;
+        }
+
+        return (
+          <img
+            src={overlaySrc}
+            alt={`${analysisResult.analysis_type?.toUpperCase() || "Analysis"} overlay`}
+            className="w-full rounded-lg mb-4"
+          />
+        );
+      })()}
 
 
 

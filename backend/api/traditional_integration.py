@@ -9,12 +9,30 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from api.traditional_forensics_utils.frame_extraction import extract_frames
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
 from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
+
+
+def _parse_frame_number(frame_label: Optional[str]) -> Optional[int]:
+    """
+    Attempt to parse a numeric frame index from a frame label (e.g., 'frame_0005.jpg').
+    Returns None if no numeric portion is found.
+    """
+    if not frame_label:
+        return None
+
+    stem = Path(frame_label).stem
+    digits = "".join(ch for ch in stem if ch.isdigit())
+    if digits:
+        try:
+            return int(digits)
+        except ValueError:
+            return None
+    return None
 
 
 def run_traditional_forensics(video_path: str, modules: list[str]) -> dict[str, Any]:
@@ -63,15 +81,15 @@ def run_traditional_forensics(video_path: str, modules: list[str]) -> dict[str, 
                 try:
                     if module_name == "ela":
                         raw_result = run_ela(frames_folder, top_percent=10)
-                        results["ela"] = _transform_ela_result(raw_result)
+                        results["ela"] = transform_ela_result(raw_result)
 
                     elif module_name == "noise":
                         raw_result = run_noise_analysis(frames_folder, top_percent=10)
-                        results["noise"] = _transform_noise_result(raw_result)
+                        results["noise"] = transform_noise_result(raw_result)
 
                     elif module_name == "lbp":
                         raw_result = run_lbp_analysis(frames_folder, top_percent=10)
-                        results["lbp"] = _transform_lbp_result(raw_result)
+                        results["lbp"] = transform_lbp_result(raw_result)
 
                     else:
                         results[module_name] = {
@@ -98,7 +116,7 @@ def run_traditional_forensics(video_path: str, modules: list[str]) -> dict[str, 
             }
 
 
-def _transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
+def transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     """Transform ELA result to API response format."""
     if raw_result.get("mode") == "single_frame":
         frame_entry = {
@@ -106,6 +124,7 @@ def _transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
             "score": raw_result.get("score", 0.0),
             "overlay": raw_result.get("ela_image_base64", "")
         }
+        frame_entry["frame_number"] = _parse_frame_number(frame_entry.get("frame"))
         return {
             "score": frame_entry["score"],
             "frames": [frame_entry]
@@ -118,7 +137,8 @@ def _transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
             {
                 "frame": frame.get("frame"),
                 "score": frame.get("score", 0.0),
-                "overlay": frame.get("ela_image_base64", "")
+                "overlay": frame.get("ela_image_base64", ""),
+                "frame_number": _parse_frame_number(frame.get("frame")),
             }
             for frame in top_frames
         ]
@@ -130,7 +150,7 @@ def _transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     return {"score": 0.0, "frames": []}
 
 
-def _transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
+def transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     """Transform noise result to API response format."""
     if raw_result.get("mode") == "single_frame":
         frame_entry = {
@@ -138,6 +158,7 @@ def _transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
             "confidence": raw_result.get("confidence", 0.0),
             "overlay": raw_result.get("residual_image_base64", "")
         }
+        frame_entry["frame_number"] = _parse_frame_number(frame_entry.get("frame"))
         return {
             "confidence": frame_entry["confidence"],
             "frames": [frame_entry]
@@ -150,7 +171,8 @@ def _transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
             {
                 "frame": frame.get("frame"),
                 "confidence": frame.get("score", 0.0),
-                "overlay": frame.get("residual_image_base64", "")
+                "overlay": frame.get("residual_image_base64", ""),
+                "frame_number": _parse_frame_number(frame.get("frame")),
             }
             for frame in top_frames
         ]
@@ -162,7 +184,7 @@ def _transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     return {"confidence": 0.0, "frames": []}
 
 
-def _transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
+def transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     """Transform LBP result to API response format."""
     if raw_result.get("mode") == "single_frame":
         frame_entry = {
@@ -170,6 +192,7 @@ def _transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
             "score": raw_result.get("score", 0.0),
             "overlay": raw_result.get("lbp_image_base64", "")
         }
+        frame_entry["frame_number"] = _parse_frame_number(frame_entry.get("frame"))
         return {
             "score": frame_entry["score"],
             "frames": [frame_entry]
@@ -182,7 +205,8 @@ def _transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
             {
                 "frame": frame.get("frame"),
                 "score": frame.get("normalized_score", frame.get("score", 0.0)),
-                "overlay": frame.get("lbp_image_base64", "")
+                "overlay": frame.get("lbp_image_base64", ""),
+                "frame_number": _parse_frame_number(frame.get("frame")),
             }
             for frame in top_frames
         ]

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import FrameViewer from './FrameViewer';
 import { useAnalysis } from '../app/AnalysisProvider';
@@ -6,7 +6,7 @@ import { useAnalysis } from '../app/AnalysisProvider';
 export default function FrameViewerPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { analysisResult } = useAnalysis();
+  const { analysisResult, setAnalysisResult } = useAnalysis();
   const state = location.state || {};
 
   const analysisId = state.analysisId || analysisResult?.analysis_id;
@@ -18,6 +18,21 @@ export default function FrameViewerPage() {
   const mlFramesRaw = state.mlFrames ?? analysisResult?.ml_frames ?? [];
   const mlModels = state.mlModels ?? analysisResult?.ml ?? {};
   const traditionalResults = state.traditional ?? analysisResult?.traditional ?? {};
+
+  const handleTraditionalResultsUpdate = useCallback(
+    (updatedTraditional) => {
+      setAnalysisResult((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        return {
+          ...prev,
+          traditional: updatedTraditional,
+        };
+      });
+    },
+    [setAnalysisResult]
+  );
 
   const flaggedFrameIndices = useMemo(() => {
     if (!Array.isArray(mlFramesRaw)) {
@@ -58,6 +73,8 @@ export default function FrameViewerPage() {
         deepfakeFrames={flaggedFrameIndices}
         deepfakeMeta={mlModels}
         traditionalResults={traditionalResults}
+        analysisId={analysisId}
+        onTraditionalResultsUpdate={handleTraditionalResultsUpdate}
       />
     </div>
   );

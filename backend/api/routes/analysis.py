@@ -11,6 +11,9 @@ from __future__ import annotations
 import os
 import tempfile
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+import cv2
 from flask import Blueprint, jsonify, request, session
 from sqlalchemy import update
 from werkzeug.exceptions import HTTPException
@@ -19,7 +22,12 @@ from api import get_db
 from api.auth_utils import require_login, check_analysis_ownership
 from models import Analysis
 from api.ml_integration import run_ml_analysis
-from api.traditional_integration import run_traditional_forensics
+from api.traditional_integration import (
+    run_traditional_forensics,
+    transform_ela_result,
+    transform_noise_result,
+    transform_lbp_result,
+)
 from api.traditional_forensics_utils.frame_extraction import extract_single_frame
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
@@ -106,13 +114,16 @@ def start_analysis(analysis_id: str):
                 db.refresh(analysis)
                 return jsonify(error=f"Analysis already {analysis.status}"), 409
 
+            # Collect baseline metadata (used even if ML modules are skipped)
+            video_metadata = _get_video_metadata(analysis.video_path)
+
             # Run analyses (BLOCKING)
             ml_results = {}
             traditional_results = {}
 
             try:
                 # Run ML analysis
-                ml_video_meta = None
+                ml_video_meta = video_metadata
                 ml_frames_meta = []
                 ml_timing_meta = None
 
@@ -123,7 +134,7 @@ def start_analysis(analysis_id: str):
                         device=None  # Will use env var DEVICE or auto-detect
                     )
                     ml_results = ml_output.get("models", {})
-                    ml_video_meta = ml_output.get("video")
+                    ml_video_meta = ml_output.get("video") or video_metadata
                     ml_frames_meta = ml_output.get("frames", [])
                     ml_timing_meta = ml_output.get("timing_ms")
 
@@ -190,6 +201,50 @@ def start_analysis(analysis_id: str):
         raise  # Re-raise HTTP exceptions (401/403/404) from check_analysis_ownership
     except Exception as e:
         return jsonify(error=str(e)), 500
+
+
+def _get_video_metadata(video_path: str) -> Dict[str, Any]:
+    """
+    Extract basic metadata (fps, frame count, duration, resolution) from a video.
+    Falls back to sensible defaults if the file cannot be probed.
+    """
+    metadata: Dict[str, Any] = {
+        "path": video_path,
+        "fps": None,
+        "frame_count": None,
+        "duration_sec": None,
+        "width": None,
+        "height": None,
+    }
+
+    if not os.path.exists(video_path):
+        return metadata
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return metadata
+
+    try:
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0
+        width = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0.0
+        height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0.0
+
+        duration_sec = frame_count / fps if fps > 0 else 0.0
+
+        metadata.update(
+            {
+                "fps": float(fps) if fps else None,
+                "frame_count": int(frame_count) if frame_count else None,
+                "duration_sec": float(duration_sec) if duration_sec else None,
+                "width": int(width) if width else None,
+                "height": int(height) if height else None,
+            }
+        )
+    finally:
+        cap.release()
+
+    return metadata
 
 
 @analysis_bp.get("/analyses/<analysis_id>")
@@ -311,24 +366,26 @@ def analyze_frame(analysis_id: str, frame_number: int):
                     try:
                         if method == "ela":
                             raw_result = run_ela(tmp_path, top_percent=10)
-                            results["ela"] = {
-                                "score": raw_result.get("score", 0.0),
-                                "overlay": raw_result.get("ela_image_base64", "")
-                            }
+                            transformed = transform_ela_result(raw_result)
 
                         elif method == "noise":
                             raw_result = run_noise_analysis(tmp_path, top_percent=10)
-                            results["noise"] = {
-                                "confidence": raw_result.get("confidence", 0.0),
-                                "overlay": raw_result.get("residual_image_base64", "")
-                            }
+                            transformed = transform_noise_result(raw_result)
 
                         elif method == "lbp":
                             raw_result = run_lbp_analysis(tmp_path, top_percent=10)
-                            results["lbp"] = {
-                                "score": raw_result.get("score", 0.0),
-                                "overlay": raw_result.get("lbp_image_base64", "")
-                            }
+                            transformed = transform_lbp_result(raw_result)
+
+                        else:
+                            continue
+
+                        # Annotate each frame entry with the requested frame number
+                        frames = transformed.get("frames", [])
+                        for entry in frames:
+                            entry.setdefault("frame_number", frame_number)
+                        transformed["frames"] = frames
+
+                        results[method] = transformed
 
                     except Exception as e:
                         results[method] = {
