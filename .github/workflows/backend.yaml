@@ -30,13 +30,13 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1
+        sudo apt-get install -y libgl1-mesa-dev libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 ffmpeg
 
     - name: Cache pip dependencies
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements-test.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements*.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -44,9 +44,10 @@ jobs:
       working-directory: backend
       run: |
         python -m pip install --upgrade pip
+        # Install main dependencies first
+        pip install -r requirements.txt
+        # Then install test dependencies
         pip install -r requirements-test.txt
-        # Install main dependencies (create a basic requirements.txt if it doesn't exist)
-        pip install flask flask-cors flask-compress sqlalchemy werkzeug opencv-python
 
     - name: Lint with flake8 (if available)
       working-directory: backend
