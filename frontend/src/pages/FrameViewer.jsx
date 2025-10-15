@@ -2,11 +2,11 @@ import React, { useRef, useState, useEffect } from "react";
 import { Button } from "./Button";
 import { Card, CardContent } from "./Card";
 
-const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
+const FrameViewer = ({ videoSrc, initialFrameRate = null, deepfakeFrames = [], deepfakeMeta = {}}) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
-  const [frameRate, setFrameRate] = useState(null);
+  const [frameRate, setFrameRate] = useState(initialFrameRate);
   const [deepfakeIndex, setDeepfakeIndex] = useState(0);
   const [duration, setDuration] = useState(0);
   const [durationFrames, setDurationFrames] = useState(0);
@@ -15,6 +15,9 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   const [overlayResult, setOverlayResult] = useState(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null); 
   const [analysisPopupOpen, setAnalysisPopupOpen] = useState(false);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const [videoError, setVideoError] = useState(null);
 
 
 
@@ -35,21 +38,59 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   const getMeta = (frame) => (frame != null ? deepfakeMeta?.[frame] || null : null);
 
   useEffect(() => {
-  const fetchFrameRate = async () => {
-    try {
-      const response = await fetch("http://localhost:5050/api/framerate");
-      const data = await response.json();
-      if (data.frame_rate) {
-        setFrameRate(data.frame_rate);
-        console.log("Fetched frame rate:", data.frame_rate);
-      }
-    } catch (error) {
-      console.error("Error fetching frame rate:", error);
+    if (initialFrameRate) {
+      setFrameRate(initialFrameRate);
     }
-  };
+  }, [initialFrameRate]);
 
-  fetchFrameRate();
-}, []);
+  useEffect(() => {
+    let abort = false;
+    let objectUrl = null;
+
+    async function loadVideo() {
+      if (!videoSrc) {
+        setVideoUrl(null);
+        setIsVideoLoading(false);
+        return;
+      }
+
+      setIsVideoLoading(true);
+      setVideoError(null);
+      setVideoUrl(null);
+
+      try {
+        const response = await fetch(videoSrc, { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error(`Failed to load video (status ${response.status})`);
+        }
+        const blob = await response.blob();
+        if (abort) {
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setVideoUrl(objectUrl);
+      } catch (err) {
+        if (!abort) {
+          console.error("Error fetching video:", err);
+          setVideoError(err.message || "Failed to load video");
+          setVideoUrl(null);
+        }
+      } finally {
+        if (!abort) {
+          setIsVideoLoading(false);
+        }
+      }
+    }
+
+    loadVideo();
+
+    return () => {
+      abort = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [videoSrc]);
 
 
   // Average anomaly score across frames that have a score
@@ -99,6 +140,14 @@ const FrameViewer = ({ videoSrc, deepfakeFrames = [], deepfakeMeta = {}}) => {
   useEffect(() => {
     return () => clearHideTimer();
   }, []);
+
+  useEffect(() => {
+    if (!videoUrl) {
+      setIsPlaying(false);
+      setCurrentFrame(0);
+      setCurrentTime(0);
+    }
+  }, [videoUrl]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -288,29 +337,38 @@ const getColor = (type, value) => {
 
       <Card className="w-full max-w-3xl shadow-lg rounded-2xl">
         <CardContent className="flex flex-col items-center space-y-4 p-3">
-          <div className="relative w-full max-w-3xl">
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            crossOrigin="anonymous"
-            controls
-            width="640"
-            height="360"
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            className="rounded-lg border border-gray-300"
-          />
+          <div className="relative w-full max-w-3xl min-h-[360px] flex items-center justify-center">
+            <video
+              ref={videoRef}
+              src={videoUrl || ""}
+              controls={Boolean(videoUrl)}
+              width="640"
+              height="360"
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              className="rounded-lg border border-gray-300 bg-black"
+            />
 
-          {/* Overlay image for ELA, LBP, or Noise */}
-          {overlayResult?.image_file && (
-          <img
-            src={`http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`}
-            alt={`${overlayResult.analysis_type?.toUpperCase()} overlay`}
-            className="absolute top-0 left-0 w-full h-full object-cover opacity-100 pointer-events-none rounded-lg"
-          />
-        )}
+            {isVideoLoading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40">
+                <span className="text-white font-semibold">Loading video…</span>
+              </div>
+            )}
 
+            {videoError && !isVideoLoading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50">
+                <span className="text-red-200 font-semibold">{videoError}</span>
+              </div>
+            )}
 
+            {/* Overlay image for ELA, LBP, or Noise */}
+            {overlayResult?.image_file && (
+              <img
+                src={`http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`}
+                alt={`${overlayResult.analysis_type?.toUpperCase()} overlay`}
+                className="absolute top-0 left-0 w-full h-full object-cover opacity-100 pointer-events-none rounded-lg"
+              />
+            )}
           </div>
 
           {/* === TIMELINE BAR === */}

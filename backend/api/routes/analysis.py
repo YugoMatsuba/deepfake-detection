@@ -112,12 +112,20 @@ def start_analysis(analysis_id: str):
 
             try:
                 # Run ML analysis
+                ml_video_meta = None
+                ml_frames_meta = []
+                ml_timing_meta = None
+
                 if ml_modules:
-                    ml_results = run_ml_analysis(
+                    ml_output = run_ml_analysis(
                         video_path=analysis.video_path,
                         modules=ml_modules,
                         device=None  # Will use env var DEVICE or auto-detect
                     )
+                    ml_results = ml_output.get("models", {})
+                    ml_video_meta = ml_output.get("video")
+                    ml_frames_meta = ml_output.get("frames", [])
+                    ml_timing_meta = ml_output.get("timing_ms")
 
                 # Run traditional forensics
                 if traditional_modules:
@@ -168,6 +176,9 @@ def start_analysis(analysis_id: str):
                 "analysis_id": analysis.id,
                 "status": "succeeded",
                 "ml": ml_results,
+                "ml_video": ml_video_meta,
+                "ml_frames": ml_frames_meta,
+                "ml_timing": ml_timing_meta,
                 "traditional": traditional_results,  # Includes ephemeral overlays
                 "created_at": analysis.created_at.isoformat(),
                 "completed_at": analysis.updated_at.isoformat()

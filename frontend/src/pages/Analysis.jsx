@@ -11,6 +11,7 @@ export default function Analysis() {
   const [status, setStatus] = useState('idle'); // 'idle' | 'running' | 'success' | 'error'
   const [fakeVideoPercentage, setFakeVideoPercentage] = useState(null);
   const [error, setError] = useState(null);
+  const [analysisData, setAnalysisData] = useState(null);
 
   useEffect(() => {
     if (!analysisId) {
@@ -22,6 +23,7 @@ export default function Analysis() {
   const handleStartAnalysis = async () => {
     setStatus('running');
     setError(null);
+    setAnalysisData(null);
 
     try {
       const response = await startAnalysis(
@@ -38,6 +40,7 @@ export default function Analysis() {
         : 0;
 
       setFakeVideoPercentage(avgScore);
+      setAnalysisData(response);
       setStatus('success');
     } catch (err) {
       setError(err.message || 'Analysis failed');
@@ -116,10 +119,24 @@ export default function Analysis() {
       </h3>
 
       <div className="flex flex-row gap-20 mt-[20px]">
-        <button className={`${baseButton} bg-[#1E88E5] text-white hover:bg-[#114f85] hover:text-[#cccccc] transition-colors`}>
+        <button
+          onClick={() => navigate('/frame-viewer', {
+            state: {
+              analysisId,
+              fps: analysisData?.ml_video?.fps ?? null,
+              mlFrames: analysisData?.ml_frames ?? [],
+              mlModels: analysisData?.ml ?? {}
+            }
+          })}
+          className={`${baseButton} bg-[#1E88E5] text-white hover:bg-[#114f85] hover:text-[#cccccc] transition-colors`}
+          disabled={!analysisData}
+        >
           Yes
         </button>
-        <button className={`${baseButton} bg-[#E0E0E0] text-[#1702028F] border border-[#1E88E5] hover:bg-[#b5b5b5] hover:text-[#02028f] transition-colors`}>
+        <button
+          onClick={() => navigate('/upload')}
+          className={`${baseButton} bg-[#E0E0E0] text-[#1702028F] border border-[#1E88E5] hover:bg-[#b5b5b5] hover:text-[#02028f] transition-colors`}
+        >
           No
         </button>
       </div>

@@ -27,15 +27,24 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
 
     Returns:
         {
-            "xception": {
-                "score": 0.871,
-                "frames": [
-                    {"index": 0, "time": 0.00, "score": 0.903},
-                    ...
-                ],
-                "weights_hash": "sha256..."
+            "models": {
+                "xception": {
+                    "score": 0.871,
+                    "frames": [
+                        {"index": 0, "time": 0.00, "score": 0.903},
+                        ...
+                    ],
+                    "weights_hash": "sha256..."
+                },
+                ...
             },
-            ...
+            "video": {
+                "path": "...",
+                "fps": 29.97,
+                ...
+            },
+            "frames": [...],
+            "timing_ms": {...}
         }
 
     Raises:
@@ -64,7 +73,7 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
 
     # Transform output format for API
     # ML runner returns: {"models": [{"name": "Xception", "score": 0.87, "frames": [...]}, ...], ...}
-    # We need: {"xception": {"score": 0.87, "frames": [...], "weights_hash": "..."}}
+    # We need structured output with model dict plus metadata.
 
     api_results = {}
     for model in results.get("models", []):
@@ -76,4 +85,9 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
             "weights_hash": model.get("weights_hash")
         }
 
-    return api_results
+    return {
+        "models": api_results,
+        "video": results.get("video"),
+        "frames": results.get("frames", []),
+        "timing_ms": results.get("timing_ms"),
+    }

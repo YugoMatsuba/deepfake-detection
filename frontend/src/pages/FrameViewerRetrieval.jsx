@@ -1,37 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import FrameViewer from './FrameViewer';
 
 export default function FrameViewerPage() {
-  const [latestVideo, setLatestVideo] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { analysisId, fps } = location.state || {};
 
   useEffect(() => {
-    const fetchVideos = async () => {
-      try {
-        const response = await fetch('http://localhost:5050/api/videos/all'); 
-        const data = await response.json();
+    if (!analysisId) {
+      navigate('/upload', { replace: true });
+    }
+  }, [analysisId, navigate]);
 
-        if (data.length > 0) {
-          // Pick the last video (most recent)
-          const lastVideo = data[data.length - 1];
-          setLatestVideo(lastVideo);
-        }
-      } catch (err) {
-        console.error('Error fetching videos:', err);
-      }
-    };
+  if (!analysisId) {
+    return null;
+  }
 
-    fetchVideos();
-  }, []);
-
-  if (!latestVideo) return <p>Loading latest video...</p>;
-
-  // Construct the src URL
-  const videoSrc = `http://localhost:5050/api/videos/${latestVideo.id}`;
+  // Construct the secure video URL
+  const videoSrc = `http://localhost:5050/api/analyses/${analysisId}/video`;
 
   return (
     <div className="p-4">
       <h1 className="text-3xl font-bold mb-4">Frame Analysis</h1>
-      <FrameViewer videoSrc={videoSrc} />
+      <FrameViewer
+        videoSrc={videoSrc}
+        initialFrameRate={fps}
+      />
     </div>
   );
 }

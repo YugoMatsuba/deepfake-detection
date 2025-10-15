@@ -106,6 +106,36 @@ def upload_video():
             return jsonify(error=f"Upload failed: {str(e)}"), 500
 
 
+@video_bp.get("/videos/all")
+@cross_origin()
+def list_videos():
+    """
+    List all uploaded videos from analysis storage.
+
+    Used by frame viewer to show available videos.
+    Returns array of {id: analysis_id, ...metadata}.
+    """
+    videos = []
+
+    # Iterate through all analysis directories
+    if DATA_ROOT.exists():
+        for analysis_dir in DATA_ROOT.iterdir():
+            if not analysis_dir.is_dir():
+                continue
+
+            analysis_id = analysis_dir.name
+
+            # Check if video exists
+            video_files = list(analysis_dir.glob("video.*"))
+            if video_files:
+                videos.append({
+                    "id": analysis_id,
+                    "path": f"/api/videos/{analysis_id}"
+                })
+
+    return jsonify(videos), 200
+
+
 @video_bp.get("/videos/<analysis_id>")
 @cross_origin()
 def get_video(analysis_id: str):
@@ -127,3 +157,37 @@ def get_video(analysis_id: str):
 
     video_path = video_files[0]
     return send_file(video_path, mimetype="video/mp4")
+
+
+@video_bp.get("/analyses/<analysis_id>/video")
+@require_login
+def get_analysis_video(analysis_id: str):
+    """
+    Serve video file for a given analysis with authentication and ownership check.
+
+    Used by frame viewer to stream video content securely.
+    Requires authentication and verifies user owns the analysis.
+
+    Returns:
+    - 200: Video file stream
+    - 401: Unauthorized (no session)
+    - 403: Forbidden (not owner)
+    - 404: Analysis or video not found
+    """
+    with get_db() as db:
+        # Check ownership
+        from api.routes.analysis import check_analysis_ownership
+        analysis = check_analysis_ownership(db, analysis_id)
+
+        # Find video file in analysis directory
+        video_dir = DATA_ROOT / analysis_id
+        if not video_dir.exists():
+            return jsonify(error="Analysis not found"), 404
+
+        # Find video file (any extension)
+        video_files = list(video_dir.glob("video.*"))
+        if not video_files:
+            return jsonify(error="Video file not found"), 404
+
+        video_path = video_files[0]
+        return send_file(video_path, mimetype="video/mp4")
