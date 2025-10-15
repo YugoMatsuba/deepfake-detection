@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libjpeg62-turbo-dev \
     ca-certificates \
+    ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspaces/deepfake_AI
@@ -93,6 +94,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libjpeg62-turbo-dev \
     ca-certificates \
+    ffmpeg \
     python3.9 \
     python3.9-distutils \
     python3.9-dev \
@@ -132,6 +134,12 @@ CMD ["/bin/bash"]
 ############################
 ARG DEVICE=cpu
 FROM base-${DEVICE} AS runtime
+
+# Default paths for ML assets (works for both bind mount and COPY deployments)
+ENV ML_WEIGHTS_DIR=/workspaces/deepfake_AI/ml/weights \
+    XCEPTION_WEIGHTS=/workspaces/deepfake_AI/ml/weights/xception_best.pth \
+    SPSL_WEIGHTS=/workspaces/deepfake_AI/ml/weights/spsl_best.pth \
+    UCF_WEIGHTS=/workspaces/deepfake_AI/ml/weights/ucf_best.pth
 
 # Expose Flask port
 EXPOSE 5050

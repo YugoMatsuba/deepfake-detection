@@ -55,31 +55,33 @@ def load_ucf(weights_path: str, device: str) -> torch.nn.Module:
     # Build UCF detector with dual Xception encoders
     model = UCFDetector(config)
 
-    # PR4: Load weights using centralized DFB checkpoint loader (if path provided)
+    # PR4: Load weights using centralized DFB checkpoint loader
     # Follows ucf_detector.py lines 105-111 (build_backbone)
-    # NOTE: UCF loads ImageNet pretrained weights into BOTH encoder_f and encoder_c
-    if weights_path and os.path.isfile(weights_path):
-        report = load_dfb_checkpoint(
-            model,
-            weights_path,
-            device=device,
-            arch="ucf",
-            expected_num_classes=2
-        )
-        # Store weights hash for provenance (used by runner.py for JSON output)
-        model._weights_hash = report['weights_hash']
-        # Log detailed per-encoder loading info
-        logger.info(
-            f"Loaded UCF from {weights_path} (sha256={report['weights_hash'][:16]}...), "
-            f"total keys: {report['keys_loaded']}/{report['keys_total']*2} across dual encoders, "
-            f"pointwise fixes: {report['fixed_pointwise_count']}"
-        )
-        if report['notes']:
-            logger.debug(f"UCF loading details: {report['notes']}")
-    else:
-        # No weights loaded (for testing)
-        logger.info("UCF: no weights_path; dual encoders remain randomly initialized")
-        model._weights_hash = ""
+    # NOTE: UCF loads trained detector weights (not ImageNet) with both encoders + heads
+    # FAIL FAST: Production should never run with untrained weights
+    if not weights_path:
+        raise ValueError("UCF: weights_path is required but not provided")
+
+    if not os.path.isfile(weights_path):
+        raise FileNotFoundError(f"UCF weights not found: {weights_path}")
+
+    report = load_dfb_checkpoint(
+        model,
+        weights_path,
+        device=device,
+        arch="ucf",
+        expected_num_classes=2
+    )
+    # Store weights hash for provenance (used by runner.py for JSON output)
+    model._weights_hash = report['weights_hash']
+    # Log detailed per-encoder loading info
+    logger.info(
+        f"Loaded UCF from {weights_path} (sha256={report['weights_hash'][:16]}...), "
+        f"total keys: {report['keys_loaded']}/{report['keys_total']*2} across dual encoders, "
+        f"pointwise fixes: {report['fixed_pointwise_count']}"
+    )
+    if report['notes']:
+        logger.debug(f"UCF loading details: {report['notes']}")
 
     # Move to device and set eval mode
     model = ensure_eval(model).to(device)

@@ -55,14 +55,21 @@ def init_engine(db_url: str) -> None:
 def get_db() -> Iterator[Session]:
     """
     Yields a SQLAlchemy Session and guarantees close() at exit.
+    Automatically commits on success, rolls back on exception.
+
     Usage:
         with get_db() as db:
             ...
+            # commit happens automatically on successful exit
     """
     assert _SessionLocal is not None, "init_engine() must be called before get_db()"
     db = _SessionLocal()
     try:
         yield db
+        db.commit()  # Auto-commit on success
+    except Exception:
+        db.rollback()  # Auto-rollback on exception
+        raise
     finally:
         db.close()
 

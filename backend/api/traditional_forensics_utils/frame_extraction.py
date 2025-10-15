@@ -1,6 +1,56 @@
 import cv2
 import os
 
+
+def extract_single_frame(video_path: str, frame_number: int, output_path: str) -> str:
+    """
+    Extract a specific frame by index from video and save to output_path.
+
+    Args:
+        video_path: Path to input video
+        frame_number: 0-indexed frame number to extract
+        output_path: Full path where frame should be saved (e.g., /tmp/frame.jpg)
+
+    Returns:
+        str: Path to saved frame file
+
+    Raises:
+        FileNotFoundError: If video doesn't exist
+        ValueError: If frame_number is out of range
+        RuntimeError: If video cannot be opened
+    """
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video not found: {video_path}")
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Failed to open video: {video_path}")
+
+    try:
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frame_number < 0 or frame_number >= total_frames:
+            raise ValueError(
+                f"Frame number {frame_number} out of range (video has {total_frames} frames)"
+            )
+
+        # Seek to specific frame
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+        ret, frame = cap.read()
+
+        if not ret:
+            raise RuntimeError(f"Failed to read frame {frame_number} from video")
+
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Save frame
+        cv2.imwrite(output_path, frame)
+        return output_path
+
+    finally:
+        cap.release()
+
+
 def extract_frames(video_path: str, output_base: str = "frames") -> list[str]:
     """
     Extract frames from a single video based on FPS and save in output folder.

@@ -6,8 +6,6 @@ from api.traditional_forensics_utils.frame_extraction import extract_frames
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
 from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
-from api.traditional_forensics_utils.cmfd_analysis import run_cmfd_analysis
-from api.traditional_forensics_utils.temporal_analysis import run_temporal_analysis
 
 
 bp_forensics = Blueprint("forensics", __name__)
@@ -42,15 +40,19 @@ def ela_analysis_route():
     """
     POST /api/forensics/ela_analysis
     Body: { "input_path": "frames/video1" }
+
     - input_path can be a single image OR a folder of frames
+    - Returns top ELA frames with Base64-encoded images
     """
     data = request.get_json(silent=True) or {}
     input_path = data.get("input_path")
+    top_percent = data.get("top_percent", 10)  # optional, defaults to 10%
+
     if not input_path:
         return jsonify(error="input_path_required"), 400
 
     try:
-        result = run_ela(input_path)
+        result = run_ela(input_path, top_percent=top_percent)
     except FileNotFoundError:
         return jsonify(error="file_or_folder_not_found"), 404
     except ValueError as e:
@@ -63,11 +65,11 @@ def ela_analysis_route():
         result=result
     ), 200
 
-# Noise Analysis
+# --- Noise Analysis ---
 @bp_forensics.post("/noise_analysis")
 def noise_route():
     """
-    POST /api/forensics/noise
+    POST /api/forensics/noise_analysis
     Body: { "input_path": "frames" } OR { "input_path": "frames/frame1.jpg" }
     """
     data = request.get_json(silent=True) or {}
@@ -76,37 +78,7 @@ def noise_route():
         return jsonify(error="input_path_required"), 400
 
     try:
-        confidence = run_noise_analysis(input_path)
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-
-    return jsonify(message="Noise analysis completed", confidence=confidence), 200
-
-# LBP Analysis
-@bp_forensics.post("/lbp_analysis")
-def lbp_route():
-    data = request.get_json(silent=True) or {}
-    input_path = data.get("input_path")
-    if not input_path:
-        return jsonify(error="input_path_required"), 400
-
-    try:
-        result = run_lbp_analysis(input_path)
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-
-    return jsonify(result), 200
-
-# CMFD Analysis
-@bp_forensics.post("/cmfd_analysis")
-def cmfd_route():
-    data = request.get_json(silent=True) or {}
-    input_path = data.get("input_path")
-    if not input_path:
-        return jsonify(error="input_path_required"), 400
-
-    try:
-        result = run_cmfd_analysis(input_path)
+        result = run_noise_analysis(input_path)
     except FileNotFoundError:
         return jsonify(error="file_or_folder_not_found"), 404
     except ValueError as e:
@@ -115,28 +87,36 @@ def cmfd_route():
         return jsonify(error=str(e)), 500
 
     return jsonify(
-        message="CMFD analysis complete",
+        message="Noise analysis completed",
         result=result
     ), 200
 
-# --- Temporal Analysis ---
-@bp_forensics.post("/temporal_analysis")
-def temporal_route():
-
+# --- LBP Analysis ---
+@bp_forensics.post("/lbp_analysis")
+def lbp_route():
+    """
+    POST /api/forensics/lbp_analysis
+    Body: { "input_path": "frames" } OR { "input_path": "frames/frame1.jpg" }
+    Returns top LBP frames with Base64 images.
+    """
     data = request.get_json(silent=True) or {}
-    video_path = data.get("video_path")
-    if not video_path:
-        return jsonify(error="video_path_required"), 400
+    input_path = data.get("input_path")
+    top_percent = data.get("top_percent", 10)  # optional, defaults to 10%
+
+    if not input_path:
+        return jsonify(error="input_path_required"), 400
 
     try:
-        result = run_temporal_analysis(video_path)
+        result = run_lbp_analysis(input_path, top_percent=top_percent)
     except FileNotFoundError:
-        return jsonify(error="video_not_found"), 404
+        return jsonify(error="file_or_folder_not_found"), 404
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
     except Exception as e:
         return jsonify(error=str(e)), 500
 
     return jsonify(
-        message="Temporal analysis complete",
+        message="LBP analysis completed",
         result=result
     ), 200
 
