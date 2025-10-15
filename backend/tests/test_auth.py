@@ -87,7 +87,11 @@ class TestAuthRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data['error'], 'invalid_credentials')
 
-    def test_logout(self):
+    @patch('api.routes.auth.get_db')
+    def test_logout(self, mock_get_db):
+        mock_db = MagicMock()
+        mock_get_db.return_value.__enter__.return_value = mock_db
+
         with self.client.session_transaction() as sess:
             sess['user_id'] = 1
 

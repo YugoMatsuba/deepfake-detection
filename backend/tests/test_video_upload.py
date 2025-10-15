@@ -108,6 +108,8 @@ class TestVideoUploadRoutes(unittest.TestCase):
     @patch('api.routes.video_upload.DATA_ROOT')
     def test_get_analysis_video_not_found(self, mock_data_root, mock_get_db):
         mock_db = MagicMock()
+        # Mock database query to return None (analysis not found)
+        mock_db.query().filter().first.return_value = None
         mock_get_db.return_value.__enter__.return_value = mock_db
 
         mock_video_dir = MagicMock()
