@@ -191,3 +191,34 @@ def get_analysis_video(analysis_id: str):
 
         video_path = video_files[0]
         return send_file(video_path, mimetype="video/mp4")
+
+
+def get_all_videos():
+    """
+    Get all uploaded videos with metadata for frame rate analysis.
+
+    Returns Flask Response object with JSON array of videos containing:
+    - id: analysis_id
+    - path: actual file system path to video file
+    - original_name: original filename
+    """
+    videos = []
+
+    # Iterate through all analysis directories
+    if DATA_ROOT.exists():
+        for analysis_dir in DATA_ROOT.iterdir():
+            if not analysis_dir.is_dir():
+                continue
+
+            analysis_id = analysis_dir.name
+
+            # Check if video exists
+            video_files = list(analysis_dir.glob("video.*"))
+            if video_files:
+                videos.append({
+                    "id": analysis_id,
+                    "path": str(video_files[0]),  # actual file path for OpenCV
+                    "original_name": video_files[0].name
+                })
+
+    return jsonify(videos)
