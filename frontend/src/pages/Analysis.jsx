@@ -15,6 +15,9 @@ export default function Analysis() {
   } = useAnalysis();
   const [status, setStatus] = useState('idle'); // 'idle' | 'running' | 'success' | 'error'
   const [fakeVideoPercentage, setFakeVideoPercentage] = useState(null);
+  const [ela, setEla] = useState(null);
+  const [noise, setNoise] = useState(null);
+  const [lbp, setLbp] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -35,6 +38,21 @@ export default function Analysis() {
         selectedModules.ml,
         selectedModules.traditional
       );
+
+      console.log("Full analysis response:", response);
+
+      const tradResults = response?.traditional || {};
+      const elaScore = tradResults?.ela?.score || null;
+      const lbpScore = tradResults?.lbp.score || null;
+      const noiseConfidence = tradResults?.noise.confidence || null;
+
+      setEla(elaScore.toFixed(2));
+      setNoise(noiseConfidence.toFixed(2));
+      setLbp(lbpScore.toFixed(2));
+
+      console.log("ELA: ", elaScore);
+      console.log("LBP: ", lbpScore);
+      console.log("Noise: ", noiseConfidence);
 
       // Calculate ML score from response
       const mlResults = response?.ml || {};
@@ -111,14 +129,23 @@ export default function Analysis() {
 
   // Success - show only the percentage
   return (
-    <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[200px]">
-      <h1 className="mt-[60px] text-4xl text-[#0D47A1] text-center">
+    <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[100px]">
+      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
         Initial Analysis: Synthetic Media Chance = {fakeVideoPercentage}%
+      </h1>
+      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+        ELA Analysis Score = {ela}%
+      </h1>
+      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+        Noise Analysis Confidence = {noise}%
+      </h1>
+      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+        LBP Analysis Score = {lbp}%
       </h1>
       <h2 className="mt-[40px] text-4xl leading-none tracking-normal text-black">
         Metadata anomalies: None found
       </h2>
-      <h3 className="mt-[140px] text-4xl">
+      <h3 className="mt-[100px] text-4xl">
         Proceed to frame analysis?
       </h3>
 
