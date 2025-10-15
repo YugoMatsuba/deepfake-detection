@@ -17,6 +17,7 @@ export default function FileUploader() {
     aiDetection: false,
     ela: false,
     noise: false,
+    lbp: false,
   });
 
   const onDrop = useCallback(async (droppedFiles) => {
@@ -60,10 +61,11 @@ export default function FileUploader() {
     }
 
     // Build module arrays from checkboxes
-    const mlModules = options.aiDetection ? ['xception', 'spsl', 'ucf'] : [];
+    const mlModules = options.aiDetection ? ['xception'] : [];
     const traditionalModules = [];
     if (options.ela) traditionalModules.push('ela');
     if (options.noise) traditionalModules.push('noise');
+    if (options.lbp) traditionalModules.push('lbp');
 
     if (mlModules.length === 0 && traditionalModules.length === 0) {
       alert('Please select at least one analysis method');
@@ -134,6 +136,16 @@ export default function FileUploader() {
                 className="w-4 h-4"
               />
               <span className="font-semibold">Noise Analysis</span>
+            </label>
+            <label className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                name="lbp"
+                checked={options.lbp}
+                onChange={handleCheckboxChange}
+                className="w-4 h-4"
+              />
+              <span className="font-semibold">LBP Analysis</span>
             </label>
           </div>
         </Card>
