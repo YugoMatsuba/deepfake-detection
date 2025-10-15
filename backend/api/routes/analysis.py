@@ -5,10 +5,13 @@ Analysis lifecycle endpoints.
 Routes:
 - POST /api/analyses/<id>/start - Start analysis (synchronous, returns full results)
 - GET /api/analyses/<id> - Fetch analysis status/results (scores only from DB)
+- POST /api/analyses/<id>/frames/<frame_number>/forensics - On-demand frame analysis
 """
 from __future__ import annotations
+import os
+import tempfile
 from datetime import datetime, timezone
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from sqlalchemy import update
 from werkzeug.exceptions import HTTPException
 
@@ -17,6 +20,10 @@ from api.auth_utils import require_login, check_analysis_ownership
 from models import Analysis
 from api.ml_integration import run_ml_analysis
 from api.traditional_integration import run_traditional_forensics
+from api.traditional_forensics_utils.frame_extraction import extract_single_frame
+from api.traditional_forensics_utils.ela_analysis import run_ela
+from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
+from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
 
 analysis_bp = Blueprint("analysis", __name__)
 
@@ -218,3 +225,130 @@ def get_analysis(analysis_id: str):
         }
 
         return jsonify(response), 200
+
+
+@analysis_bp.post("/analyses/<analysis_id>/frames/<int:frame_number>/forensics")
+@require_login
+def analyze_frame(analysis_id: str, frame_number: int):
+    """
+    Run on-demand traditional forensics analysis on a specific frame.
+
+    Request body:
+    {
+      "methods": ["ela", "noise", "lbp"]
+    }
+
+    Response (200):
+    {
+      "analysis_id": "uuid",
+      "frame_number": 42,
+      "results": {
+        "ela": {
+          "score": 0.73,
+          "overlay": "data:image/jpeg;base64,..."
+        },
+        "noise": {
+          "confidence": 0.68,
+          "overlay": "data:image/jpeg;base64,..."
+        },
+        "lbp": {
+          "score": 0.81,
+          "overlay": "data:image/jpeg;base64,..."
+        }
+      }
+    }
+
+    Response (400/403/404/500): error message
+    """
+    try:
+        with get_db() as db:
+            # Check ownership
+            analysis = check_analysis_ownership(db, analysis_id)
+
+            # Parse request
+            body = request.get_json() or {}
+            methods = body.get("methods", [])
+
+            if not methods:
+                return jsonify(error="No methods specified"), 400
+
+            # Validate methods
+            VALID_METHODS = {"ela", "noise", "lbp"}
+            invalid_methods = set(methods) - VALID_METHODS
+            if invalid_methods:
+                return jsonify(
+                    error=f"Invalid methods: {', '.join(sorted(invalid_methods))}"
+                ), 400
+
+            # Extract frame to temporary file
+            with tempfile.NamedTemporaryFile(
+                suffix=".jpg", delete=False, prefix=f"frame_{frame_number}_"
+            ) as tmp_file:
+                tmp_path = tmp_file.name
+
+            try:
+                extract_single_frame(
+                    video_path=analysis.video_path,
+                    frame_number=frame_number,
+                    output_path=tmp_path
+                )
+
+                # Run each requested forensics method on the single frame
+                results = {}
+
+                for method in methods:
+                    try:
+                        if method == "ela":
+                            raw_result = run_ela(tmp_path, top_percent=10)
+                            results["ela"] = {
+                                "score": raw_result.get("score", 0.0),
+                                "overlay": raw_result.get("ela_image_base64", "")
+                            }
+
+                        elif method == "noise":
+                            raw_result = run_noise_analysis(tmp_path, top_percent=10)
+                            results["noise"] = {
+                                "confidence": raw_result.get("confidence", 0.0),
+                                "overlay": raw_result.get("residual_image_base64", "")
+                            }
+
+                        elif method == "lbp":
+                            raw_result = run_lbp_analysis(tmp_path, top_percent=10)
+                            results["lbp"] = {
+                                "score": raw_result.get("score", 0.0),
+                                "overlay": raw_result.get("lbp_image_base64", "")
+                            }
+
+                    except Exception as e:
+                        results[method] = {
+                            "score": None,
+                            "error": f"Analysis failed: {str(e)}"
+                        }
+
+                response = {
+                    "analysis_id": analysis.id,
+                    "frame_number": frame_number,
+                    "results": results
+                }
+
+                return jsonify(response), 200
+
+            except ValueError as e:
+                # Frame number out of range
+                return jsonify(error=str(e)), 400
+
+            except Exception as e:
+                return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
+
+            finally:
+                # Clean up temporary frame file
+                try:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                except:
+                    pass
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (401/403/404)
+    except Exception as e:
+        return jsonify(error=str(e)), 500

@@ -6,3 +6,13 @@ export async function uploadVideo(file) {
   fd.append("file", file); // must be 'file'
   return fetchJson("/videos", { method: "POST", body: fd });
 }
+
+export async function startAnalysis(analysisId, mlModules, traditionalModules) {
+  return fetchJson(`/analyses/${analysisId}/start`, {
+    method: "POST",
+    json: {
+      modules: mlModules,
+      traditional: traditionalModules
+    }
+  });
+}

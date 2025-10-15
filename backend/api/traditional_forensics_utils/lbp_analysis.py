@@ -79,8 +79,8 @@ def run_lbp_analysis(input_path, top_percent=10):
 
     results_sorted = sorted(results, key=lambda x: x["normalized_score"], reverse=True)
 
-    # Top frames
-    top_count = max(1, int(len(results_sorted) * top_percent / 100))
+    # Top frames (cap at 32 to limit JSON payload size)
+    top_count = min(max(1, int(len(results_sorted) * top_percent / 100)), 32)
     top_frames = results_sorted[:top_count]
 
     return {

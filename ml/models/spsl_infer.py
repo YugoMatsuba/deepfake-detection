@@ -106,26 +106,27 @@ def load_spsl(weights_path: str, device: str) -> torch.nn.Module:
     # Build Xception backbone using exact DFB architecture from PR1
     model = Xception(config)
 
-    # PR4: Load weights using centralized DFB checkpoint loader (if path provided)
+    # PR4: Load weights using centralized DFB checkpoint loader
     # CRITICAL: For SPSL, the loader handles conv1 popping and 4-ch replacement
     # Follows spsl_detector.py lines 71-88
-    if weights_path and os.path.isfile(weights_path):
-        report = load_dfb_checkpoint(
-            model,
-            weights_path,
-            device=device,
-            arch="spsl",
-            expected_num_classes=2
-        )
-        # Store weights hash for provenance (used by runner.py for JSON output)
-        model._weights_hash = report['weights_hash']
-        seeded_msg = "seeded from checkpoint" if report['spsl_conv1_seeded'] else "default init (no conv1 in ckpt)"
-        logger.info(f"Loaded SPSL with {report['keys_loaded']}/{report['keys_total']} backbone weights, conv1 4-ch {seeded_msg}")
-    else:
-        # No weights loaded (for testing)
-        logger.info("SPSL: no weights_path; build 3-ch then replace conv1→4-ch with default init")
-        _spsl_replace_conv1_with_4ch(model, conv1_data=None)
-        model._weights_hash = ""
+    # FAIL FAST: Production should never run with untrained weights
+    if not weights_path:
+        raise ValueError("SPSL: weights_path is required but not provided")
+
+    if not os.path.isfile(weights_path):
+        raise FileNotFoundError(f"SPSL weights not found: {weights_path}")
+
+    report = load_dfb_checkpoint(
+        model,
+        weights_path,
+        device=device,
+        arch="spsl",
+        expected_num_classes=2
+    )
+    # Store weights hash for provenance (used by runner.py for JSON output)
+    model._weights_hash = report['weights_hash']
+    seeded_msg = "seeded from checkpoint" if report['spsl_conv1_seeded'] else "default init (no conv1 in ckpt)"
+    logger.info(f"Loaded SPSL with {report['keys_loaded']}/{report['keys_total']} backbone weights, conv1 4-ch {seeded_msg}")
 
     # Move to device and set eval mode
     model = ensure_eval(model).to(device)

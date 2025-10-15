@@ -83,7 +83,8 @@ def run_noise_analysis(input_path, top_percent=10):
                   for f, s, img in results]
     sorted_results = sorted(normalized, key=lambda x: x[1], reverse=True)
 
-    top_count = max(1, int(len(sorted_results) * top_percent / 100))
+    # Cap at 32 frames to limit JSON payload size
+    top_count = min(max(1, int(len(sorted_results) * top_percent / 100)), 32)
     top_frames = sorted_results[:top_count]
 
     # Return top frames JSON

@@ -20,12 +20,25 @@ Usage in runner:
 
 import os
 
-# Default weight file paths (relative to ml/ directory - working directory)
-# Can be overridden via environment variables
+# Default weight file paths (repo-relative) with env overrides.
+# Priority: per-model env var → ML_WEIGHTS_DIR → repo default location.
+from ml.constants import get_weights_dir, DEFAULT_WEIGHTS as DEFAULT_WEIGHT_FILENAMES
+
+
+def _default_weight_path(model_key: str, env_var: str) -> str:
+    env_override = os.getenv(env_var)
+    if env_override:
+        return env_override
+
+    weights_dir = get_weights_dir()
+    filename = DEFAULT_WEIGHT_FILENAMES[model_key]
+    return os.path.join(weights_dir, filename)
+
+
 DEFAULT_WEIGHTS = {
-    "xception": os.getenv("XCEPTION_WEIGHTS", "weights/xception_best.pth"),
-    "spsl":     os.getenv("SPSL_WEIGHTS",     "weights/spsl_best.pth"),
-    "ucf":      os.getenv("UCF_WEIGHTS",      "weights/ucf_best.pth"),
+    "xception": _default_weight_path("xception", "XCEPTION_WEIGHTS"),
+    "spsl":     _default_weight_path("spsl", "SPSL_WEIGHTS"),
+    "ucf":      _default_weight_path("ucf", "UCF_WEIGHTS"),
 }
 
 # Aggregation method for frame-level probabilities → clip-level score

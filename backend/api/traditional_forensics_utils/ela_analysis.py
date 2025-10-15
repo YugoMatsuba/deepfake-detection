@@ -81,9 +81,9 @@ def run_ela(input_path, top_percent=10):
     normalized_results = [(f, max((s - mean_score) / std_score, 0), b64)
                           for f, s, b64 in results]
 
-    # Sort and pick top frames
+    # Sort and pick top frames (cap at 32 to limit JSON payload size)
     normalized_results.sort(key=lambda x: x[1], reverse=True)
-    top_count = max(1, int(len(normalized_results) * top_percent / 100))
+    top_count = min(max(1, int(len(normalized_results) * top_percent / 100)), 32)
     top_frames = normalized_results[:top_count]
 
     # Return JSON-ready dict

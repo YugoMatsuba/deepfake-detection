@@ -43,23 +43,25 @@ def load_xception(weights_path: str, device: str) -> torch.nn.Module:
     # Instantiate using exact DeepfakeBench Xception architecture from PR1
     model = Xception(model_config)
 
-    # PR4: Load weights using centralized DFB checkpoint loader (if path provided)
+    # PR4: Load weights using centralized DFB checkpoint loader
     # Follows xception_detector.py lines 69-75
-    if weights_path and os.path.isfile(weights_path):
-        report = load_dfb_checkpoint(
-            model,
-            weights_path,
-            device=device,
-            arch="xception",
-            expected_num_classes=2
-        )
-        # Store weights hash for provenance (used by runner.py for JSON output)
-        model._weights_hash = report['weights_hash']
-        logger.info(f"Loaded Xception with {report['keys_loaded']}/{report['keys_total']} backbone weights")
-    else:
-        # No weights loaded (for testing)
-        model._weights_hash = ""
-        logger.info("Xception: no weights_path provided; skipping external weight load")
+    # FAIL FAST: Production should never run with untrained weights
+    if not weights_path:
+        raise ValueError("Xception: weights_path is required but not provided")
+
+    if not os.path.isfile(weights_path):
+        raise FileNotFoundError(f"Xception weights not found: {weights_path}")
+
+    report = load_dfb_checkpoint(
+        model,
+        weights_path,
+        device=device,
+        arch="xception",
+        expected_num_classes=2
+    )
+    # Store weights hash for provenance (used by runner.py for JSON output)
+    model._weights_hash = report['weights_hash']
+    logger.info(f"Loaded Xception with {report['keys_loaded']}/{report['keys_total']} backbone weights")
 
     # Move to device and set eval mode
     model = ensure_eval(model).to(device)
