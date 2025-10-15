@@ -2,7 +2,13 @@ import React, { useRef, useState, useEffect } from "react";
 import { Button } from "./Button";
 import { Card, CardContent } from "./Card";
 
-const FrameViewer = ({ videoSrc, initialFrameRate = null, deepfakeFrames = [], deepfakeMeta = {}}) => {
+const FrameViewer = ({
+  videoSrc,
+  initialFrameRate = null,
+  deepfakeFrames = [],
+  deepfakeMeta = {},
+  traditionalResults = {}
+}) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);

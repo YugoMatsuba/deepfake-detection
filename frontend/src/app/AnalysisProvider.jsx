@@ -5,12 +5,15 @@ const AnalysisContext = createContext(null);
 export function AnalysisProvider({ children }) {
   const [analysisId, setAnalysisId] = useState(null);
   const [selectedModules, setSelectedModules] = useState({ ml: [], traditional: [] });
+  const [analysisResult, setAnalysisResult] = useState(null);
 
   const value = {
     analysisId,
     setAnalysisId,
     selectedModules,
     setSelectedModules,
+    analysisResult,
+    setAnalysisResult,
   };
 
   return (
