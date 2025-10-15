@@ -155,8 +155,6 @@ def analyze_frame_route():
             result = run_ela(temp_path)
         elif analysis_type == "noise":
             result = run_noise_analysis(temp_path)
-        # elif analysis_type == "cmfd":
-        #     result = run_cmfd_analysis(temp_path)  # TODO: implement CMFD analysis
         else:
             os.remove(temp_path)
             return jsonify(error="unsupported_analysis_type"), 400
