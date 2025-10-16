@@ -732,6 +732,10 @@ const getColor = (type, value) => {
 >
   <span className="text-2xl">&lt;&lt;</span>
 </Button>
+
+<Button variant="secondary" size="lg" className="bg-white" onClick={prevFrame}>
+              <span className="text-2xl">&gt;</span>
+            </Button>
             
 
             <div className="flex flex-col items-center gap-2">
