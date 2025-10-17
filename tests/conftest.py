@@ -18,6 +18,9 @@ import models
 import api as api_module
 from app import create_app
 
+# Project root for ML model weights
+PROJECT_ROOT = Path(__file__).parent.parent
+
 
 @pytest.fixture(scope="session")
 def engine():
@@ -121,3 +124,25 @@ def clean_db(engine):
     yield
 
     # No need for explicit cleanup - next test will clean again
+
+
+# ============================================================================
+# ML Model Weight Fixtures
+# ============================================================================
+
+@pytest.fixture(scope="session")
+def xception_weights_path():
+    """Path to Xception model weights for testing."""
+    return str(PROJECT_ROOT / "ml" / "weights" / "xception_best.pth")
+
+
+@pytest.fixture(scope="session")
+def spsl_weights_path():
+    """Path to SPSL model weights for testing."""
+    return str(PROJECT_ROOT / "ml" / "weights" / "spsl_best.pth")
+
+
+@pytest.fixture(scope="session")
+def ucf_weights_path():
+    """Path to UCF model weights for testing."""
+    return str(PROJECT_ROOT / "ml" / "weights" / "ucf_best.pth")

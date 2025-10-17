@@ -65,12 +65,12 @@ class TestIntegrationConstants:
 class TestLoadTimeHeadValidation:
     """Test that load-time probes catch incorrect head dimensions."""
 
-    def test_xception_probe_catches_wrong_head(self):
+    def test_xception_probe_catches_wrong_head(self, xception_weights_path):
         """Xception loader should fail if classifier outputs != 2 classes."""
         from ml.models.xception_infer import load_xception
 
-        # Load model without weights (architecture only)
-        m = load_xception("", "cpu")
+        # Load model with weights
+        m = load_xception(xception_weights_path, "cpu")
 
         # Model should have loaded successfully with 2-class head
         assert m.last_linear.out_features == 2
@@ -93,12 +93,12 @@ class TestLoadTimeHeadValidation:
                     f"Check your checkpoint or num_classes in config."
                 )
 
-    def test_spsl_probe_catches_wrong_head(self):
+    def test_spsl_probe_catches_wrong_head(self, spsl_weights_path):
         """SPSL loader should fail if classifier outputs != 2 classes."""
         from ml.models.spsl_infer import load_spsl
 
-        # Load model without weights (architecture only)
-        m = load_spsl("", "cpu")
+        # Load model with weights
+        m = load_spsl(spsl_weights_path, "cpu")
 
         # Model should have loaded successfully with 2-class head
         assert m.last_linear.out_features == 2
@@ -119,12 +119,12 @@ class TestLoadTimeHeadValidation:
                     f"SPSL head must output 2 classes, got {logits.shape[-1]}."
                 )
 
-    def test_ucf_head_sizes(self):
+    def test_ucf_head_sizes(self, ucf_weights_path):
         """UCF should have 2-class shared head and 5-class specific head."""
         from ml.models.ucf_infer import load_ucf
 
-        # Load model without weights
-        m = load_ucf("", "cpu")
+        # Load model with weights
+        m = load_ucf(ucf_weights_path, "cpu")
 
         # Verify head sizes (these assertions also exist in load_ucf itself)
         assert m.head_sha.mlp[-1].out_features == 2, "Shared head should be 2-class"
@@ -136,11 +136,11 @@ class TestLoadTimeHeadValidation:
 class TestRuntimeGuards:
     """Test that inference-time guards catch bad outputs (NaN, Inf, out-of-range)."""
 
-    def test_xception_guards_catch_nan_logits(self, monkeypatch):
+    def test_xception_guards_catch_nan_logits(self, xception_weights_path, monkeypatch):
         """Xception predictor should raise on NaN logits from classifier."""
         from ml.models.xception_infer import load_xception, predict_probs_xception
 
-        m = load_xception("", "cpu")
+        m = load_xception(xception_weights_path, "cpu")
         x = torch.randn(2, 3, 256, 256)
 
         # Monkeypatch classifier to output NaNs
@@ -152,12 +152,12 @@ class TestRuntimeGuards:
         with pytest.raises(AssertionError, match="non-finite"):
             predict_probs_xception(m, x)
 
-    def test_spsl_guards_catch_bad_probabilities(self, monkeypatch):
+    def test_spsl_guards_catch_bad_probabilities(self, spsl_weights_path, monkeypatch):
         """SPSL predictor should raise on non-finite probabilities."""
         from ml.models.spsl_infer import load_spsl, predict_probs_spsl
         import ml.models.spsl_infer as spsl_module
 
-        m = load_spsl("", "cpu")
+        m = load_spsl(spsl_weights_path, "cpu")
         x = torch.randn(2, 3, 256, 256)
 
         # Patch softmax_fake to return NaN (simulates numerical instability)
@@ -176,11 +176,11 @@ class TestRuntimeGuards:
             # Restore original (monkeypatch handles this, but being explicit)
             monkeypatch.setattr(spsl_module, "softmax_fake", original_softmax)
 
-    def test_ucf_guards_catch_out_of_range_probs(self, monkeypatch):
+    def test_ucf_guards_catch_out_of_range_probs(self, ucf_weights_path, monkeypatch):
         """UCF predictor should raise if probabilities fall outside [0, 1]."""
         from ml.models.ucf_infer import load_ucf, predict_probs_ucf
 
-        m = load_ucf("", "cpu")
+        m = load_ucf(ucf_weights_path, "cpu")
         x = torch.randn(2, 3, 256, 256)
 
         # Monkeypatch forward_inference to return out-of-range probs
@@ -199,14 +199,21 @@ class TestRuntimeGuards:
         with pytest.raises(AssertionError, match="non-finite"):
             predict_probs_ucf(m, x)
 
-    def test_prob_shape_guard(self):
+    def test_prob_shape_guard(self, xception_weights_path, spsl_weights_path, ucf_weights_path):
         """Verify all adapters check prob tensor is 1-D."""
         from ml.models.integration import MODEL_REGISTRY
 
         x = torch.randn(3, 3, 256, 256, dtype=torch.float32)
 
+        # Map model names to their weights paths
+        weights_map = {
+            "xception": xception_weights_path,
+            "spsl": spsl_weights_path,
+            "ucf": ucf_weights_path
+        }
+
         for name, (load_fn, predict_fn, _) in MODEL_REGISTRY.items():
-            m = load_fn("", "cpu")
+            m = load_fn(weights_map[name], "cpu")
             result = predict_fn(m, x)
 
             # Verify prob is 1-D (guards check this)

@@ -19,9 +19,9 @@ from ml.models.xception_infer import load_xception, predict_probs_xception
 
 
 @pytest.fixture
-def xception_model():
+def xception_model(xception_weights_path):
     """Fixture to load Xception model for testing."""
-    return load_xception("", "cpu")  # No weights for PR1
+    return load_xception(xception_weights_path, "cpu")
 
 
 @pytest.fixture
@@ -113,10 +113,10 @@ def test_model_in_eval_mode(xception_model):
     assert not xception_model.training, "Model should be in eval mode"
 
 
-def test_config_compatibility():
+def test_config_compatibility(xception_weights_path):
     """Test that config matches DeepfakeBench expectations."""
     # Test the exact config used matches DeepfakeBench xception.yaml
-    model = load_xception("", "cpu")
+    model = load_xception(xception_weights_path, "cpu")
 
     assert model.mode == "original", "Mode should match DeepfakeBench config"
     assert model.num_classes == 2, "Should be binary classification"
