@@ -2,27 +2,43 @@
 Pytest configuration for backend tests.
 
 Ensures database engine is initialized before any tests run.
+Provides clean database state for each test.
 """
+import sys
+from pathlib import Path
 import pytest
-from api import init_engine, Base, engine as get_engine
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from api import init_engine, engine as get_engine
+from models import Base
 
 
 @pytest.fixture(scope="session", autouse=True)
-def init_test_db():
+def _engine(tmp_path_factory):
     """
-    Initialize in-memory SQLite database once for all tests.
+    Initialize SQLite engine once for entire test session.
 
-    Runs automatically before any tests (autouse=True).
-    Only runs once per test session (scope="session").
-
-    If the engine is already initialized (e.g., locally), does nothing.
-    Otherwise, initializes with an in-memory database and creates tables.
+    Uses file-backed SQLite to avoid cross-connection issues.
     """
-    try:
-        # Try to get engine - will raise AssertionError if not initialized
-        get_engine()
-    except AssertionError:
-        # Engine not initialized yet, so initialize it with in-memory DB
-        init_engine("sqlite:///:memory:")
-        # Create all tables from models
-        Base.metadata.create_all(get_engine())
+    dbdir = tmp_path_factory.mktemp("db")
+    init_engine(f"sqlite:///{dbdir}/test.db")
+    yield
+    get_engine().dispose()
+
+
+@pytest.fixture(autouse=True)
+def _schema():
+    """
+    Provide clean database schema for each test.
+
+    - Drops all tables before test
+    - Creates all tables before test
+    - Drops all tables after test (cleanup)
+    - Ensures test isolation
+    """
+    eng = get_engine()
+    Base.metadata.drop_all(eng)
+    Base.metadata.create_all(eng)
+    yield
+    Base.metadata.drop_all(eng)

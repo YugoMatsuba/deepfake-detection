@@ -112,7 +112,8 @@ class TestAuthRoutes(unittest.TestCase):
                 pending_approval=False
             )
             db.add(user)
-            user_id = user.id  # Get ID before commit
+            db.flush()  # Assign primary key now
+            user_id = user.id  # Now it's a real int
 
         with self.client.session_transaction() as sess:
             sess['user_id'] = user_id
