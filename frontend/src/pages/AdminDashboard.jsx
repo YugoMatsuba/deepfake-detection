@@ -523,30 +523,35 @@ function ReassignModal({ analysis, onClose, onSuccess }) {
 
 function RoleManagementTab() {
   const [query, setQuery] = useState("");
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Search users
+  // Load all users on mount
   useEffect(() => {
-    if (query.length === 0) {
-      setUsers([]);
-      return;
+    loadAllUsers();
+  }, []);
+
+  const loadAllUsers = async () => {
+    setLoading(true);
+    try {
+      // Search with empty query returns all users, or we can use a wildcard
+      const data = await adminApi.searchUsers("", 1000); // Get up to 1000 users
+      // Sort alphabetically by username
+      const sorted = data.users.sort((a, b) => a.username.localeCompare(b.username));
+      setAllUsers(sorted);
+    } catch (err) {
+      console.error('Failed to load users:', err);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const data = await adminApi.searchUsers(query);
-        setUsers(data.users);
-      } catch (err) {
-        console.error('Search failed:', err);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [query]);
+  // Filter users client-side based on search query
+  const filteredUsers = query.trim().length === 0
+    ? allUsers
+    : allUsers.filter(user =>
+        user.username.toLowerCase().includes(query.trim().toLowerCase())
+      );
 
   const handlePromote = async (userId, username) => {
     if (!confirm(`Promote "${username}" to admin?`)) return;
@@ -554,9 +559,8 @@ function RoleManagementTab() {
     try {
       await adminApi.promoteUser(userId);
       alert(`${username} promoted to admin`);
-      // Reload search
-      const data = await adminApi.searchUsers(query);
-      setUsers(data.users);
+      // Reload all users
+      await loadAllUsers();
     } catch (err) {
       alert(`Failed: ${err.message}`);
     }
@@ -568,9 +572,8 @@ function RoleManagementTab() {
     try {
       await adminApi.demoteUser(userId);
       alert(`${username} demoted to user`);
-      // Reload search
-      const data = await adminApi.searchUsers(query);
-      setUsers(data.users);
+      // Reload all users
+      await loadAllUsers();
     } catch (err) {
       alert(`Failed: ${err.message}`);
     }
@@ -582,9 +585,8 @@ function RoleManagementTab() {
     try {
       await adminApi.deactivateUser(userId);
       alert(`${username} deactivated`);
-      // Reload search
-      const data = await adminApi.searchUsers(query);
-      setUsers(data.users);
+      // Reload all users
+      await loadAllUsers();
     } catch (err) {
       alert(`Failed: ${err.message}`);
     }
@@ -603,17 +605,17 @@ function RoleManagementTab() {
         />
       </div>
 
-      {loading && <div className="text-gray-600">Loading...</div>}
+      {loading && <div className="text-gray-600">Loading all users...</div>}
 
-      {users.length === 0 && query.length > 0 && !loading && (
-        <div className="text-gray-600 text-center py-8">No users found</div>
+      {!loading && allUsers.length === 0 && (
+        <div className="text-gray-600 text-center py-8">No users found in system</div>
       )}
 
-      {users.length === 0 && query.length === 0 && (
-        <div className="text-gray-600 text-center py-8">Search for users to manage roles</div>
+      {!loading && allUsers.length > 0 && filteredUsers.length === 0 && (
+        <div className="text-gray-600 text-center py-8">No users match your search</div>
       )}
 
-      {users.length > 0 && (
+      {!loading && filteredUsers.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -624,7 +626,7 @@ function RoleManagementTab() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <tr key={user.id} className="border-b border-gray-100 even:bg-gray-50">
                   <td className="px-4 py-3">{user.username}</td>
                   <td className="px-4 py-3">

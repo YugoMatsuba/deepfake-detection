@@ -104,11 +104,10 @@ export async function reassignAnalysis(analysisId, newUserId) {
  * @returns {Promise<{users: Array<{id: number, username: string}>}>}
  */
 export async function searchUsers(query, limit = 20) {
-  if (!query || query.trim().length === 0) {
-    return { users: [] };
-  }
-
-  const params = new URLSearchParams({ q: query.trim(), limit });
+  const params = new URLSearchParams({
+    q: query ? query.trim() : "",
+    limit
+  });
   return apiFetch(`${BASE_URL}/users/search?${params}`);
 }
 

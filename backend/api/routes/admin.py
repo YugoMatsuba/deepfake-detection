@@ -304,15 +304,17 @@ def search_users():
         query = request.args.get("q", "").strip().lower()
         limit = min(int(request.args.get("limit", 20)), 100)
 
-        if not query:
-            return jsonify(users=[]), 200
-
-        # Case-insensitive search using ilike
-        users = db.query(User).filter(
-            User.username.ilike(f"%{query}%"),
+        # Build base query for active, approved users
+        base_query = db.query(User).filter(
             User.active == True,
             User.pending_approval == False
-        ).limit(limit).all()
+        )
+
+        # Apply username filter if query is provided
+        if query:
+            base_query = base_query.filter(User.username.ilike(f"%{query}%"))
+
+        users = base_query.limit(limit).all()
 
         return jsonify(users=[{
             "id": u.id,
