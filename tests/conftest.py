@@ -1,304 +1,123 @@
 """
-Pytest configuration and fixtures for backend tests.
+Simple test fixtures using in-memory SQLite.
 
-Provides:
-- Flask app with test config
-- Test database (in-memory SQLite)
-- Test client with session support
-- User fixtures (owner, admin, regular, pending)
-- Analysis fixtures
+No complex SAVEPOINT transactions - just clean DB state before each test.
 """
 
-import pytest
 import os
+import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
 import sys
 from pathlib import Path
-
-# Add backend to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
-from flask import Flask
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-
-# Import backend modules
-from api import Base, hash_password
-from models import User, Analysis, AuditLog
-import app as app_module
+import models
+import api as api_module
+from app import create_app
 
 
-@pytest.fixture(scope="function")
-def test_db():
+@pytest.fixture(scope="session")
+def engine():
     """
-    Create in-memory test database.
-
-    Yields:
-        SQLAlchemy engine with all tables created
-
-    Cleanup:
-        Drops all tables after test
+    Single in-memory SQLite DB shared by all tests.
+    Uses StaticPool to keep the same connection alive.
     """
-    # In-memory SQLite database
-    engine = create_engine("sqlite:///:memory:", echo=False)
+    eng = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        future=True,
+    )
+
+    # Enable foreign keys for SQLite
+    @event.listens_for(eng, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    return eng
+
+
+@pytest.fixture(scope="session")
+def bind_app_to_test_engine(engine):
+    """
+    Point the app's DB to our test engine and create tables.
+    This runs once per test session.
+    """
+    # Point API module to use test engine
+    api_module._engine = engine
+    api_module._SessionLocal = sessionmaker(
+        bind=engine,
+        expire_on_commit=False,
+        future=True
+    )
 
     # Create all tables
-    Base.metadata.create_all(engine)
+    models.Base.metadata.create_all(bind=engine)
 
-    yield engine
+    yield
 
-    # Cleanup
-    Base.metadata.drop_all(engine)
-    engine.dispose()
+    # Teardown: drop all tables
+    models.Base.metadata.drop_all(bind=engine)
 
 
-@pytest.fixture(scope="function")
-def db_session(test_db):
+@pytest.fixture(scope="session")
+def app(bind_app_to_test_engine):
     """
-    Create SQLAlchemy session for test.
-
-    Yields:
-        Scoped session connected to test_db
-
-    Cleanup:
-        Rolls back and closes session after test
-    """
-    Session = scoped_session(sessionmaker(bind=test_db))
-    session = Session()
-
-    yield session
-
-    session.rollback()
-    session.close()
-    Session.remove()
-
-
-@pytest.fixture(scope="function")
-def app(test_db, monkeypatch):
-    """
-    Create Flask test app with test database.
-
-    Args:
-        test_db: Test database fixture
-        monkeypatch: Pytest monkeypatch for env vars
-
-    Yields:
-        Flask app configured for testing
+    Create Flask app in testing mode.
+    Session-scoped so we don't recreate app for each test.
     """
     # Set test environment variables
-    monkeypatch.setenv("ENVIRONMENT", "test")
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
-    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    os.environ["FLASK_ENV"] = "testing"
+    os.environ["SECRET_KEY"] = "test-secret-key"
 
-    # Patch db_engine to use test_db
-    monkeypatch.setattr(app_module, "db_engine", lambda: test_db)
+    # Skip owner bootstrap for tests (we create users manually in tests)
+    os.environ["OWNER_USERNAME"] = ""
 
-    # Patch get_db to use test_db
-    original_get_db = app_module.get_db
+    # Create Flask app
+    flask_app = create_app()
+    flask_app.testing = True
 
-    def test_get_db():
-        Session = scoped_session(sessionmaker(bind=test_db))
-        try:
-            yield Session()
-        finally:
-            Session.remove()
-
-    monkeypatch.setattr("api.get_db", test_get_db)
-    monkeypatch.setattr("backend.api.get_db", test_get_db)
-
-    # Initialize app
-    from api import init_engine
-    init_engine(db_url="sqlite:///:memory:")
-
-    # Create app without calling bootstrap_owner_from_env
-    test_app = Flask(__name__)
-    test_app.config.update({
+    # Configure for testing
+    flask_app.config.update({
         "TESTING": True,
-        "SECRET_KEY": "test-secret-key",
-        "SESSION_COOKIE_HTTPONLY": True,
         "SESSION_COOKIE_SAMESITE": "Lax",
+        "SESSION_COOKIE_HTTPONLY": True,
+        "SERVER_NAME": "localhost",
     })
 
-    # Register blueprints
-    from api.routes.auth import bp as auth_bp
-    from api.routes.admin import admin_bp
-    from api.routes.video_upload import video_bp
-    from api.routes.analysis import analysis_bp
-
-    test_app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    test_app.register_blueprint(admin_bp, url_prefix="/api/admin")
-    test_app.register_blueprint(video_bp, url_prefix="/api")
-    test_app.register_blueprint(analysis_bp, url_prefix="/api")
-
-    yield test_app
+    return flask_app
 
 
-@pytest.fixture(scope="function")
-def client(app):
+@pytest.fixture()
+def client(app, clean_db):
     """
     Create Flask test client.
+    Function-scoped so each test gets a fresh client with clean session.
 
-    Args:
-        app: Flask app fixture
-
-    Yields:
-        Test client with session support
+    Depends on clean_db to ensure database is clean before each test.
     """
-    return app.test_client()
+    with app.test_client() as c, app.app_context():
+        yield c
 
 
-# ============================================================================
-# User Fixtures
-# ============================================================================
-
-@pytest.fixture(scope="function")
-def owner_user(db_session):
+@pytest.fixture()
+def clean_db(engine):
     """
-    Create owner user.
+    Clean all tables before each test.
+    This ensures test isolation without complex SAVEPOINT logic.
 
-    Returns:
-        User object with role="owner"
+    Note: Not autouse - only used by tests that need database (via client fixture).
     """
-    user = User(
-        username="test_owner",
-        password_hash=hash_password("password123"),
-        role="owner",
-        active=True,
-        pending_approval=False
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
+    # Delete all rows from all tables
+    with engine.begin() as conn:
+        for table in reversed(models.Base.metadata.sorted_tables):
+            conn.execute(table.delete())
 
+    yield
 
-@pytest.fixture(scope="function")
-def admin_user(db_session):
-    """
-    Create admin user.
-
-    Returns:
-        User object with role="admin"
-    """
-    user = User(
-        username="test_admin",
-        password_hash=hash_password("password123"),
-        role="admin",
-        active=True,
-        pending_approval=False
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
-
-
-@pytest.fixture(scope="function")
-def regular_user(db_session):
-    """
-    Create regular approved user.
-
-    Returns:
-        User object with role="user", approved
-    """
-    user = User(
-        username="test_user",
-        password_hash=hash_password("password123"),
-        role="user",
-        active=True,
-        pending_approval=False
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
-
-
-@pytest.fixture(scope="function")
-def pending_user(db_session):
-    """
-    Create pending approval user.
-
-    Returns:
-        User object with pending_approval=True
-    """
-    user = User(
-        username="test_pending",
-        password_hash=hash_password("password123"),
-        role="user",
-        active=False,
-        pending_approval=True
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
-
-
-@pytest.fixture(scope="function")
-def inactive_user(db_session):
-    """
-    Create inactive user.
-
-    Returns:
-        User object with active=False
-    """
-    user = User(
-        username="test_inactive",
-        password_hash=hash_password("password123"),
-        role="user",
-        active=False,
-        pending_approval=False
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
-
-
-# ============================================================================
-# Analysis Fixtures
-# ============================================================================
-
-@pytest.fixture(scope="function")
-def analysis(db_session, regular_user):
-    """
-    Create analysis owned by regular_user.
-
-    Returns:
-        Analysis object
-    """
-    import uuid
-    analysis = Analysis(
-        id=str(uuid.uuid4()),
-        user_id=regular_user.id,
-        status="created",
-        video_path="/fake/path/video.mp4",
-        video_sha256="fake_sha256",
-        metadata_json={"fps": 30, "frame_count": 100}
-    )
-    db_session.add(analysis)
-    db_session.commit()
-    db_session.refresh(analysis)
-    return analysis
-
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-def login_as(client, username, password="password123"):
-    """
-    Helper to login as a user and return response.
-
-    Args:
-        client: Flask test client
-        username: Username to login
-        password: Password (default "password123")
-
-    Returns:
-        Response object from login request
-    """
-    return client.post("/api/auth/login", json={
-        "username": username,
-        "password": password
-    })
+    # No need for explicit cleanup - next test will clean again
