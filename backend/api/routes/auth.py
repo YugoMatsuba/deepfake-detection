@@ -5,7 +5,7 @@ Implements the following endpoints (REST + JSON):
 
 POST /api/auth/register
     Purpose: seed first admin, or admin creates users.
-    Body: { "username": "str", "password": "str", "role": "investigator"|"admin"? (optional) }
+    Body: { "username": "str", "password": "str", "role": "user"|"admin"? (optional) }
     Returns:
       201 { "id": int, "username": "str", "role": "str", "active": true }
       400 { "error": "username_taken" | "invalid_payload" }
@@ -97,10 +97,10 @@ def _require_auth(db: Session) -> Optional[User]:
 
 def _require_admin(db: Session) -> Optional[User]:
     """
-    Return current user if admin else None.
+    Return current user if admin or owner else None.
     """
     u = _require_auth(db)
-    if not u or u.role != "admin" or not u.active:
+    if not u or u.role not in ("admin", "owner") or not u.active:
         return None
     return u
 
@@ -140,8 +140,8 @@ def register():
             return jsonify(error="username_taken"), 400
 
         pw_hash = hash_password(password)
-        role = "admin" if count == 0 else "investigator"
-        u = User(username=username, password_hash=pw_hash, role=role, active=True)
+        role = "admin" if count == 0 else "user"
+        u = User(username=username, password_hash=pw_hash, role=role, active=True, pending_approval=False)
         db.add(u)
         db.commit()
         db.refresh(u)
@@ -173,15 +173,16 @@ def login():
             db.commit()
             return jsonify(error="invalid_credentials"), 401
 
-        if not u.active:
-            db.add(AuditLog(user_id=u.id, event="login_failed", ip=_client_ip(), user_agent=_ua()))
-            db.commit()
-            return jsonify(error="invalid_credentials"), 401
-
         if not verify_password(u.password_hash, password):
             db.add(AuditLog(user_id=u.id, event="login_failed", ip=_client_ip(), user_agent=_ua()))
             db.commit()
             return jsonify(error="invalid_credentials"), 401
+
+        # Block inactive or pending approval users
+        if not u.active or u.pending_approval:
+            db.add(AuditLog(user_id=u.id, event="login_failed_pending", ip=_client_ip(), user_agent=_ua()))
+            db.commit()
+            return jsonify(error="account_pending_approval"), 403
 
         # success
         session.clear()  # prevent fixation
@@ -217,12 +218,13 @@ def signup():
             db.commit()
             return jsonify(error="username_taken"), 409
 
-        # create user 
+        # create user in pending state (requires admin approval)
         u = User(
             username=username,
             password_hash=hash_password(password),
-            active=True,                 # or rely on model default
-            # role defaults to "investigator"
+            role="user",                 # default role
+            active=False,                # pending approval
+            pending_approval=True,       # requires admin approval
         )
         db.add(u)
 
@@ -234,15 +236,15 @@ def signup():
             db.commit()
             return jsonify(error="username_taken"), 409
 
-        # success: audit + auto-login
-        db.add(AuditLog(user_id=u.id, event="signup", ip=_client_ip(), user_agent=_ua()))
+        # success: audit, NO auto-login (pending approval)
+        db.add(AuditLog(user_id=u.id, event="signup_pending", ip=_client_ip(), user_agent=_ua()))
         db.commit()
 
-        session.clear()
-        session["user_id"] = u.id
-        session["role"] = u.role
-
-        return jsonify(user={"id": u.id, "username": u.username, "role": u.role}), 201
+        # Do NOT auto-login; user needs approval first
+        return jsonify(
+            message="Account created. Awaiting admin approval.",
+            user_id=u.id
+        ), 201
 
 @bp.post("/logout")
 def logout():
@@ -265,16 +267,23 @@ def logout():
 @bp.get("/me")
 def me():
     """
-    Return current user info.
-    Implementation outline:
-      - u = _require_auth(db); if None: return 401
-      - return {id, username, role}
+    Return current user info including approval status.
+    Uses current_user() from auth_utils for consistency and g.user caching.
     """
+    from api.auth_utils import current_user
+
     with get_db() as db:
-        u = _require_auth(db)
-        if not u:
+        try:
+            user = current_user(db)  # Raises 401 if not logged in or inactive
+            return jsonify(user={
+                "id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "active": user.active,
+                "pending_approval": user.pending_approval
+            }), 200
+        except:
             return jsonify(error="unauthenticated"), 401
-        return jsonify(user={"id": u.id, "username": u.username, "role": u.role}), 200
 
 
 @bp.get("/audit")

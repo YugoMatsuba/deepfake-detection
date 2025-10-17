@@ -19,7 +19,7 @@ from sqlalchemy import update
 from werkzeug.exceptions import HTTPException
 
 from api import get_db
-from api.auth_utils import require_login, check_analysis_ownership
+from api.auth_utils import require_user, check_analysis_ownership
 from models import Analysis
 from api.ml_integration import run_ml_analysis
 from api.traditional_integration import (
@@ -37,7 +37,7 @@ analysis_bp = Blueprint("analysis", __name__)
 
 
 @analysis_bp.post("/analyses/<analysis_id>/start")
-@require_login
+@require_user
 def start_analysis(analysis_id: str):
     """
     Start synchronous analysis (blocking, 1-2 min).
@@ -248,7 +248,7 @@ def _get_video_metadata(video_path: str) -> Dict[str, Any]:
 
 
 @analysis_bp.get("/analyses/<analysis_id>")
-@require_login
+@require_user
 def get_analysis(analysis_id: str):
     """
     Fetch analysis status and results (scores only from DB, no base64).
@@ -294,7 +294,7 @@ def get_analysis(analysis_id: str):
 
 
 @analysis_bp.post("/analyses/<analysis_id>/frames/<int:frame_number>/forensics")
-@require_login
+@require_user
 def analyze_frame(analysis_id: str, frame_number: int):
     """
     Run on-demand traditional forensics analysis on a specific frame.
