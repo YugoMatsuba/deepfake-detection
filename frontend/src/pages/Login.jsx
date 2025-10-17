@@ -16,13 +16,28 @@ export default function Login() {
     e.preventDefault();
     setErr(null);
     setSubmitting(true);
-    
+
     try {
       const usernameValue = username.trim();
-      await login(usernameValue, password);
-      navigate("/", { replace: true });
+      const data = await login(usernameValue, password);
+
+      // Role-based routing after successful login
+      if (data.user.role === 'admin' || data.user.role === 'owner') {
+        navigate("/role-select", { replace: true });
+      } else {
+        navigate("/upload", { replace: true });
+      }
     } catch (error) {
-      setErr(error.body?.error || error.message || "Login failed");
+      // Handle specific error cases
+      const errorCode = error.body?.error;
+
+      if (errorCode === 'account_pending_approval') {
+        setErr('Your account is awaiting admin approval. Please check back later.');
+      } else if (errorCode === 'invalid_credentials') {
+        setErr('Invalid username or password.');
+      } else {
+        setErr(error.message || "Login failed");
+      }
     } finally {
       setSubmitting(false);
     }

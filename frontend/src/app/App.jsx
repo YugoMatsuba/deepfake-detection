@@ -8,6 +8,8 @@ import SignUp from '../pages/SignUp.jsx';
 import Analysis from '../pages/Analysis.jsx';
 import Upload from '../pages/Upload.jsx';
 import FrameViewerPage from '../pages/FrameViewerRetrieval.jsx';
+import RoleSelect from '../pages/RoleSelect.jsx';
+import AdminDashboard from '../pages/AdminDashboard.jsx';
 
 export default function App() {
   return (
@@ -28,6 +30,24 @@ export default function App() {
             <Route path="/upload" element={<Upload />} />
             <Route path="/analysis" element={<Analysis />}/>
             <Route path="/frame-viewer" element={<FrameViewerPage />} />
+
+            {/* Admin routes - require admin role */}
+            <Route
+              path="/role-select"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <RoleSelect />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </AnalysisProvider>
       </AuthProvider>
