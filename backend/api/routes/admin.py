@@ -316,7 +316,8 @@ def search_users():
 
         return jsonify(users=[{
             "id": u.id,
-            "username": u.username
+            "username": u.username,
+            "role": u.role
         } for u in users]), 200
 
 
