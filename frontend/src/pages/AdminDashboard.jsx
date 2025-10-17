@@ -638,12 +638,20 @@ function RoleManagementTab() {
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">
                     {user.role === 'user' && (
-                      <button
-                        onClick={() => handlePromote(user.id, user.username)}
-                        className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 transition"
-                      >
-                        Promote to Admin
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handlePromote(user.id, user.username)}
+                          className="px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 transition"
+                        >
+                          Promote to Admin
+                        </button>
+                        <button
+                          onClick={() => handleDeactivate(user.id, user.username)}
+                          className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700 transition"
+                        >
+                          Deactivate
+                        </button>
+                      </>
                     )}
                     {user.role === 'admin' && (
                       <>
