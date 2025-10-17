@@ -241,7 +241,7 @@ def count_active_admins(db: Session) -> int:
     """
     return db.query(User).filter(
         User.role.in_(["admin", "owner"]),
-        User.active == True
+        User.active.is_(True)
     ).count()
 
 

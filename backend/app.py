@@ -24,7 +24,7 @@ from api.routes.video_upload import video_bp
 from api.routes.analysis import analysis_bp
 from api.routes.admin import admin_bp  # Admin dashboard routes
 # Models now in consolidated models.py (managed by Alembic)
-from models import User, AuditLog, Analysis
+from models import User
 
 DEFAULT_DB_URL = "sqlite:///instance/app.db"
 
@@ -57,7 +57,7 @@ def bootstrap_owner_from_env():
         # Count existing owners
         owner_count = db.query(User).filter(
             User.role == "owner",
-            User.active == True
+            User.active.is_(True)
         ).count()
 
         # Find env user
@@ -94,19 +94,19 @@ def bootstrap_owner_from_env():
                 db.commit()
                 print(f"✓ Promoted {owner_username} to owner (no existing owners)")
                 if seed_pw:
-                    print(f"  Password reset to OWNER_SEED_PASSWORD")
+                    print("  Password reset to OWNER_SEED_PASSWORD")
 
         elif owner_count >= 1:
             # Owner already exists - only transfer if explicitly allowed
             allow_transfer = os.getenv("ALLOW_OWNER_TRANSFER", "0") == "1"
             if not allow_transfer:
-                print(f"⚠ Owner already exists. ALLOW_OWNER_TRANSFER not set. Skipping bootstrap.")
+                print("⚠ Owner already exists. ALLOW_OWNER_TRANSFER not set. Skipping bootstrap.")
                 return
 
             # Transfer ownership: demote current owners and promote env user
             current_owners = db.query(User).filter(
                 User.role == "owner",
-                User.active == True
+                User.active.is_(True)
             ).all()
 
             for o in current_owners:
@@ -125,12 +125,13 @@ def bootstrap_owner_from_env():
                 db.commit()
                 print(f"✓ Transferred ownership to {owner_username}")
                 if seed_pw:
-                    print(f"  Password reset to OWNER_SEED_PASSWORD")
+                    print("  Password reset to OWNER_SEED_PASSWORD")
             else:
                 raise RuntimeError(
                     f"OWNER_USERNAME={owner_username} doesn't exist and an owner already exists. "
                     "Cannot transfer ownership to non-existent user."
                 )
+
 
 def create_app() -> Flask:
     app = Flask(__name__)
@@ -163,13 +164,13 @@ def create_app() -> Flask:
         "http://localhost:5173,http://127.0.0.1:5173"  # default dev FE origins
     )
     origins_list = [o.strip() for o in frontend_origins.split(",") if o.strip()]
-    
+
     CORS(
         app,
         resources={r"/api/*": {"origins": origins_list}},
         supports_credentials=True,
     )
-    
+
     # Session cookie config for dev/prod
     is_prod = os.getenv("ENVIRONMENT") == "production"
     app.config.update(

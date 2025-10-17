@@ -57,7 +57,7 @@ def get_pending_users():
         limit = min(int(request.args.get("limit", 100)), 500)
 
         users = db.query(User).filter(
-            User.pending_approval == True
+            User.pending_approval.is_(True)
         ).order_by(desc(User.created_at)).limit(limit).all()
 
         return jsonify(users=[{
@@ -306,8 +306,8 @@ def search_users():
 
         # Build base query for active, approved users
         base_query = db.query(User).filter(
-            User.active == True,
-            User.pending_approval == False
+            User.active.is_(True),
+            User.pending_approval.is_(False)
         )
 
         # Apply username filter if query is provided
