@@ -6,6 +6,8 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from api.routes.analysis import analysis_bp
+from api import get_db, hash_password
+from models import User
 
 
 class TestAnalysisRoutes(unittest.TestCase):
@@ -16,6 +18,19 @@ class TestAnalysisRoutes(unittest.TestCase):
         self.app.config['SECRET_KEY'] = 'test-key'
         self.app.register_blueprint(analysis_bp, url_prefix='/api')
         self.client = self.app.test_client()
+
+        # Create a test user for @require_user decorated routes
+        with get_db() as db:
+            self.test_user = User(
+                username='testuser',
+                password_hash=hash_password('password123'),
+                role='user',
+                active=True,
+                pending_approval=False
+            )
+            db.add(self.test_user)
+            db.flush()  # Get the ID without committing
+            self.test_user_id = self.test_user.id
 
     @patch('api.routes.analysis.get_db')
     @patch('api.routes.analysis.check_analysis_ownership')
@@ -52,7 +67,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         }
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/analyses/test-analysis-id/start',
                                   json={'modules': ['xception'], 'traditional': ['ela']})
@@ -71,7 +86,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         mock_get_db.return_value.__enter__.return_value = mock_db
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/analyses/test-id/start', json={})
         self.assertEqual(response.status_code, 400)
@@ -92,7 +107,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         mock_get_db.return_value.__enter__.return_value = mock_db
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.get('/api/analyses/test-analysis-id')
         self.assertEqual(response.status_code, 200)
@@ -121,7 +136,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         }
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/analyses/test-analysis-id/frames/42/forensics',
                                   json={'methods': ['ela']})

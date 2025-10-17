@@ -57,8 +57,9 @@ class TestAuthRoutes(unittest.TestCase):
         mock_user = MagicMock()
         mock_user.id = 1
         mock_user.username = 'testuser'
-        mock_user.role = 'investigator'
+        mock_user.role = 'user'  # Updated from 'investigator' to 'user'
         mock_user.active = True
+        mock_user.pending_approval = False  # User is approved
         mock_user.password_hash = 'hashed_password'
 
         mock_db.query().filter().first.return_value = mock_user
@@ -98,19 +99,24 @@ class TestAuthRoutes(unittest.TestCase):
         response = self.client.post('/api/auth/logout')
         self.assertEqual(response.status_code, 204)
 
-    @patch('api.routes.auth.get_db')
-    def test_me_authenticated(self, mock_get_db):
-        mock_db = MagicMock()
-        mock_user = MagicMock()
-        mock_user.id = 1
-        mock_user.username = 'testuser'
-        mock_user.role = 'investigator'
+    def test_me_authenticated(self):
+        # Create real user in test database
+        from api import get_db as real_get_db, hash_password
 
-        mock_db.get.return_value = mock_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
+        with real_get_db() as db:
+            user = User(
+                username='testuser',
+                password_hash=hash_password('password123'),
+                role='user',
+                active=True,
+                pending_approval=False
+            )
+            db.add(user)
+            db.flush()  # Assign primary key now
+            user_id = user.id  # Now it's a real int
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = user_id
 
         response = self.client.get('/api/auth/me')
         self.assertEqual(response.status_code, 200)

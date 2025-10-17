@@ -8,6 +8,8 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from api.routes.video_upload import video_bp
+from api import get_db, hash_password
+from models import User
 
 
 class TestVideoUploadRoutes(unittest.TestCase):
@@ -18,6 +20,19 @@ class TestVideoUploadRoutes(unittest.TestCase):
         self.app.config['SECRET_KEY'] = 'test-key'
         self.app.register_blueprint(video_bp, url_prefix='/api')
         self.client = self.app.test_client()
+
+        # Create a test user for @require_user decorated routes
+        with get_db() as db:
+            self.test_user = User(
+                username='testuser',
+                password_hash=hash_password('password123'),
+                role='user',
+                active=True,
+                pending_approval=False
+            )
+            db.add(self.test_user)
+            db.flush()  # Get the ID without committing
+            self.test_user_id = self.test_user.id
 
     @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.save_video_for_analysis')
@@ -41,7 +56,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
         )
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/videos',
                                   data={'file': file_obj},
@@ -54,7 +69,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
     def test_upload_video_no_file(self):
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/videos')
         self.assertEqual(response.status_code, 400)
@@ -68,7 +83,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
         )
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/videos',
                                   data={'file': file_obj},
@@ -117,7 +132,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
         mock_data_root.__truediv__.return_value = mock_video_dir
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            sess['user_id'] = self.test_user_id
 
         response = self.client.get('/api/analyses/nonexistent/video')
         self.assertEqual(response.status_code, 404)

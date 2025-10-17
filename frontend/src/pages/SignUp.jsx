@@ -11,6 +11,7 @@ export default function SignUp() {
   const [showConfirm, setShowConfirm]         = useState(false);
   const [submitting, setSubmitting]           = useState(false);
   const [err, setErr]                         = useState(null);
+  const [success, setSuccess]                 = useState(false);
 
   const navigate = useNavigate();
   const { signup } = useAuth();
@@ -18,6 +19,7 @@ export default function SignUp() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr(null);
+    setSuccess(false);
     setSubmitting(true);
 
     try {
@@ -25,10 +27,10 @@ export default function SignUp() {
         throw new Error("Passwords do not match");
       }
       const usernameValue = username.trim();
-      await signup(usernameValue, password);
-      // For now (static): pretend success and go to home or login
-      navigate("/", { replace: true });
-      // or: navigate("/login", { replace: true });
+      const data = await signup(usernameValue, password);
+
+      // Success - show pending approval message (backend doesn't auto-login)
+      setSuccess(true);
     } catch (error) {
       setErr(error.message || "Sign up failed");
     } finally {
@@ -46,6 +48,20 @@ export default function SignUp() {
 
         {err && <p className="text-red-600 text-sm mb-2">{err}</p>}
 
+        {success ? (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-green-800 font-semibold mb-1">Account created!</p>
+            <p className="text-green-700 text-sm mb-3">
+              Your account is awaiting admin approval. You'll be able to log in once an admin reviews your request.
+            </p>
+            <button
+              onClick={() => navigate("/login")}
+              className="w-full px-3 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white font-semibold hover:opacity-95 active:opacity-90 transition"
+            >
+              Go to Login
+            </button>
+          </div>
+        ) : (
         <form onSubmit={onSubmit} className="grid gap-3">
           {/* Username */}
           <div>
@@ -142,6 +158,7 @@ export default function SignUp() {
             {submitting ? "Creating account..." : "Create account"}
           </button>
         </form>
+        )}
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, Index, text, CheckConstraint
 from sqlalchemy.dialects.sqlite import JSON as SQLITE_JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,14 +22,50 @@ from api import Base
 # ============================================================================
 
 class User(Base):
-    """User account for authentication and authorization."""
+    """
+    User account for authentication and authorization.
+
+    Roles:
+    - user: normal usage (pending approval by default)
+    - admin: can approve users, view all data, reassign analyses
+    - owner: single super-admin, can promote/demote admins (env-enforced)
+    """
     __tablename__ = "users"
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        Index('ix_users_pending_created', 'pending_approval', 'created_at'),
+        Index('ix_users_active_role', 'active', 'role'),
+        CheckConstraint("role IN ('user', 'admin', 'owner')", name='ck_user_role'),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[str] = mapped_column(String(16), default="investigator", nullable=False)
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Role as String for portability (avoids Enum ALTER TYPE headaches)
+    role: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="user",
+        server_default="user"
+    )
+
+    active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("1")
+    )
+
+    # New field: approval workflow
+    pending_approval: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("1")
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -38,22 +74,36 @@ class User(Base):
 
 
 class AuditLog(Base):
-    """Audit trail for authentication events."""
+    """
+    Audit trail for authentication and admin events.
+
+    Captures: login, logout, signup, approval, rejection, reassignment, etc.
+    """
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("users.id"),
-        nullable=True
+        nullable=True,
+        index=True
     )
-    event: Mapped[str] = mapped_column(String(32), nullable=False)
+    event: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # New field: structured details for admin actions
+    details_json: Mapped[Optional[dict]] = mapped_column(
+        SQLITE_JSON,
+        nullable=True,
+        default=None
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
 
@@ -80,6 +130,12 @@ class Analysis(Base):
     - Base64 overlays sent in HTTP response but NOT persisted to DB
     """
     __tablename__ = "analyses"
+
+    # Composite indexes for admin dashboard queries
+    __table_args__ = (
+        Index('ix_analyses_user_created', 'user_id', 'created_at'),
+        Index('ix_analyses_status_created', 'status', 'created_at'),
+    )
 
     # Primary key (UUID for external references)
     id: Mapped[str] = mapped_column(

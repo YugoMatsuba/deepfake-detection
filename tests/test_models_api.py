@@ -11,13 +11,22 @@ ADAPTERS = [
     ("ucf",      load_ucf,      predict_probs_ucf),
 ]
 
+@pytest.fixture
+def weights_map(xception_weights_path, spsl_weights_path, ucf_weights_path):
+    """Map model names to their weights paths."""
+    return {
+        "xception": xception_weights_path,
+        "spsl": spsl_weights_path,
+        "ucf": ucf_weights_path
+    }
+
 @pytest.mark.parametrize("name,load,pred", ADAPTERS)
-def test_adapter_api_shapes_and_probs_cpu(name, load, pred):
+def test_adapter_api_shapes_and_probs_cpu(name, load, pred, weights_map):
     device = "cpu"
     N = 4
     x = torch.randn(N, 3, 256, 256, device=device, dtype=torch.float32)
 
-    m = load(weights_path="", device=device)
+    m = load(weights_path=weights_map[name], device=device)
     out = pred(m, x)
 
     # Dict API
@@ -33,11 +42,11 @@ def test_adapter_api_shapes_and_probs_cpu(name, load, pred):
     assert (out["prob"] >= 0).all() and (out["prob"] <= 1).all()
 
 @pytest.mark.parametrize("name,load,pred", ADAPTERS)
-def test_adapter_empty_batch(name, load, pred):
+def test_adapter_empty_batch(name, load, pred, weights_map):
     device = "cpu"
     x = torch.empty(0, 3, 256, 256, device=device, dtype=torch.float32)
 
-    m = load(weights_path="", device=device)
+    m = load(weights_path=weights_map[name], device=device)
     out = pred(m, x)
 
     assert out["cls"].shape == (0, 2)
@@ -45,10 +54,10 @@ def test_adapter_empty_batch(name, load, pred):
     assert out["feat"].shape[0] == 0
 
 @pytest.mark.parametrize("name,load,pred", ADAPTERS)
-def test_adapter_dtype_guard_throws(name, load, pred):
+def test_adapter_dtype_guard_throws(name, load, pred, weights_map):
     device = "cpu"
     x_wrong = torch.randn(2, 3, 256, 256, device=device, dtype=torch.float64)
 
-    m = load(weights_path="", device=device)
+    m = load(weights_path=weights_map[name], device=device)
     with pytest.raises(AssertionError):
         pred(m, x_wrong)

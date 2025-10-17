@@ -18,7 +18,7 @@ from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 
 from api import get_db
-from api.auth_utils import require_login
+from api.auth_utils import require_user
 from models import Analysis
 from storage import save_video_for_analysis, probe_video_metadata, DATA_ROOT
 
@@ -30,14 +30,14 @@ ALLOWED_MIME = {
 
 
 @video_bp.post("/videos")
-@require_login
+@require_user
 def upload_video():
     """
     Upload video and create Analysis record.
 
     Expects:
     - multipart/form-data with 'file' field
-    - Session must contain user_id (enforced by @require_login)
+    - Session must contain user_id (enforced by @require_user)
 
     Returns:
     - 201: {analysis_id, video_sha256, meta: {fps, frame_count, width, height}}
@@ -160,7 +160,7 @@ def get_video(analysis_id: str):
 
 
 @video_bp.get("/analyses/<analysis_id>/video")
-@require_login
+@require_user
 def get_analysis_video(analysis_id: str):
     """
     Serve video file for a given analysis with authentication and ownership check.

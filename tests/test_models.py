@@ -319,9 +319,9 @@ class TestModelImplementations:
         else:
             assert features.shape == (2, 2048)
 
-    def test_spsl_real_forward(self):
+    def test_spsl_real_forward(self, spsl_weights_path):
         """Test SPSL with real Xception can forward pass with 4-channel input."""
-        model = load_spsl("", "cpu")  # No weights for testing
+        model = load_spsl(spsl_weights_path, "cpu")
         model.eval()
 
         # Test conv1 replacement worked
@@ -369,9 +369,9 @@ class TestModelImplementations:
         expected_weight = expected_avg.repeat(1, 4, 1, 1)    # [32, 4, 3, 3]
         assert torch.allclose(model2.conv1.weight.data, expected_weight)
 
-    def test_ucf_real_forward(self):
+    def test_ucf_real_forward(self, ucf_weights_path):
         """Test UCF with real dual Xception encoders can forward pass."""
-        model = load_ucf("", "cpu")  # No weights for testing
+        model = load_ucf(ucf_weights_path, "cpu")
         model.eval()
 
         # Test architecture components
