@@ -1,0 +1,11 @@
+[bandit]
+# Bandit configuration file
+exclude_dirs = tests
+skips = B101,B105,B110
+# B101: Use of assert detected (common in tests and dev code)
+# B105: Possible hardcoded password string (test keys are fine)
+# B110: Try, Except, Pass detected (sometimes necessary for cleanup)
+
+[bandit:test_files]
+# Test files often have hardcoded values and assert statements
+exclude_dirs = tests

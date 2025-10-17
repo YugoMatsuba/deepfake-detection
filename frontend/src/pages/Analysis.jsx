@@ -39,20 +39,37 @@ export default function Analysis() {
         selectedModules.traditional
       );
 
-      console.log("Full analysis response:", response);
-
+      // Calculates traditional forensics scores
       const tradResults = response?.traditional || {};
-      const elaScore = tradResults?.ela?.score || null;
-      const lbpScore = tradResults?.lbp.score || null;
-      const noiseConfidence = tradResults?.noise.confidence || null;
 
-      setEla(elaScore.toFixed(2));
-      setNoise(noiseConfidence.toFixed(2));
-      setLbp(lbpScore.toFixed(2));
+      console.log(tradResults);
 
-      console.log("ELA: ", elaScore);
-      console.log("LBP: ", lbpScore);
-      console.log("Noise: ", noiseConfidence);
+      const elaScore = tradResults?.ela?.score ?? null;
+      const lbpScore = tradResults?.lbp?.score ?? null;
+      const noiseConfidence = tradResults?.noise?.confidence ?? null;
+
+      // setEla(elaScore.toFixed(2));
+      // setNoise(noiseConfidence.toFixed(2));
+      // setLbp(lbpScore.toFixed(2));
+
+      // Only update states if the module was actually selected
+      if (selectedModules.traditional.includes("ela") && typeof elaScore === "number") {
+        setEla(elaScore.toFixed(2));
+      } else {
+        setEla(null);
+      }
+
+      if (selectedModules.traditional.includes("noise") && typeof noiseConfidence === "number") {
+        setNoise(noiseConfidence.toFixed(2));
+      } else {
+        setNoise(null);
+      }
+
+      if (selectedModules.traditional.includes("lbp") && typeof lbpScore === "number") {
+        setLbp(lbpScore.toFixed(2));
+      } else {
+        setLbp(null);
+      }
 
       // Calculate ML score from response
       const mlResults = response?.ml || {};
@@ -133,15 +150,23 @@ export default function Analysis() {
       <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
         Initial Analysis: Synthetic Media Chance = {fakeVideoPercentage}%
       </h1>
-      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
-        ELA Analysis Score = {ela}%
-      </h1>
-      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
-        Noise Analysis Confidence = {noise}%
-      </h1>
-      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
-        LBP Analysis Score = {lbp}%
-      </h1>
+      {ela !== null && (
+        <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+          ELA Analysis Score = {ela}
+        </h1>
+      )}
+
+      {noise !== null && (
+        <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+          Noise Analysis Confidence = {noise}
+        </h1>
+      )}
+
+      {lbp !== null && (
+        <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+          LBP Analysis Score = {lbp}
+        </h1>
+      )}
       <h2 className="mt-[40px] text-4xl leading-none tracking-normal text-black">
         Metadata anomalies: None found
       </h2>

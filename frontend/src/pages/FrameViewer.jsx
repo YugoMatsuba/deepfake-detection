@@ -207,36 +207,53 @@ useEffect(() => {
     setCurrentFrame(Math.floor(video.currentTime * frameRate));
   };
 
-  const nextDeepfake = () => {
-    if (deepfakeFrames.length === 0) return;
-    const nextIndex = deepfakeFrames.findIndex((f) => f > currentFrame);
-    if (nextIndex !== -1) {
-      const video = videoRef.current;
-      video.currentTime = deepfakeFrames[nextIndex] / frameRate;
-      setCurrentFrame(deepfakeFrames[nextIndex]);
-      setDeepfakeIndex(nextIndex);
-    }
-  };
+  const jumpToNextMarker = (type) => {
+  if (!frameRate || !videoRef.current) return;
 
-  const prevDeepfake = () => {
-    if (deepfakeFrames.length === 0) return;
+  let frames = [];
+  if (type === "ml") {
+    frames = deepfakeFrames;
+  } else {
+    frames = (traditionalResults?.[type]?.frames || [])
+      .map(f => f.frame_number ?? f.frame)
+      .filter(n => typeof n === "number");
+  }
 
-    let prevDeepfakeIndex = -1;
-    for (let i = 0; i < deepfakeFrames.length; i++) {
-      if (deepfakeFrames[i] < currentFrame) {
-        prevDeepfakeIndex = i;
-      }
-    }
+  if (frames.length === 0) return;
 
-    if (prevDeepfakeIndex !== -1) {
-      const video = videoRef.current;
-      video.currentTime = deepfakeFrames[prevDeepfakeIndex] / frameRate;
+  frames.sort((a, b) => a - b);
+  const next = frames.find(f => f > currentFrame);
+  if (typeof next === "number") {
+    const video = videoRef.current;
+    video.currentTime = next / frameRate;
+    setCurrentFrame(next);
+  }
+};
 
-     
-      setCurrentFrame(deepfakeFrames[prevDeepfakeIndex]);
-      setDeepfakeIndex(prevDeepfakeIndex);
-    }
-  };
+const jumpToPreviousMarker = (type) => {
+  if (!frameRate || !videoRef.current) return;
+
+  let frames = [];
+  if (type === "ml") {
+    frames = deepfakeFrames;
+  } else {
+    frames = (traditionalResults?.[type]?.frames || [])
+      .map(f => f.frame_number ?? f.frame)
+      .filter(n => typeof n === "number");
+  }
+
+  if (frames.length === 0) return;
+
+  frames.sort((a, b) => a - b);
+  const prev = [...frames].reverse().find(f => f < currentFrame);
+  if (typeof prev === "number") {
+    const video = videoRef.current;
+    video.currentTime = prev / frameRate;
+    setCurrentFrame(prev);
+  }
+};
+
+  
 
   const restartVideo = () => {
     const video = videoRef.current;
@@ -707,12 +724,19 @@ const getColor = (type, value) => {
 </div>
 
           <div className="flex justify-center gap-12">
-            <Button variant="secondary" className="bg-white" onClick={prevDeepfake}>
-              <span className="text-2xl">&lt;&lt;</span>
+
+            <Button 
+  variant="secondary" 
+  className="bg-white"
+  onClick={() => jumpToPreviousMarker(markerType)}
+>
+  <span className="text-2xl">&lt;&lt;</span>
+</Button>
+
+<Button variant="secondary" size="lg" className="bg-white" onClick={prevFrame}>
+              <span className="text-2xl">&gt;</span>
             </Button>
-            <Button size="lg" variant="secondary" className="bg-white" onClick={prevFrame}>
-              <span className="text-2xl">&lt;</span>
-            </Button>
+            
 
             <div className="flex flex-col items-center gap-2">
               <Button variant="default" onClick={() => {
@@ -730,9 +754,14 @@ const getColor = (type, value) => {
             <Button variant="secondary" size="lg" className="bg-white" onClick={nextFrame}>
               <span className="text-2xl">&gt;</span>
             </Button>
-            <Button variant="secondary" className="bg-white" onClick={nextDeepfake}>
-              <span className="text-2xl">&gt;&gt;</span>
-            </Button>
+            <Button 
+  variant="secondary" 
+  className="bg-white"
+  onClick={() => jumpToNextMarker(markerType)}
+>
+  <span className="text-2xl">&gt;&gt;</span>
+</Button>
+            
           </div>
 
           <div className="text-sm text-gray-700">
