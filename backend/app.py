@@ -84,12 +84,17 @@ def bootstrap_owner_from_env():
                 db.commit()
                 print(f"✓ Created owner user: {owner_username}")
             else:
-                # Promote existing user to owner
+                # Promote existing user to owner and reset password if provided
+                seed_pw = os.getenv("OWNER_SEED_PASSWORD")
+                if seed_pw:
+                    user.password_hash = hash_password(seed_pw)
                 user.role = "owner"
                 user.active = True
                 user.pending_approval = False
                 db.commit()
                 print(f"✓ Promoted {owner_username} to owner (no existing owners)")
+                if seed_pw:
+                    print(f"  Password reset to OWNER_SEED_PASSWORD")
 
         elif owner_count >= 1:
             # Owner already exists - only transfer if explicitly allowed
@@ -110,11 +115,17 @@ def bootstrap_owner_from_env():
                     print(f"✓ Demoted {o.username} from owner to admin")
 
             if user:
+                # Transfer ownership and reset password to env value
+                seed_pw = os.getenv("OWNER_SEED_PASSWORD")
+                if seed_pw:
+                    user.password_hash = hash_password(seed_pw)
                 user.role = "owner"
                 user.active = True
                 user.pending_approval = False
                 db.commit()
                 print(f"✓ Transferred ownership to {owner_username}")
+                if seed_pw:
+                    print(f"  Password reset to OWNER_SEED_PASSWORD")
             else:
                 raise RuntimeError(
                     f"OWNER_USERNAME={owner_username} doesn't exist and an owner already exists. "
