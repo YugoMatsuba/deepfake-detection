@@ -770,7 +770,7 @@ const getColor = (type, value) => {
 </Button>
 
 <Button variant="secondary" size="lg" className="bg-white" onClick={prevFrame}>
-              <span className="text-2xl">&gt;</span>
+              <span className="text-2xl">&lt;</span>
             </Button>
             
 
