@@ -346,75 +346,66 @@ def analyze_frame(analysis_id: str, frame_number: int):
                     error=f"Invalid methods: {', '.join(sorted(invalid_methods))}"
                 ), 400
 
-            # Extract frame to temporary file
-            with tempfile.NamedTemporaryFile(
-                suffix=".jpg", delete=False, prefix=f"frame_{frame_number}_"
-            ) as tmp_file:
-                tmp_path = tmp_file.name
+            # Extract frame to temporary directory (consistent with initial analysis pattern)
+            with tempfile.TemporaryDirectory(prefix=f"frame_{frame_number}_") as tmp_dir:
+                frame_path = os.path.join(tmp_dir, f"frame_{frame_number}.jpg")
 
-            try:
-                extract_single_frame(
-                    video_path=analysis.video_path,
-                    frame_number=frame_number,
-                    output_path=tmp_path
-                )
-
-                # Run each requested forensics method on the single frame
-                results = {}
-
-                for method in methods:
-                    try:
-                        if method == "ela":
-                            raw_result = run_ela(tmp_path, top_percent=10)
-                            transformed = transform_ela_result(raw_result)
-
-                        elif method == "noise":
-                            raw_result = run_noise_analysis(tmp_path, top_percent=10)
-                            transformed = transform_noise_result(raw_result)
-
-                        elif method == "lbp":
-                            raw_result = run_lbp_analysis(tmp_path, top_percent=10)
-                            transformed = transform_lbp_result(raw_result)
-
-                        else:
-                            continue
-
-                        # Annotate each frame entry with the requested frame number
-                        frames = transformed.get("frames", [])
-                        for entry in frames:
-                            entry.setdefault("frame_number", frame_number)
-                        transformed["frames"] = frames
-
-                        results[method] = transformed
-
-                    except Exception as e:
-                        results[method] = {
-                            "score": None,
-                            "error": f"Analysis failed: {str(e)}"
-                        }
-
-                response = {
-                    "analysis_id": analysis.id,
-                    "frame_number": frame_number,
-                    "results": results
-                }
-
-                return jsonify(response), 200
-
-            except ValueError as e:
-                # Frame number out of range
-                return jsonify(error=str(e)), 400
-
-            except Exception as e:
-                return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
-
-            finally:
-                # Clean up temporary frame file
                 try:
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
-                except:
-                    pass
+                    extract_single_frame(
+                        video_path=analysis.video_path,
+                        frame_number=frame_number,
+                        output_path=frame_path
+                    )
+
+                    # Run each requested forensics method on the single frame
+                    results = {}
+
+                    for method in methods:
+                        try:
+                            if method == "ela":
+                                raw_result = run_ela(frame_path, top_percent=10)
+                                transformed = transform_ela_result(raw_result)
+
+                            elif method == "noise":
+                                raw_result = run_noise_analysis(frame_path, top_percent=10)
+                                transformed = transform_noise_result(raw_result)
+
+                            elif method == "lbp":
+                                raw_result = run_lbp_analysis(frame_path, top_percent=10)
+                                transformed = transform_lbp_result(raw_result)
+
+                            else:
+                                continue
+
+                            # Annotate each frame entry with the requested frame number
+                            frames = transformed.get("frames", [])
+                            for entry in frames:
+                                entry.setdefault("frame_number", frame_number)
+                            transformed["frames"] = frames
+
+                            results[method] = transformed
+
+                        except Exception as e:
+                            results[method] = {
+                                "score": None,
+                                "error": f"Analysis failed: {str(e)}"
+                            }
+
+                    response = {
+                        "analysis_id": analysis.id,
+                        "frame_number": frame_number,
+                        "results": results
+                    }
+
+                    return jsonify(response), 200
+
+                except ValueError as e:
+                    # Frame number out of range
+                    return jsonify(error=str(e)), 400
+
+                except Exception as e:
+                    return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
+            # Temp directory auto-cleaned up here
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)
