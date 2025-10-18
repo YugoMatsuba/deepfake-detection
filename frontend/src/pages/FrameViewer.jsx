@@ -198,6 +198,7 @@ useEffect(() => {
     if (!video) return;
     video.currentTime = Math.min(video.currentTime + 1 / frameRate, video.duration);
     setCurrentFrame(Math.round(video.currentTime * frameRate));
+    setOverlayResult(null); // Clear overlay when navigating frames
   };
 
   const prevFrame = () => {
@@ -205,6 +206,7 @@ useEffect(() => {
     if (!video) return;
     video.currentTime = Math.max(video.currentTime - 1 / frameRate, 0);
     setCurrentFrame(Math.round(video.currentTime * frameRate));
+    setOverlayResult(null); // Clear overlay when navigating frames
   };
 
   const jumpToNextMarker = (type) => {
@@ -243,6 +245,7 @@ useEffect(() => {
     const video = videoRef.current;
     video.currentTime = next / frameRate;
     setCurrentFrame(next);
+    setOverlayResult(null); // Clear overlay when jumping to marker
   }
 };
 
@@ -282,6 +285,7 @@ const jumpToPreviousMarker = (type) => {
     const video = videoRef.current;
     video.currentTime = prev / frameRate;
     setCurrentFrame(prev);
+    setOverlayResult(null); // Clear overlay when jumping to marker
   }
 };
 
