@@ -91,3 +91,74 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
         "frames": results.get("frames", []),
         "timing_ms": results.get("timing_ms"),
     }
+
+
+def run_single_frame_ml_analysis(
+    video_path: str,
+    frame_number: int,
+    models: list[str],
+    device: str | None = None
+) -> dict[str, Any]:
+    """
+    Run ML deepfake detection on a single frame.
+
+    Args:
+        video_path: Absolute path to video file
+        frame_number: 0-indexed frame number to analyze
+        models: List of ML module names (e.g., ["xception", "spsl", "ucf"])
+        device: Device override ("cpu" or "cuda"), or None to use env var/auto-detect
+
+    Returns:
+        {
+            "frame_number": 42,
+            "time": 1.4,
+            "xception": {
+                "score": 0.856,
+                "index": 42,
+                "time": 1.4
+            },
+            "spsl": { ... },
+            "ucf": { ... }
+        }
+
+    Raises:
+        Exception: If ML analysis fails
+    """
+    # Determine device
+    if device is None:
+        device = os.getenv("DEVICE", "cpu")  # Default to cpu
+
+    # Import ML runner
+    from ml.runner import analyze_single_frame
+
+    # Run single frame inference
+    results = analyze_single_frame(
+        video_path=video_path,
+        frame_number=frame_number,
+        models=models,
+        device=device,
+        weights=None  # Will use defaults from constants
+    )
+
+    # Check for errors
+    if results.get("error"):
+        error = results["error"]
+        raise Exception(f"ML single frame analysis failed: {error.get('message', 'Unknown error')}")
+
+    # Transform output format for API
+    # ML runner returns: {"frame_number": 42, "time": 1.4, "models": {"xception": {"score": 0.856}, ...}, ...}
+    # We need flattened structure with model results at top level
+
+    api_results = {
+        "frame_number": results.get("frame_number"),
+        "time": results.get("time")
+    }
+
+    for model_name, model_data in results.get("models", {}).items():
+        api_results[model_name] = {
+            "score": model_data.get("score"),
+            "index": results.get("frame_number"),
+            "time": results.get("time")
+        }
+
+    return api_results

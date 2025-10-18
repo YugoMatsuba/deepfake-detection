@@ -21,7 +21,7 @@ from werkzeug.exceptions import HTTPException
 from api import get_db
 from api.auth_utils import require_user, check_analysis_ownership
 from models import Analysis
-from api.ml_integration import run_ml_analysis
+from api.ml_integration import run_ml_analysis, run_single_frame_ml_analysis
 from api.traditional_integration import (
     run_traditional_forensics,
     transform_ela_result,
@@ -432,6 +432,96 @@ def analyze_frame(analysis_id: str, frame_number: int):
                 except Exception as e:
                     return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
             # Temp directory auto-cleaned up here
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (401/403/404)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@analysis_bp.post("/analyses/<analysis_id>/frames/<int:frame_number>/ml")
+@require_user
+def analyze_frame_ml(analysis_id: str, frame_number: int):
+    """
+    Run on-demand ML analysis on a specific frame.
+
+    Request body:
+    {
+      "models": ["xception", "spsl", "ucf"]  // Optional, defaults to all 3
+    }
+
+    Response (200):
+    {
+      "analysis_id": "uuid",
+      "frame_number": 42,
+      "results": {
+        "xception": {
+          "score": 0.856,
+          "index": 42,
+          "time": 1.4
+        },
+        "spsl": {
+          "score": 0.821,
+          "index": 42,
+          "time": 1.4
+        },
+        "ucf": {
+          "score": 0.903,
+          "index": 42,
+          "time": 1.4
+        }
+      }
+    }
+
+    Response (400/403/404/500): error message
+    """
+    try:
+        with get_db() as db:
+            # Check ownership
+            analysis = check_analysis_ownership(db, analysis_id)
+
+            # Parse request
+            body = request.get_json() or {}
+            models = body.get("models", ["xception", "spsl", "ucf"])
+
+            if not models:
+                return jsonify(error="No models specified"), 400
+
+            # Validate models
+            VALID_MODELS = {"xception", "spsl", "ucf"}
+            invalid_models = set(models) - VALID_MODELS
+            if invalid_models:
+                return jsonify(
+                    error=f"Invalid models: {', '.join(sorted(invalid_models))}"
+                ), 400
+
+            # Run ML analysis on single frame
+            try:
+                results = run_single_frame_ml_analysis(
+                    video_path=analysis.video_path,
+                    frame_number=frame_number,
+                    models=models,
+                    device=None  # Will use env var DEVICE or auto-detect
+                )
+
+                # Extract frame_number and time from results
+                response_frame_number = results.pop("frame_number", frame_number)
+                response_time = results.pop("time", 0.0)
+
+                # Remaining keys are model results
+                model_results = results
+
+                response = {
+                    "analysis_id": analysis.id,
+                    "frame_number": response_frame_number,
+                    "time": response_time,
+                    "results": model_results
+                }
+
+                return jsonify(response), 200
+
+            except Exception as e:
+                return jsonify(error=f"ML analysis failed: {str(e)}"), 500
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)

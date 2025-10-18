@@ -10,6 +10,7 @@ const FrameViewer = ({
   traditionalResults = {},
   analysisId,
   onTraditionalResultsUpdate = () => {},
+  onMLResultsUpdate = () => {},
 }) => {
 
    useEffect(() => {
@@ -38,6 +39,8 @@ const FrameViewer = ({
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(null);
   const [traditionalData, setTraditionalData] = useState(traditionalResults || {});
+  const [mlData, setMLData] = useState(deepfakeMeta || {});
+  const [mlFrames, setMLFrames] = useState(deepfakeFrames || []);
   const [markerType, setMarkerType] = useState("ml");
   const [isTooltipHovered, setIsTooltipHovered] = useState(false); 
   const [selectedMarkerType, setSelectedMarkerType] = useState(null);
@@ -61,7 +64,7 @@ const FrameViewer = ({
   // ========== FRAME ANALYSIS DETAILS ==========
 
   // Get meta for a frame (safe)
-  const getMeta = (frame) => (frame != null ? deepfakeMeta?.[frame] || null : null);
+  const getMeta = (frame) => (frame != null ? mlData?.[frame] || null : null);
 
 useEffect(() => {
   if (initialFrameRate) {
@@ -72,6 +75,14 @@ useEffect(() => {
 useEffect(() => {
   setTraditionalData(traditionalResults || {});
 }, [traditionalResults]);
+
+useEffect(() => {
+  setMLData(deepfakeMeta || {});
+}, [deepfakeMeta]);
+
+useEffect(() => {
+  setMLFrames(deepfakeFrames || []);
+}, [deepfakeFrames]);
 
   useEffect(() => {
     let abort = false;
@@ -139,7 +150,7 @@ useEffect(() => {
 
   // Average anomaly score across frames that have a score
   const getAverageAnomaly = () => {
-    const entries = Object.values(deepfakeMeta || {}).filter(
+    const entries = Object.values(mlData || {}).filter(
       (m) => typeof m?.anomalyScore === "number"
     );
     if (!entries.length) return null;
@@ -231,7 +242,7 @@ useEffect(() => {
   // If showing all markers, combine frames from all types
   if (showAllMarkers) {
     // Add ML frames
-    frames = [...deepfakeFrames];
+    frames = [...mlFrames];
 
     // Add traditional forensics frames
     ["ela", "noise", "lbp"].forEach(t => {
@@ -243,7 +254,7 @@ useEffect(() => {
   } else {
     // Single type
     if (type === "ml") {
-      frames = deepfakeFrames;
+      frames = mlFrames;
     } else {
       frames = (traditionalResults?.[type]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
@@ -271,7 +282,7 @@ const jumpToPreviousMarker = (type) => {
   // If showing all markers, combine frames from all types
   if (showAllMarkers) {
     // Add ML frames
-    frames = [...deepfakeFrames];
+    frames = [...mlFrames];
 
     // Add traditional forensics frames
     ["ela", "noise", "lbp"].forEach(t => {
@@ -283,7 +294,7 @@ const jumpToPreviousMarker = (type) => {
   } else {
     // Single type
     if (type === "ml") {
-      frames = deepfakeFrames;
+      frames = mlFrames;
     } else {
       frames = (traditionalResults?.[type]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
@@ -349,7 +360,7 @@ useEffect(() => {
   const typeToCheck = selectedMarkerType || markerType;
 
   if (typeToCheck === "ml") {
-    return deepfakeFrames[hoveredIndex] ?? null;
+    return mlFrames[hoveredIndex] ?? null;
   }
 
   // For other types
@@ -362,8 +373,8 @@ useEffect(() => {
 
   // Tooltip text: from deepfakeMeta if available, else a fallback
   const hoveredSummary =
-    hoveredFrame != null && deepfakeMeta && deepfakeMeta[hoveredFrame]?.summary
-      ? deepfakeMeta[hoveredFrame].summary
+    hoveredFrame != null && mlData && mlData[hoveredFrame]?.summary
+      ? mlData[hoveredFrame].summary
       : hoveredFrame != null
       ? `Flagged at frame ${hoveredFrame}`
       : "";
@@ -411,6 +422,92 @@ useEffect(() => {
     setAnalysisResult(null);
 
     try {
+      // Handle ML analysis differently
+      if (analysisType === "ml") {
+        const response = await fetch(
+          `http://localhost:5050/api/analyses/${analysisId}/frames/${targetFrame}/ml`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ models: ["xception", "spsl", "ucf"] }),
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "ML analysis failed");
+        }
+
+        // Process ML results: {xception: {score, index, time}, spsl: {...}, ucf: {...}}
+        const results = result.results || {};
+        const frameNumber = result.frame_number;
+        const frameTime = result.time;
+
+        // Update each model's data
+        const updatedMLData = { ...mlData };
+
+        for (const [modelName, modelResult] of Object.entries(results)) {
+          const existingModel = updatedMLData[modelName] || { frames: [], score: null };
+
+          // Create new frame entry
+          const newFrameEntry = {
+            index: frameNumber,
+            time: frameTime,
+            score: modelResult.score
+          };
+
+          // Merge with existing frames (avoid duplicates)
+          const existingFrames = existingModel.frames || [];
+          const frameIndex = existingFrames.findIndex(f => f.index === frameNumber);
+
+          let updatedFrames;
+          if (frameIndex >= 0) {
+            // Update existing frame
+            updatedFrames = [...existingFrames];
+            updatedFrames[frameIndex] = { ...updatedFrames[frameIndex], ...newFrameEntry };
+          } else {
+            // Add new frame
+            updatedFrames = [...existingFrames, newFrameEntry];
+          }
+
+          updatedMLData[modelName] = {
+            ...existingModel,
+            frames: updatedFrames
+          };
+        }
+
+        setMLData(updatedMLData);
+        onMLResultsUpdate(updatedMLData, frameNumber);
+
+        // Add frame to mlFrames array if not already present
+        if (!mlFrames.includes(frameNumber)) {
+          const updatedFrames = [...mlFrames, frameNumber].sort((a, b) => a - b);
+          setMLFrames(updatedFrames);
+        }
+
+        // Calculate average score from all models for popup
+        const modelScores = Object.values(results)
+          .map(r => r.score)
+          .filter(s => typeof s === 'number');
+
+        const avgScore = modelScores.length > 0
+          ? modelScores.reduce((a, b) => a + b, 0) / modelScores.length
+          : null;
+
+        // Show popup with average ML score
+        setAnalysisResult({
+          analysis_type: "ml",
+          frame_number: frameNumber,
+          score: avgScore
+        });
+
+        setIsAnalysing(false);
+        return;
+      }
+
+      // Traditional forensics analysis (existing code)
       const response = await fetch(
         `http://localhost:5050/api/analyses/${analysisId}/frames/${targetFrame}/forensics`,
         {
@@ -683,7 +780,7 @@ const getColor = (type, value) => {
 {/* Timeline markers */}
 {(showAllMarkers ? ["ml", "ela", "noise", "lbp"] : [markerType]).map((type) => {
   if (type === "ml") {
-    return deepfakeFrames.map((frame, index) => (
+    return mlFrames.map((frame, index) => (
       <div
         key={`df-${index}`}
         className="absolute top-0 h-4 w-1 bg-red-500"
@@ -790,7 +887,7 @@ const getColor = (type, value) => {
 
       {/* Summary */}
       <p className="text-sm text-gray-800 leading-snug">
-        {deepfakeMeta?.[hoveredFrame]?.summary || `Flagged at frame ${hoveredFrame}`}
+        {mlData?.[hoveredFrame]?.summary || `Flagged at frame ${hoveredFrame}`}
       </p>
 
       {/* Tooltip arrow */}
@@ -846,10 +943,10 @@ const getColor = (type, value) => {
             <p>
               <span className="font-medium">Current Frame:</span> {currentFrame}
             </p>
-            {deepfakeFrames.length > 0 && (
+            {mlFrames.length > 0 && (
               <p>
                 <span className="font-medium">Next Deepfake Frame:</span>{" "}
-                {deepfakeFrames[deepfakeIndex] || "None"}
+                {mlFrames[deepfakeIndex] || "None"}
               </p>
             )}
             <p>
@@ -862,7 +959,7 @@ const getColor = (type, value) => {
 
 <Card className="w-full max-w-3xl shadow-lg rounded-2xl">
     <CardContent className="flex justify-center gap-4 p-0">
-      {["ela", "noise", "lbp"].map((method) => (
+      {["ml", "ela", "noise", "lbp"].map((method) => (
         <Button
           key={method}
           variant="default"
@@ -903,7 +1000,7 @@ const getColor = (type, value) => {
   <section>
     <h4 className="text-sm font-medium text-gray-700 mb-2">ML Detection Score</h4>
     {(() => {
-      const flaggedFrames = Object.entries(deepfakeMeta || {}).map(([modelName, modelData]) => {
+      const flaggedFrames = Object.entries(mlData || {}).map(([modelName, modelData]) => {
         const frame = modelData.frames?.find(f => f.index === detailsFrame);
         if (!frame || typeof frame.score !== "number") return null;
         return {
