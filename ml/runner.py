@@ -13,6 +13,8 @@ import os
 import time
 from typing import Dict, List, Optional
 
+import cv2
+import numpy as np
 import torch
 
 from ml.video_io import process_video
@@ -22,6 +24,8 @@ from ml.models.spsl_infer import load_spsl, predict_probs_spsl
 from ml.models.ucf_infer import load_ucf, predict_probs_ucf
 from ml.models.utils import hash_file
 from ml.schema import SCHEMA_VERSION
+from ml import face_align_crop
+from ml import constants
 
 # Model routing following DFB patterns
 MODEL_ROUTES = {
@@ -298,6 +302,158 @@ def run(video_path: str, device: Optional[str] = None, models: Optional[List[str
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
         return _assemble_empty_output(None, "internal", str(e))
+
+
+def analyze_single_frame(
+    video_path: str,
+    frame_number: int,
+    device: Optional[str] = None,
+    models: Optional[List[str]] = None,
+    weights: Optional[Dict[str, Optional[str]]] = None
+) -> dict:
+    """
+    Analyze a single frame from a video using ML models.
+
+    Extracts the specified frame, runs face detection + alignment,
+    and performs ML inference following DeepfakeBench patterns.
+
+    Args:
+        video_path: Path to input video
+        frame_number: 0-indexed frame number to analyze
+        device: Target device ("cuda", "cpu", etc.)
+        models: List of models to run (default: all)
+        weights: Dict of model -> weight path
+
+    Returns:
+        JSON-serializable dict with per-model scores:
+        {
+            "frame_number": 42,
+            "time": 1.4,
+            "models": {
+                "xception": {"score": 0.856},
+                "spsl": {"score": 0.821},
+                "ucf": {"score": 0.903}
+            },
+            "error": None or {"message": "..."}
+        }
+    """
+    # Resolve configuration
+    device = _select_device(device)
+    models = models or ["xception", "spsl", "ucf"]
+    weights = _resolve_weight_paths(weights)
+
+    logger.info(f"Analyzing frame {frame_number} from {video_path} with device={device}, models={models}")
+
+    try:
+        # Open video to get metadata and extract frame
+        cap = cv2.VideoCapture(video_path)
+
+        try:
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+            fps = float(cap.get(cv2.CAP_PROP_FPS)) or 0.0
+
+            # Validate frame number
+            if frame_number < 0 or frame_number >= frame_count:
+                return {
+                    "frame_number": frame_number,
+                    "time": 0.0,
+                    "models": {},
+                    "error": {
+                        "message": f"Frame number {frame_number} out of range (video has {frame_count} frames)"
+                    }
+                }
+
+            # Seek to specific frame
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_number))
+            success, bgr_frame = cap.read()
+
+            if not success or bgr_frame is None:
+                return {
+                    "frame_number": frame_number,
+                    "time": 0.0,
+                    "models": {},
+                    "error": {"message": f"Failed to read frame {frame_number}"}
+                }
+
+            # Convert BGR→RGB (DeepfakeBench pattern)
+            rgb_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
+
+            # Calculate timestamp
+            timestamp = (frame_number / fps) if fps > 0 else 0.0
+
+        finally:
+            cap.release()
+
+        # Face detection and alignment
+        detector, predictor = face_align_crop.create_dlib_detector_and_predictor()
+
+        aligned_crop = face_align_crop.align_and_crop_rgb(
+            rgb_frame, detector, predictor,
+            outsize=constants.ALIGN_OUTPUT_SIZE,
+            scale=constants.ALIGN_SCALE
+        )
+
+        if aligned_crop is None:
+            return {
+                "frame_number": frame_number,
+                "time": timestamp,
+                "models": {},
+                "error": {"message": f"No face detected in frame {frame_number}"}
+            }
+
+        # Create batch of size 1
+        crops_rgb = [aligned_crop]
+
+        # Preprocess following DFB normalization
+        batch_rgb_norm = preprocess_crops(crops_rgb, device=device)
+
+        logger.info(f"Preprocessed frame {frame_number}, batch shape: {batch_rgb_norm.shape}")
+
+        # Load models
+        loaded_models = _load_models(device, weights, models)
+
+        if not loaded_models:
+            return {
+                "frame_number": frame_number,
+                "time": timestamp,
+                "models": {},
+                "error": {"message": "No models loaded successfully"}
+            }
+
+        # Run inference for each model
+        results = {}
+        for model_name, model in loaded_models.items():
+            try:
+                logger.info(f"Running inference with {model_name} on frame {frame_number}")
+                output = _infer_one(model_name, model, batch_rgb_norm)
+
+                # Extract score from single frame
+                prob = output["prob"].cpu().detach().numpy()[0]  # Get first (and only) element
+                score = float(prob)
+
+                results[model_name] = {"score": score}
+
+                logger.info(f"{model_name} frame {frame_number} score: {score:.4f}")
+
+            except Exception as e:
+                logger.error(f"Inference failed for {model_name}: {e}")
+                results[model_name] = {"score": None, "error": str(e)}
+
+        return {
+            "frame_number": frame_number,
+            "time": timestamp,
+            "models": results,
+            "error": None
+        }
+
+    except Exception as e:
+        logger.error(f"Single frame analysis error: {e}")
+        return {
+            "frame_number": frame_number,
+            "time": 0.0,
+            "models": {},
+            "error": {"message": str(e)}
+        }
 
 
 def main():

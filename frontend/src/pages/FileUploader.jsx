@@ -61,7 +61,7 @@ export default function FileUploader() {
     }
 
     // Build module arrays from checkboxes
-    const mlModules = options.aiDetection ? ['xception'] : [];
+    const mlModules = options.aiDetection ? ['xception', 'spsl', 'ucf'] : [];
     const traditionalModules = [];
     if (options.ela) traditionalModules.push('ela');
     if (options.noise) traditionalModules.push('noise');

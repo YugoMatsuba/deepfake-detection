@@ -10,6 +10,7 @@ import Upload from '../pages/Upload.jsx';
 import FrameViewerPage from '../pages/FrameViewerRetrieval.jsx';
 import RoleSelect from '../pages/RoleSelect.jsx';
 import AdminDashboard from '../pages/AdminDashboard.jsx';
+import Landing from '../pages/Landing.jsx';
 
 export default function App() {
   return (
@@ -23,7 +24,7 @@ export default function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <Upload />
+                  <Landing />
                 </ProtectedRoute>
               }
             />

@@ -34,6 +34,32 @@ export default function FrameViewerPage() {
     [setAnalysisResult]
   );
 
+  const handleMLResultsUpdate = useCallback(
+    (updatedML, frameNumber) => {
+      setAnalysisResult((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        // Update ml models data
+        const newML = updatedML;
+
+        // Update ml_frames to include the new frame
+        const currentFrames = prev.ml_frames || [];
+        const updatedFrames = currentFrames.includes(frameNumber)
+          ? currentFrames
+          : [...currentFrames, frameNumber].sort((a, b) => a - b);
+
+        return {
+          ...prev,
+          ml: newML,
+          ml_frames: updatedFrames
+        };
+      });
+    },
+    [setAnalysisResult]
+  );
+
   const flaggedFrameIndices = useMemo(() => {
     if (!Array.isArray(mlFramesRaw)) {
       return [];
@@ -75,6 +101,7 @@ export default function FrameViewerPage() {
         traditionalResults={traditionalResults}
         analysisId={analysisId}
         onTraditionalResultsUpdate={handleTraditionalResultsUpdate}
+        onMLResultsUpdate={handleMLResultsUpdate}
       />
     </div>
   );
