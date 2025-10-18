@@ -331,12 +331,15 @@ useEffect(() => {
   const hoveredFrame = (() => {
   if (hoveredIndex === null) return null;
 
-  if (markerType === "ml") {
+  // Use selectedMarkerType (set on hover) instead of markerType (filter button)
+  const typeToCheck = selectedMarkerType || markerType;
+
+  if (typeToCheck === "ml") {
     return deepfakeFrames[hoveredIndex] ?? null;
   }
 
   // For other types
-  const frames = traditionalData?.[markerType]?.frames;
+  const frames = traditionalData?.[typeToCheck]?.frames;
   if (!frames || hoveredIndex < 0 || hoveredIndex >= frames.length) return null;
 
   return frames[hoveredIndex].frame_number ?? frames[hoveredIndex].frame;
@@ -671,7 +674,11 @@ const getColor = (type, value) => {
         key={`df-${index}`}
         className="absolute top-0 h-4 w-1 bg-red-500"
         style={{ left: `${pctLeft(frame)}%` }}
-        onMouseEnter={() => setHoveredIndex(index)}
+        onMouseEnter={() => {
+          setHoveredIndex(index);
+          setSelectedMarkerType("ml");
+          setDetailsFrame(frame);
+        }}
         onMouseLeave={() => { if (!isTooltipHovered) setHoveredIndex(null); }}
         onDoubleClick={() => {
           setIsDetailsOpen(true);
@@ -743,7 +750,7 @@ const getColor = (type, value) => {
       
       {/* Title: ML, ELA, Noise, or LBP */}
       <h4 className="text-center text-sm font-semibold mb-1">
-        {markerType.toUpperCase()}
+        {(selectedMarkerType || markerType).toUpperCase()}
       </h4>
 
       {/* Summary */}
