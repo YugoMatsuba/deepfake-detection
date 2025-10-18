@@ -197,26 +197,42 @@ useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = Math.min(video.currentTime + 1 / frameRate, video.duration);
-    setCurrentFrame(Math.floor(video.currentTime * frameRate));
+    setCurrentFrame(Math.round(video.currentTime * frameRate));
   };
 
   const prevFrame = () => {
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = Math.max(video.currentTime - 1 / frameRate, 0);
-    setCurrentFrame(Math.floor(video.currentTime * frameRate));
+    setCurrentFrame(Math.round(video.currentTime * frameRate));
   };
 
   const jumpToNextMarker = (type) => {
   if (!frameRate || !videoRef.current) return;
 
   let frames = [];
-  if (type === "ml") {
-    frames = deepfakeFrames;
+
+  // If showing all markers, combine frames from all types
+  if (showAllMarkers) {
+    // Add ML frames
+    frames = [...deepfakeFrames];
+
+    // Add traditional forensics frames
+    ["ela", "noise", "lbp"].forEach(t => {
+      const tFrames = (traditionalResults?.[t]?.frames || [])
+        .map(f => f.frame_number ?? f.frame)
+        .filter(n => typeof n === "number");
+      frames.push(...tFrames);
+    });
   } else {
-    frames = (traditionalResults?.[type]?.frames || [])
-      .map(f => f.frame_number ?? f.frame)
-      .filter(n => typeof n === "number");
+    // Single type
+    if (type === "ml") {
+      frames = deepfakeFrames;
+    } else {
+      frames = (traditionalResults?.[type]?.frames || [])
+        .map(f => f.frame_number ?? f.frame)
+        .filter(n => typeof n === "number");
+    }
   }
 
   if (frames.length === 0) return;
@@ -234,12 +250,28 @@ const jumpToPreviousMarker = (type) => {
   if (!frameRate || !videoRef.current) return;
 
   let frames = [];
-  if (type === "ml") {
-    frames = deepfakeFrames;
+
+  // If showing all markers, combine frames from all types
+  if (showAllMarkers) {
+    // Add ML frames
+    frames = [...deepfakeFrames];
+
+    // Add traditional forensics frames
+    ["ela", "noise", "lbp"].forEach(t => {
+      const tFrames = (traditionalResults?.[t]?.frames || [])
+        .map(f => f.frame_number ?? f.frame)
+        .filter(n => typeof n === "number");
+      frames.push(...tFrames);
+    });
   } else {
-    frames = (traditionalResults?.[type]?.frames || [])
-      .map(f => f.frame_number ?? f.frame)
-      .filter(n => typeof n === "number");
+    // Single type
+    if (type === "ml") {
+      frames = deepfakeFrames;
+    } else {
+      frames = (traditionalResults?.[type]?.frames || [])
+        .map(f => f.frame_number ?? f.frame)
+        .filter(n => typeof n === "number");
+    }
   }
 
   if (frames.length === 0) return;
@@ -271,7 +303,7 @@ const handleTimeUpdate = () => {
   const video = videoRef.current;
   if (!video) return;
   setCurrentTime(video.currentTime);
-  if (frameRate) setCurrentFrame(Math.floor(video.currentTime * frameRate));
+  if (frameRate) setCurrentFrame(Math.round(video.currentTime * frameRate));
 };
   const handleLoadedMetadata = () => {
   const video = videoRef.current;
