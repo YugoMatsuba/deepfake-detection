@@ -76,6 +76,7 @@ useEffect(() => {
   useEffect(() => {
     let abort = false;
     let objectUrl = null;
+    let hasRetried = false;
 
     async function loadVideo() {
       if (!videoSrc) {
@@ -99,14 +100,27 @@ useEffect(() => {
         }
         objectUrl = URL.createObjectURL(blob);
         setVideoUrl(objectUrl);
+        setIsVideoLoading(false);
       } catch (err) {
         if (!abort) {
           console.error("Error fetching video:", err);
+
+          // Retry once if this is the first failure
+          if (!hasRetried) {
+            console.log("Retrying video load once...");
+            hasRetried = true;
+            // Wait a bit before retrying
+            setTimeout(() => {
+              if (!abort) {
+                loadVideo();
+              }
+            }, 500);
+            return;
+          }
+
+          // If retry also failed, show error
           setVideoError(err.message || "Failed to load video");
           setVideoUrl(null);
-        }
-      } finally {
-        if (!abort) {
           setIsVideoLoading(false);
         }
       }

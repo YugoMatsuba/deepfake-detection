@@ -138,6 +138,32 @@ def start_analysis(analysis_id: str):
                     ml_frames_meta = ml_output.get("frames", [])
                     ml_timing_meta = ml_output.get("timing_ms")
 
+                    # Filter frames based on average score across all models > 0.5
+                    if ml_results:
+                        filtered_frames = []
+
+                        for frame in ml_frames_meta:
+                            frame_index = frame["index"]
+
+                            # Collect scores for this frame from all models
+                            scores = []
+                            for model_name, model_data in ml_results.items():
+                                model_frames = model_data.get("frames", [])
+                                frame_score = next(
+                                    (f["score"] for f in model_frames if f["index"] == frame_index),
+                                    None
+                                )
+                                if frame_score is not None:
+                                    scores.append(frame_score)
+
+                            # Calculate average score for this frame
+                            if scores:
+                                avg_score = sum(scores) / len(scores)
+                                if avg_score > 0.5:  # 50% threshold
+                                    filtered_frames.append(frame)
+
+                        ml_frames_meta = filtered_frames  # Replace with filtered list
+
                 # Run traditional forensics
                 if traditional_modules:
                     traditional_results = run_traditional_forensics(

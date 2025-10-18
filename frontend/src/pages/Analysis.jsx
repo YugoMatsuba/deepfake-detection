@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAnalysis } from "../app/AnalysisProvider";
 import { startAnalysis } from "../api/videos";
@@ -13,17 +13,24 @@ export default function Analysis() {
     analysisResult,
     setAnalysisResult
   } = useAnalysis();
-  const [status, setStatus] = useState('idle'); // 'idle' | 'running' | 'success' | 'error'
+  const [status, setStatus] = useState('running'); // Start directly in running state
   const [fakeVideoPercentage, setFakeVideoPercentage] = useState(null);
   const [ela, setEla] = useState(null);
   const [noise, setNoise] = useState(null);
   const [lbp, setLbp] = useState(null);
   const [error, setError] = useState(null);
+  const hasRun = useRef(false);
 
   useEffect(() => {
     if (!analysisId) {
       navigate('/upload');
       return;
+    }
+
+    // Auto-start analysis once
+    if (!hasRun.current) {
+      hasRun.current = true;
+      handleStartAnalysis();
     }
   }, [analysisId, navigate]);
 
@@ -42,15 +49,9 @@ export default function Analysis() {
       // Calculates traditional forensics scores
       const tradResults = response?.traditional || {};
 
-      console.log(tradResults);
-
       const elaScore = tradResults?.ela?.score ?? null;
       const lbpScore = tradResults?.lbp?.score ?? null;
       const noiseConfidence = tradResults?.noise?.confidence ?? null;
-
-      // setEla(elaScore.toFixed(2));
-      // setNoise(noiseConfidence.toFixed(2));
-      // setLbp(lbpScore.toFixed(2));
 
       // Only update states if the module was actually selected
       if (selectedModules.traditional.includes("ela") && typeof elaScore === "number") {
@@ -87,33 +88,6 @@ export default function Analysis() {
     }
   };
 
-  if (status === 'idle') {
-    return (
-      <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[200px]">
-        <h1 className="mt-[60px] text-4xl text-[#0D47A1] text-center">
-          Ready to Start Analysis
-        </h1>
-        <h3 className="mt-[140px] text-4xl">
-          Proceed with analysis?
-        </h3>
-        <div className="flex flex-row gap-20 mt-[20px]">
-          <button
-            onClick={handleStartAnalysis}
-            className={`${baseButton} bg-[#1E88E5] text-white hover:bg-[#114f85] transition-colors`}
-          >
-            Yes
-          </button>
-          <button
-            onClick={() => navigate('/upload')}
-            className={`${baseButton} bg-[#E0E0E0] text-[#1702028F] border border-[#1E88E5] hover:bg-[#b5b5b5] transition-colors`}
-          >
-            No
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   if (status === 'running') {
     return (
       <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[200px]">
@@ -144,7 +118,7 @@ export default function Analysis() {
     );
   }
 
-  // Success - show only the percentage
+  // Success - show results
   return (
     <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[100px]">
       <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
