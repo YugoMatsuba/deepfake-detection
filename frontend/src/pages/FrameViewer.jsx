@@ -198,6 +198,7 @@ useEffect(() => {
     if (!video) return;
     video.currentTime = Math.min(video.currentTime + 1 / frameRate, video.duration);
     setCurrentFrame(Math.round(video.currentTime * frameRate));
+    setOverlayResult(null); // Clear overlay when navigating frames
   };
 
   const prevFrame = () => {
@@ -205,6 +206,7 @@ useEffect(() => {
     if (!video) return;
     video.currentTime = Math.max(video.currentTime - 1 / frameRate, 0);
     setCurrentFrame(Math.round(video.currentTime * frameRate));
+    setOverlayResult(null); // Clear overlay when navigating frames
   };
 
   const jumpToNextMarker = (type) => {
@@ -243,6 +245,7 @@ useEffect(() => {
     const video = videoRef.current;
     video.currentTime = next / frameRate;
     setCurrentFrame(next);
+    setOverlayResult(null); // Clear overlay when jumping to marker
   }
 };
 
@@ -282,6 +285,7 @@ const jumpToPreviousMarker = (type) => {
     const video = videoRef.current;
     video.currentTime = prev / frameRate;
     setCurrentFrame(prev);
+    setOverlayResult(null); // Clear overlay when jumping to marker
   }
 };
 
@@ -327,12 +331,15 @@ useEffect(() => {
   const hoveredFrame = (() => {
   if (hoveredIndex === null) return null;
 
-  if (markerType === "ml") {
+  // Use selectedMarkerType (set on hover) instead of markerType (filter button)
+  const typeToCheck = selectedMarkerType || markerType;
+
+  if (typeToCheck === "ml") {
     return deepfakeFrames[hoveredIndex] ?? null;
   }
 
   // For other types
-  const frames = traditionalData?.[markerType]?.frames;
+  const frames = traditionalData?.[typeToCheck]?.frames;
   if (!frames || hoveredIndex < 0 || hoveredIndex >= frames.length) return null;
 
   return frames[hoveredIndex].frame_number ?? frames[hoveredIndex].frame;
@@ -667,12 +674,23 @@ const getColor = (type, value) => {
         key={`df-${index}`}
         className="absolute top-0 h-4 w-1 bg-red-500"
         style={{ left: `${pctLeft(frame)}%` }}
-        onMouseEnter={() => setHoveredIndex(index)}
+        onMouseEnter={() => {
+          setHoveredIndex(index);
+          setSelectedMarkerType("ml");
+          setDetailsFrame(frame);
+        }}
         onMouseLeave={() => { if (!isTooltipHovered) setHoveredIndex(null); }}
-        onDoubleClick={() => {
+        onClick={() => {
           setIsDetailsOpen(true);
           setDetailsFrame(frame);
           setSelectedMarkerType("ml");
+        }}
+        onDoubleClick={() => {
+          if (frameRate && videoRef.current) {
+            videoRef.current.currentTime = frame / frameRate;
+            setCurrentFrame(frame);
+            setOverlayResult(null);
+          }
         }}
       />
     ));
@@ -701,10 +719,17 @@ const getColor = (type, value) => {
             setSelectedMarkerType(type);
           }}
           onMouseLeave={hideTooltip}
-          onDoubleClick={() => {
+          onClick={() => {
             setIsDetailsOpen(true);
             setDetailsFrame(frameNum);
             setSelectedMarkerType(type);
+          }}
+          onDoubleClick={() => {
+            if (frameRate && videoRef.current) {
+              videoRef.current.currentTime = frameNum / frameRate;
+              setCurrentFrame(frameNum);
+              setOverlayResult(null);
+            }
           }}
         />
       );
@@ -720,7 +745,7 @@ const getColor = (type, value) => {
 {/* Hover tooltip */}
 {hoveredFrame != null && (
   <div
-    className="absolute -top-28 z-30"
+    className="absolute -top-20 z-30"
     style={{
       left: `${pctLeft(hoveredFrame)}%`,
       transform: "translateX(-50%)",
@@ -730,16 +755,23 @@ const getColor = (type, value) => {
       setIsTooltipHovered(false);
       setHoveredIndex(null); // hide when mouse leaves the tooltip
     }}
-    onDoubleClick={() => {
+    onClick={() => {
       setIsDetailsOpen(true);
       setDetailsFrame(hoveredFrame);
     }}
+    onDoubleClick={() => {
+      if (frameRate && videoRef.current) {
+        videoRef.current.currentTime = hoveredFrame / frameRate;
+        setCurrentFrame(hoveredFrame);
+        setOverlayResult(null);
+      }
+    }}
   >
-    <div className="flex flex-col items-center justify-center relative w-64 rounded-xl border border-gray-300 bg-white p-3 shadow-lg">
-      
+    <div className="flex flex-col items-center justify-center relative w-64 rounded-xl border border-gray-300 bg-white p-3 shadow-lg cursor-pointer">
+
       {/* Title: ML, ELA, Noise, or LBP */}
       <h4 className="text-center text-sm font-semibold mb-1">
-        {markerType.toUpperCase()}
+        {(selectedMarkerType || markerType).toUpperCase()}
       </h4>
 
       {/* Summary */}
@@ -766,7 +798,7 @@ const getColor = (type, value) => {
 </Button>
 
 <Button variant="secondary" size="lg" className="bg-white" onClick={prevFrame}>
-              <span className="text-2xl">&gt;</span>
+              <span className="text-2xl">&lt;</span>
             </Button>
             
 
