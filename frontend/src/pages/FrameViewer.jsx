@@ -680,10 +680,17 @@ const getColor = (type, value) => {
           setDetailsFrame(frame);
         }}
         onMouseLeave={() => { if (!isTooltipHovered) setHoveredIndex(null); }}
-        onDoubleClick={() => {
+        onClick={() => {
           setIsDetailsOpen(true);
           setDetailsFrame(frame);
           setSelectedMarkerType("ml");
+        }}
+        onDoubleClick={() => {
+          if (frameRate && videoRef.current) {
+            videoRef.current.currentTime = frame / frameRate;
+            setCurrentFrame(frame);
+            setOverlayResult(null);
+          }
         }}
       />
     ));
@@ -712,10 +719,17 @@ const getColor = (type, value) => {
             setSelectedMarkerType(type);
           }}
           onMouseLeave={hideTooltip}
-          onDoubleClick={() => {
+          onClick={() => {
             setIsDetailsOpen(true);
             setDetailsFrame(frameNum);
             setSelectedMarkerType(type);
+          }}
+          onDoubleClick={() => {
+            if (frameRate && videoRef.current) {
+              videoRef.current.currentTime = frameNum / frameRate;
+              setCurrentFrame(frameNum);
+              setOverlayResult(null);
+            }
           }}
         />
       );
@@ -731,7 +745,7 @@ const getColor = (type, value) => {
 {/* Hover tooltip */}
 {hoveredFrame != null && (
   <div
-    className="absolute -top-28 z-30"
+    className="absolute -top-20 z-30"
     style={{
       left: `${pctLeft(hoveredFrame)}%`,
       transform: "translateX(-50%)",
@@ -741,13 +755,20 @@ const getColor = (type, value) => {
       setIsTooltipHovered(false);
       setHoveredIndex(null); // hide when mouse leaves the tooltip
     }}
-    onDoubleClick={() => {
+    onClick={() => {
       setIsDetailsOpen(true);
       setDetailsFrame(hoveredFrame);
     }}
+    onDoubleClick={() => {
+      if (frameRate && videoRef.current) {
+        videoRef.current.currentTime = hoveredFrame / frameRate;
+        setCurrentFrame(hoveredFrame);
+        setOverlayResult(null);
+      }
+    }}
   >
-    <div className="flex flex-col items-center justify-center relative w-64 rounded-xl border border-gray-300 bg-white p-3 shadow-lg">
-      
+    <div className="flex flex-col items-center justify-center relative w-64 rounded-xl border border-gray-300 bg-white p-3 shadow-lg cursor-pointer">
+
       {/* Title: ML, ELA, Noise, or LBP */}
       <h4 className="text-center text-sm font-semibold mb-1">
         {(selectedMarkerType || markerType).toUpperCase()}
