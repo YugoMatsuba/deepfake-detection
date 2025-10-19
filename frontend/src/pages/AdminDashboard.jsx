@@ -7,7 +7,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("pending");
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const isOwner = user?.role === 'owner';
+  const canManageRoles = user?.role === 'owner' || user?.role === 'admin';
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
             >
               Analyses
             </TabButton>
-            {isOwner && (
+            {canManageRoles && (
               <TabButton
                 active={activeTab === "roles"}
                 onClick={() => setActiveTab("roles")}
@@ -78,7 +78,7 @@ export default function AdminDashboard() {
             {activeTab === "pending" && <PendingUsersTab />}
             {activeTab === "logs" && <AuditLogsTab />}
             {activeTab === "analyses" && <AnalysesTab />}
-            {activeTab === "roles" && isOwner && <RoleManagementTab />}
+            {activeTab === "roles" && canManageRoles && <RoleManagementTab />}
           </div>
         </div>
       </div>

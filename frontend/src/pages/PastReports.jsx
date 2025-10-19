@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/useAuth.js";
-import client from "../api/client.js";
+import { fetchJson } from "../api/client.js";
 
 export default function PastReports() {
   const [reports, setReports] = useState([]);
@@ -20,7 +20,7 @@ export default function PastReports() {
     try {
       setLoading(true);
       setError(null);
-      const data = await client.get("/reports");
+      const data = await fetchJson("/reports");
       setReports(data);
     } catch (err) {
       setError(err.message || "Failed to load reports");
@@ -33,7 +33,7 @@ export default function PastReports() {
     try {
       setDownloading(analysisId);
 
-      const response = await fetch(`${client.baseURL}/reports/${analysisId}/pdf`, {
+      const response = await fetch(`/api/reports/${analysisId}/pdf`, {
         credentials: "include",
       });
 
