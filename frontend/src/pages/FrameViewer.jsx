@@ -943,12 +943,6 @@ const getColor = (type, value) => {
             <p>
               <span className="font-medium">Current Frame:</span> {currentFrame}
             </p>
-            {mlFrames.length > 0 && (
-              <p>
-                <span className="font-medium">Next Deepfake Frame:</span>{" "}
-                {mlFrames[deepfakeIndex] || "None"}
-              </p>
-            )}
             <p>
                 <span className="font-medium">Frame Rate:</span>{" "}
                 {frameRate ? frameRate.toFixed(2) : "Loading..."} fps

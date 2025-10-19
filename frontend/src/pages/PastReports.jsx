@@ -174,33 +174,21 @@ export default function PastReports() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() =>
-                            navigate("/frame-viewer", {
-                              state: { analysisId: report.analysis_id },
-                            })
-                          }
-                          className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition text-xs"
-                        >
-                          View Details
-                        </button>
-                        <button
-                          onClick={() =>
-                            downloadPDF(
-                              report.analysis_id,
-                              report.original_filename.replace(/\.[^/.]+$/, "") +
-                                "_report.pdf"
-                            )
-                          }
-                          disabled={downloading === report.analysis_id}
-                          className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs"
-                        >
-                          {downloading === report.analysis_id
-                            ? "Downloading..."
-                            : "Download PDF"}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() =>
+                          downloadPDF(
+                            report.analysis_id,
+                            report.original_filename.replace(/\.[^/.]+$/, "") +
+                              "_report.pdf"
+                          )
+                        }
+                        disabled={downloading === report.analysis_id}
+                        className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs"
+                      >
+                        {downloading === report.analysis_id
+                          ? "Downloading..."
+                          : "Download PDF"}
+                      </button>
                     </td>
                   </tr>
                 ))}

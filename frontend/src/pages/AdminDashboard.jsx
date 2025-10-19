@@ -9,6 +9,11 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const canManageRoles = user?.role === 'owner' || user?.role === 'admin';
 
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -34,7 +39,7 @@ export default function AdminDashboard() {
               Go to Upload
             </button>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition"
             >
               Logout
