@@ -4,7 +4,10 @@ from .metadata_analysis import (
     check_integrity_ffmpeg,
     parse_ffmpeg_log,
     generate_frame_hashes,
-    analyze_video
+    parse_frame_hashes,
+    detect_duplicate_frames,
+    detect_metadata_anomalies,
+    run_metadata_analysis
 )
 
 __all__ = [
@@ -12,5 +15,8 @@ __all__ = [
     'check_integrity_ffmpeg',
     'parse_ffmpeg_log',
     'generate_frame_hashes',
-    'analyze_video'
+    'parse_frame_hashes',
+    'detect_duplicate_frames',
+    'detect_metadata_anomalies',
+    'run_metadata_analysis'
 ]
