@@ -165,7 +165,7 @@ export default function Analysis() {
         </div>
       )}
 
-      <h3 className="mt-[100px] text-4xl">
+      <h3 className="mt-[60px] text-4xl">
         Proceed to frame analysis?
       </h3>
 
