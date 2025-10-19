@@ -22,6 +22,7 @@ from werkzeug.exceptions import HTTPException
 from api import get_db
 from api.auth_utils import require_user, check_analysis_ownership
 from models import Analysis
+from storage import delete_analysis_files
 from api.ml_integration import run_ml_analysis, run_single_frame_ml_analysis
 from api.traditional_integration import (
     run_traditional_forensics,
@@ -33,6 +34,10 @@ from api.traditional_forensics_utils.frame_extraction import extract_single_fram
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
 from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
+from api.metadata_utils import run_metadata_analysis
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Import ML schema version for traceability
 try:
@@ -225,8 +230,24 @@ def start_analysis(analysis_id: str):
                         modules=traditional_modules
                     )
 
+                # Run metadata forensics analysis (always run, fast ~1-3s)
+                metadata_result = {}
+                try:
+                    metadata_result = run_metadata_analysis(
+                        video_path=analysis.video_path,
+                        video_sha256=analysis.video_sha256
+                    )
+                except Exception as e:
+                    logger.error(f"Metadata analysis failed for {analysis.id}: {e}")
+                    metadata_result = {
+                        "error": f"Metadata analysis failed: {str(e)}",
+                        "analyzed_at": None,
+                        "file_hash": analysis.video_sha256
+                    }
+
                 # Extract scores-only for DB storage
                 result_json = {
+                    "metadata": metadata_result,  # From metadata analysis above
                     "ml": {},
                     "traditional": {}
                 }
@@ -268,11 +289,13 @@ def start_analysis(analysis_id: str):
                 return jsonify(error=f"Analysis failed: {error_msg}"), 500
 
             # Build full response payload
+            # Metadata: from upload (persisted in DB)
             # ML: scores + frames (no overlays)
             # Traditional: scores + base64 overlays (ephemeral, not in DB)
             response = {
                 "analysis_id": analysis.id,
                 "status": "succeeded",
+                "metadata": analysis.result_json.get("metadata", {}),  # From upload
                 "ml": ml_results,
                 "ml_video": ml_video_meta,
                 "ml_frames": ml_frames_meta,
@@ -587,4 +610,70 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)
     except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@analysis_bp.post("/analyses/<analysis_id>/cleanup")
+@require_user
+def cleanup_analysis_files_endpoint(analysis_id: str):
+    """
+    Delete video/frame files from disk while keeping database record.
+
+    Called when user finishes analysis in FrameViewer.
+    Database record persists so reports can still be generated.
+
+    Requires: Ownership or admin role
+    Returns: 204 No Content on success
+    """
+    try:
+        with get_db() as db:
+            # Check ownership
+            analysis = check_analysis_ownership(db, analysis_id)
+
+            # Delete files from disk
+            success = delete_analysis_files(analysis_id)
+
+            if not success:
+                logger.warning(f"Files already deleted for analysis {analysis_id}")
+                # Still return 204 - idempotent operation
+
+            return "", 204
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (401/403/404)
+    except Exception as e:
+        logger.error(f"Failed to cleanup analysis {analysis_id}: {e}")
+        return jsonify(error=str(e)), 500
+
+
+@analysis_bp.delete("/analyses/<analysis_id>")
+@require_user
+def delete_analysis(analysis_id: str):
+    """
+    Delete entire analysis: database record + files.
+
+    Called from PastReports page when user wants to permanently
+    delete an analysis.
+
+    Requires: Ownership or admin role
+    Returns: 204 No Content
+    """
+    try:
+        with get_db() as db:
+            # Check ownership
+            analysis = check_analysis_ownership(db, analysis_id)
+
+            # Delete files from disk (if they still exist)
+            delete_analysis_files(analysis_id)
+
+            # Delete database record
+            db.delete(analysis)
+            # Commit happens automatically in context manager
+
+            return "", 204
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (401/403/404)
+    except Exception as e:
+        logger.error(f"Failed to delete analysis {analysis_id}: {e}")
         return jsonify(error=str(e)), 500

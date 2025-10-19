@@ -11,11 +11,14 @@ import os
 import shutil
 import subprocess
 import json
+import logging
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 import cv2
 
+logger = logging.getLogger(__name__)
 
 # Data root for all analysis artifacts
 DATA_ROOT = Path(os.getenv("DATA_DIR", "/data")) / "analyses"
@@ -181,3 +184,97 @@ def _probe_with_opencv(path: Path) -> dict:
         }
     finally:
         cap.release()
+
+
+def delete_analysis_files(analysis_id: str) -> bool:
+    """
+    Delete video files from disk while preserving database record.
+
+    This is called when user finishes analyzing - we keep the
+    analysis results in the database but free up disk space.
+
+    Deletes:
+    - /data/analyses/{analysis_id}/video.* (uploaded video)
+    - /data/analyses/{analysis_id}/ (entire directory)
+
+    Note: Frames are auto-cleaned via tempfile.TemporaryDirectory
+    in traditional_integration.py, so no separate frame cleanup needed.
+
+    Args:
+        analysis_id: UUID of the analysis
+
+    Returns:
+        bool: True if deleted successfully, False if directory didn't exist
+    """
+    analysis_dir = DATA_ROOT / analysis_id
+
+    if not analysis_dir.exists():
+        logger.warning(f"Analysis directory not found: {analysis_dir}")
+        return False
+
+    try:
+        shutil.rmtree(analysis_dir)
+        logger.info(f"Deleted analysis files: {analysis_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete analysis files for {analysis_id}: {e}")
+        return False
+
+
+def cleanup_old_analysis_files(retention_hours: int = 1) -> dict:
+    """
+    Automatically delete video/frame files for completed analyses older than retention_hours.
+
+    This function is meant to be called periodically by a background scheduler to
+    free up disk space while preserving analysis records in the database.
+
+    Args:
+        retention_hours: Number of hours to retain files after analysis completion
+
+    Returns:
+        dict with cleanup statistics: {
+            "cleaned": int,  # Number of analyses cleaned
+            "errors": int,   # Number of failures
+            "skipped": int   # Number already cleaned
+        }
+    """
+    from database import get_db
+    from models import Analysis
+
+    stats = {"cleaned": 0, "errors": 0, "skipped": 0}
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+
+    try:
+        with get_db() as db:
+            # Find completed analyses older than retention period
+            old_analyses = db.query(Analysis).filter(
+                Analysis.status == "succeeded",
+                Analysis.updated_at < cutoff_time
+            ).all()
+
+            logger.info(f"Found {len(old_analyses)} completed analyses older than {retention_hours}h")
+
+            for analysis in old_analyses:
+                analysis_dir = DATA_ROOT / analysis.id
+
+                # Skip if already cleaned
+                if not analysis_dir.exists():
+                    stats["skipped"] += 1
+                    continue
+
+                # Delete files
+                try:
+                    shutil.rmtree(analysis_dir)
+                    logger.info(f"Auto-cleaned analysis files: {analysis.id}")
+                    stats["cleaned"] += 1
+                except Exception as e:
+                    logger.error(f"Failed to auto-clean {analysis.id}: {e}")
+                    stats["errors"] += 1
+
+            logger.info(f"Cleanup complete: {stats}")
+            return stats
+
+    except Exception as e:
+        logger.error(f"Cleanup job failed: {e}")
+        stats["errors"] += 1
+        return stats

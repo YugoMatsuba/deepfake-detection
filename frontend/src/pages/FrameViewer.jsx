@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "./Button";
 import { Card, CardContent } from "./Card";
 
@@ -46,6 +47,11 @@ const FrameViewer = ({
   const [selectedMarkerType, setSelectedMarkerType] = useState(null);
   const [showAllMarkers, setShowAllMarkers] = useState(false);
 
+  // Finish Analysis state
+  const [showFinishPopup, setShowFinishPopup] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const navigate = useNavigate();
 
 
 
@@ -612,12 +618,104 @@ const getColor = (type, value) => {
   }
 };
 
+// Finish Analysis handlers
+const handleDownloadPDF = async () => {
+  setDownloadingPDF(true);
+  try {
+    const response = await fetch(`/api/reports/${analysisId}/pdf`, {
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Failed to download PDF");
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analysis_report.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (err) {
+    alert("Failed to download PDF: " + err.message);
+  } finally {
+    setDownloadingPDF(false);
+  }
+};
+
+const handleFinishAnalysis = async () => {
+  setCleaning(true);
+  try {
+    const response = await fetch(`/api/analyses/${analysisId}/cleanup`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Failed to cleanup files");
+
+    // Success - navigate to upload page
+    navigate("/upload");
+  } catch (err) {
+    alert("Failed to cleanup: " + err.message);
+    setCleaning(false);
+  }
+};
+
 
 
 
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
+
+      {/* Finish Analysis Button - Top Right */}
+      <button
+        onClick={() => setShowFinishPopup(true)}
+        className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg"
+      >
+        Finish Analysis
+      </button>
+
+      {/* Finish Analysis Popup */}
+      {showFinishPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h2 className="text-xl font-bold mb-4">Finish Analysis?</h2>
+            <p className="text-gray-700 mb-6">
+              This will delete video files from our servers to free up space.
+              Your analysis results will be saved and available in Past Reports.
+            </p>
+
+            {/* Download PDF Option */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloadingPDF}
+              className="w-full mb-3 px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition"
+            >
+              {downloadingPDF ? "Downloading..." : "Download PDF Report"}
+            </button>
+
+            {/* Finish & Delete Files */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleFinishAnalysis}
+                disabled={cleaning}
+                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+              >
+                {cleaning ? "Finishing..." : "Finish & Clean Up"}
+              </button>
+              <button
+                onClick={() => setShowFinishPopup(false)}
+                disabled={cleaning}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-50 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col items-center flex-1 space-y-1 p-3">
 
