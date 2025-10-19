@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAnalysis } from "../app/AnalysisProvider";
 import { startAnalysis } from "../api/videos";
+import {
+  MetadataAnomaliesSummary,
+  IntegrityStatus,
+  FrameHashesSummary
+} from "./MetadataResults";
 
 const baseButton = "justify-center items-center mt-[15px] text-[17px] font-semibold px-10 py-3.5 rounded-lg shadow";
 
@@ -141,9 +146,25 @@ export default function Analysis() {
           LBP Analysis Score = {lbp}
         </h1>
       )}
-      <h2 className="mt-[40px] text-4xl leading-none tracking-normal text-black">
-        Metadata anomalies: None found
-      </h2>
+
+      {/* Metadata Forensics Results */}
+      {analysisResult?.metadata && (
+        <div className="mt-[40px] w-full max-w-4xl px-4">
+          <h2 className="text-3xl font-bold text-[#0D47A1] mb-4 text-center">
+            Metadata Forensics
+          </h2>
+
+          {/* Anomalies Summary */}
+          <MetadataAnomaliesSummary metadata={analysisResult.metadata} />
+
+          {/* Integrity Status */}
+          <IntegrityStatus metadata={analysisResult.metadata} />
+
+          {/* Frame Hashes Summary */}
+          <FrameHashesSummary metadata={analysisResult.metadata} />
+        </div>
+      )}
+
       <h3 className="mt-[100px] text-4xl">
         Proceed to frame analysis?
       </h3>

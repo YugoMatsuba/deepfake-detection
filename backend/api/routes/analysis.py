@@ -226,7 +226,11 @@ def start_analysis(analysis_id: str):
                     )
 
                 # Extract scores-only for DB storage
+                # Preserve existing metadata results from upload
+                existing_metadata = analysis.result_json.get("metadata", {})
+
                 result_json = {
+                    "metadata": existing_metadata,  # Preserve from upload
                     "ml": {},
                     "traditional": {}
                 }
@@ -268,11 +272,13 @@ def start_analysis(analysis_id: str):
                 return jsonify(error=f"Analysis failed: {error_msg}"), 500
 
             # Build full response payload
+            # Metadata: from upload (persisted in DB)
             # ML: scores + frames (no overlays)
             # Traditional: scores + base64 overlays (ephemeral, not in DB)
             response = {
                 "analysis_id": analysis.id,
                 "status": "succeeded",
+                "metadata": analysis.result_json.get("metadata", {}),  # From upload
                 "ml": ml_results,
                 "ml_video": ml_video_meta,
                 "ml_frames": ml_frames_meta,
