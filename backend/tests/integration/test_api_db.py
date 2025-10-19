@@ -3,6 +3,7 @@ import os
 import sys
 import types
 from contextlib import ExitStack
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -16,6 +17,12 @@ def client():
     os.environ.setdefault("DB_BOOTSTRAP", "1")
 
     with ExitStack() as stack:
+        backend_dir = Path(__file__).resolve().parents[2]
+        backend_path = str(backend_dir)
+        if backend_path not in sys.path:
+            sys.path.insert(0, backend_path)
+            stack.callback(lambda: sys.path.remove(backend_path))
+
         cleanup_module = None
         try:
             cleanup_module = importlib.import_module("cleanup_scheduler")
