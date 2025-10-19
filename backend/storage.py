@@ -14,6 +14,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 import cv2
 
@@ -218,3 +219,62 @@ def delete_analysis_files(analysis_id: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to delete analysis files for {analysis_id}: {e}")
         return False
+
+
+def cleanup_old_analysis_files(retention_hours: int = 1) -> dict:
+    """
+    Automatically delete video/frame files for completed analyses older than retention_hours.
+
+    This function is meant to be called periodically by a background scheduler to
+    free up disk space while preserving analysis records in the database.
+
+    Args:
+        retention_hours: Number of hours to retain files after analysis completion
+
+    Returns:
+        dict with cleanup statistics: {
+            "cleaned": int,  # Number of analyses cleaned
+            "errors": int,   # Number of failures
+            "skipped": int   # Number already cleaned
+        }
+    """
+    from database import get_db
+    from models import Analysis
+
+    stats = {"cleaned": 0, "errors": 0, "skipped": 0}
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+
+    try:
+        with get_db() as db:
+            # Find completed analyses older than retention period
+            old_analyses = db.query(Analysis).filter(
+                Analysis.status == "succeeded",
+                Analysis.updated_at < cutoff_time
+            ).all()
+
+            logger.info(f"Found {len(old_analyses)} completed analyses older than {retention_hours}h")
+
+            for analysis in old_analyses:
+                analysis_dir = DATA_ROOT / analysis.id
+
+                # Skip if already cleaned
+                if not analysis_dir.exists():
+                    stats["skipped"] += 1
+                    continue
+
+                # Delete files
+                try:
+                    shutil.rmtree(analysis_dir)
+                    logger.info(f"Auto-cleaned analysis files: {analysis.id}")
+                    stats["cleaned"] += 1
+                except Exception as e:
+                    logger.error(f"Failed to auto-clean {analysis.id}: {e}")
+                    stats["errors"] += 1
+
+            logger.info(f"Cleanup complete: {stats}")
+            return stats
+
+    except Exception as e:
+        logger.error(f"Cleanup job failed: {e}")
+        stats["errors"] += 1
+        return stats
