@@ -82,7 +82,7 @@ export default function Analysis() {
       const mlScores = Object.values(mlResults).map(r => r.score).filter(s => s != null);
       const avgScore = mlScores.length > 0
         ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
-        : 0;
+        : null;
 
       setFakeVideoPercentage(avgScore);
       setAnalysisResult(response);
@@ -127,7 +127,7 @@ export default function Analysis() {
   return (
     <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[100px]">
       <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
-        Initial Analysis: Synthetic Media Chance = {fakeVideoPercentage}%
+        Initial Analysis: Synthetic Media Chance = {fakeVideoPercentage !== null ? `${fakeVideoPercentage}%` : 'N/A'}
       </h1>
       {ela !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
