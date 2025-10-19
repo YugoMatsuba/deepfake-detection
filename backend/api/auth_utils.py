@@ -219,6 +219,53 @@ def check_analysis_ownership(db: Session, analysis_id: str) -> Analysis:
     return analysis
 
 
+def check_analysis_ownership_or_admin(db: Session, analysis_id: str) -> Analysis:
+    """
+    Load analysis and verify current user owns it OR is an admin/owner.
+
+    Similar to check_analysis_ownership, but also allows admin/owner users
+    to access any analysis (for reports, admin dashboard, etc.).
+
+    Args:
+        db: SQLAlchemy session
+        analysis_id: Analysis UUID
+
+    Returns:
+        Analysis object if found and accessible by current user
+
+    Raises:
+        404: Analysis not found
+        403: Analysis exists but user can't access it
+
+    Security:
+        - Never exposes video_path or other sensitive server-side paths
+        - Enforces row-level authorization with admin override
+
+    Note:
+        Caller must use @require_user decorator which sets g.user
+    """
+    # g.user already set by @require_user decorator
+    user_id = g.user.id if hasattr(g, 'user') and g.user else None
+    if not user_id:
+        abort(401, description="Unauthorized")
+
+    # Load analysis
+    analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+
+    if not analysis:
+        abort(404, description="Analysis not found")
+
+    # Check if user is admin/owner (can access any analysis)
+    if g.user.role in ("admin", "owner"):
+        return analysis
+
+    # Check ownership (regular users can only access their own)
+    if analysis.user_id != user_id:
+        abort(403, description="Forbidden: You do not own this analysis")
+
+    return analysis
+
+
 def get_current_user_id() -> Optional[int]:
     """
     Get current logged-in user ID from session.

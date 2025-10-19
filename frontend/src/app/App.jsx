@@ -11,6 +11,7 @@ import FrameViewerPage from '../pages/FrameViewerRetrieval.jsx';
 import RoleSelect from '../pages/RoleSelect.jsx';
 import AdminDashboard from '../pages/AdminDashboard.jsx';
 import Landing from '../pages/Landing.jsx';
+import PastReports from '../pages/PastReports.jsx';
 
 export default function App() {
   return (
@@ -31,6 +32,14 @@ export default function App() {
             <Route path="/upload" element={<Upload />} />
             <Route path="/analysis" element={<Analysis />}/>
             <Route path="/frame-viewer" element={<FrameViewerPage />} />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <PastReports />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin routes - require admin role */}
             <Route

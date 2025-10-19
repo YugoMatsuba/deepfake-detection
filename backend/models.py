@@ -164,6 +164,7 @@ class Analysis(Base):
     # Video metadata (server-only, never exposed to client)
     video_path: Mapped[str] = mapped_column(Text, nullable=False)
     video_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

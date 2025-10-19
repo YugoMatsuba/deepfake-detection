@@ -52,6 +52,9 @@ def upload_video():
     if not file or file.filename == "":
         return jsonify(error="Empty filename"), 400
 
+    # Capture original filename before sanitizing
+    original_filename = file.filename
+
     if file.mimetype not in ALLOWED_MIME:
         return jsonify(error=f"Unsupported mimetype: {file.mimetype}"), 400
 
@@ -66,6 +69,7 @@ def upload_video():
                 status="created",
                 video_path="",  # Will be updated after save
                 video_sha256="",  # Will be updated after save
+                original_filename=original_filename,
             )
             db.add(analysis)
             db.flush()  # Get analysis.id without committing

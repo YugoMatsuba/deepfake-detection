@@ -9,6 +9,7 @@ Routes:
 """
 from __future__ import annotations
 import os
+import subprocess
 import tempfile
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -33,7 +34,56 @@ from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
 from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
 
+# Import ML schema version for traceability
+try:
+    import sys
+    from pathlib import Path
+    # Add ml directory to path if not already present
+    ml_dir = Path(__file__).parent.parent.parent / "ml"
+    if ml_dir.exists() and str(ml_dir) not in sys.path:
+        sys.path.insert(0, str(ml_dir))
+    from schema import SCHEMA_VERSION
+except ImportError:
+    SCHEMA_VERSION = "unknown"
+
 analysis_bp = Blueprint("analysis", __name__)
+
+
+def _capture_ml_provenance(device: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Capture ML traceability metadata for transparency and reproducibility.
+
+    Returns:
+        Dictionary with:
+        - schema_version: ML output schema version
+        - commit_hash: Git commit SHA (or 'unknown' if not available)
+        - device: Device used for inference (cpu/cuda)
+        - timestamp: ISO8601 timestamp of analysis
+    """
+    # Capture git commit hash
+    commit_hash = "unknown"
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).parent.parent.parent,  # Project root
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        if result.returncode == 0:
+            commit_hash = result.stdout.strip()
+    except Exception:
+        pass  # Silently fall back to 'unknown'
+
+    # Determine device (will be set from env or auto-detected by ML module)
+    device_used = device or os.environ.get("DEVICE", "auto-detect")
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "commit_hash": commit_hash,
+        "device": device_used,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 
 @analysis_bp.post("/analyses/<analysis_id>/start")
@@ -120,6 +170,7 @@ def start_analysis(analysis_id: str):
             # Run analyses (BLOCKING)
             ml_results = {}
             traditional_results = {}
+            ml_provenance = None
 
             try:
                 # Run ML analysis
@@ -128,6 +179,9 @@ def start_analysis(analysis_id: str):
                 ml_timing_meta = None
 
                 if ml_modules:
+                    # Capture provenance metadata before running analysis
+                    ml_provenance = _capture_ml_provenance(device=None)
+
                     ml_output = run_ml_analysis(
                         video_path=analysis.video_path,
                         modules=ml_modules,
@@ -192,10 +246,17 @@ def start_analysis(analysis_id: str):
                         # NOTE: "overlay" field intentionally omitted (not saved to DB)
                     }
 
-                # Update Analysis record with scores only
+                # Update Analysis record with scores and provenance metadata
                 analysis.status = "succeeded"
                 analysis.result_json = result_json
                 analysis.updated_at = datetime.now(timezone.utc)
+
+                # Store ML provenance metadata in meta_json for traceability
+                if ml_provenance:
+                    current_meta = analysis.meta_json or {}
+                    current_meta["ml_provenance"] = ml_provenance
+                    analysis.meta_json = current_meta
+
                 # Commit happens automatically in context manager
 
             except Exception as e:

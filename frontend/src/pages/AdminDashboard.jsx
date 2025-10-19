@@ -7,7 +7,12 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("pending");
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const isOwner = user?.role === 'owner';
+  const canManageRoles = user?.role === 'owner' || user?.role === 'admin';
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -22,13 +27,19 @@ export default function AdminDashboard() {
           </div>
           <div className="flex gap-3">
             <button
+              onClick={() => navigate("/reports")}
+              className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:opacity-95 transition font-medium"
+            >
+              Past Reports
+            </button>
+            <button
               onClick={() => navigate("/upload")}
               className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 transition"
             >
               Go to Upload
             </button>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition"
             >
               Logout
@@ -57,7 +68,7 @@ export default function AdminDashboard() {
             >
               Analyses
             </TabButton>
-            {isOwner && (
+            {canManageRoles && (
               <TabButton
                 active={activeTab === "roles"}
                 onClick={() => setActiveTab("roles")}
@@ -72,7 +83,7 @@ export default function AdminDashboard() {
             {activeTab === "pending" && <PendingUsersTab />}
             {activeTab === "logs" && <AuditLogsTab />}
             {activeTab === "analyses" && <AnalysesTab />}
-            {activeTab === "roles" && isOwner && <RoleManagementTab />}
+            {activeTab === "roles" && canManageRoles && <RoleManagementTab />}
           </div>
         </div>
       </div>
