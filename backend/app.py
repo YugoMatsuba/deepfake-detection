@@ -23,6 +23,7 @@ from api.routes.traditional_forensics import bp_forensics
 from api.routes.video_upload import video_bp
 from api.routes.analysis import analysis_bp
 from api.routes.admin import admin_bp  # Admin dashboard routes
+from api.routes.reports import reports_bp  # PDF report generation
 # Models now in consolidated models.py (managed by Alembic)
 from models import User
 
@@ -188,6 +189,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_forensics, url_prefix="/api/forensics")
     app.register_blueprint(video_bp, url_prefix="/api")
     app.register_blueprint(analysis_bp, url_prefix="/api")
+    app.register_blueprint(reports_bp, url_prefix="/api")
 
     # --- Healthcheck ---
     @app.get("/api/health")

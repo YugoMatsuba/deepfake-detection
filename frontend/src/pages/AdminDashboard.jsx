@@ -22,6 +22,12 @@ export default function AdminDashboard() {
           </div>
           <div className="flex gap-3">
             <button
+              onClick={() => navigate("/reports")}
+              className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:opacity-95 transition font-medium"
+            >
+              Past Reports
+            </button>
+            <button
               onClick={() => navigate("/upload")}
               className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 hover:bg-gray-50 transition"
             >

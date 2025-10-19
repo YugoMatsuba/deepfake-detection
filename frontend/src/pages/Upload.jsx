@@ -1,11 +1,21 @@
+import { useNavigate } from "react-router-dom";
 import FileUploader from "./FileUploader";
 import { useAuth } from "../app/useAuth.js";
 
 export default function Page() {
   const { logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <main className="flex min-h-screen items-center justify-center relative">
+      {/* Past Reports button in top-left corner */}
+      <button
+        onClick={() => navigate("/reports")}
+        className="absolute top-4 left-4 px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:opacity-95 transition text-sm font-medium"
+      >
+        Past Reports
+      </button>
+
       {/* Logout button in top-right corner */}
       <button
         onClick={logout}
