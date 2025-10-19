@@ -21,10 +21,6 @@ from api import get_db
 from api.auth_utils import require_user
 from models import Analysis
 from storage import save_video_for_analysis, probe_video_metadata, DATA_ROOT
-from api.metadata_utils import run_metadata_analysis
-import logging
-
-logger = logging.getLogger(__name__)
 
 video_bp = Blueprint("video", __name__)
 
@@ -89,28 +85,10 @@ def upload_video():
             # Probe metadata
             meta = probe_video_metadata(video_path)
 
-            # Run metadata forensics analysis (graceful degradation on failure)
-            try:
-                metadata_result = run_metadata_analysis(
-                    video_path=str(video_path),
-                    video_sha256=sha256
-                )
-            except Exception as e:
-                logger.error(f"Metadata analysis failed for {analysis.id}: {e}")
-                metadata_result = {
-                    "error": f"Metadata analysis failed: {str(e)}",
-                    "analyzed_at": None,
-                    "file_hash": sha256
-                }
-
             # Update Analysis record
             analysis.video_path = str(video_path)
             analysis.video_sha256 = sha256
             analysis.meta_json = meta
-            # Store metadata forensics in result_json
-            analysis.result_json = {
-                "metadata": metadata_result
-            }
 
             # Commit happens automatically in context manager
             return jsonify({

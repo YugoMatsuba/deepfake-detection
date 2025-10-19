@@ -33,6 +33,10 @@ from api.traditional_forensics_utils.frame_extraction import extract_single_fram
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
 from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
+from api.metadata_utils import run_metadata_analysis
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Import ML schema version for traceability
 try:
@@ -225,12 +229,24 @@ def start_analysis(analysis_id: str):
                         modules=traditional_modules
                     )
 
-                # Extract scores-only for DB storage
-                # Preserve existing metadata results from upload
-                existing_metadata = analysis.result_json.get("metadata", {})
+                # Run metadata forensics analysis (always run, fast ~1-3s)
+                metadata_result = {}
+                try:
+                    metadata_result = run_metadata_analysis(
+                        video_path=analysis.video_path,
+                        video_sha256=analysis.video_sha256
+                    )
+                except Exception as e:
+                    logger.error(f"Metadata analysis failed for {analysis.id}: {e}")
+                    metadata_result = {
+                        "error": f"Metadata analysis failed: {str(e)}",
+                        "analyzed_at": None,
+                        "file_hash": analysis.video_sha256
+                    }
 
+                # Extract scores-only for DB storage
                 result_json = {
-                    "metadata": existing_metadata,  # Preserve from upload
+                    "metadata": metadata_result,  # From metadata analysis above
                     "ml": {},
                     "traditional": {}
                 }
