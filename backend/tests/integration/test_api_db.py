@@ -41,7 +41,9 @@ def client():
                     patch.object(cleanup_module, "cleanup_job", return_value=None)
                 )
 
-        if "database" not in sys.modules:
+        try:
+            importlib.import_module("database")
+        except ModuleNotFoundError:
             database_stub = types.ModuleType("database")
             database_stub.get_db = lambda *args, **kwargs: None
             sys.modules["database"] = database_stub
