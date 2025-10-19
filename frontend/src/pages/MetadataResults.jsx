@@ -66,7 +66,7 @@ export function MetadataAnomaliesSummary({ metadata }) {
 
 export function IntegrityStatus({ metadata }) {
   const integrity = metadata?.integrity || {};
-  const status = integrity.status || "UNKNOWN";
+  const status = integrity.integrity_status || "UNKNOWN";
 
   const statusColors = {
     "PASSED": "bg-green-50 border-green-500 text-green-700",
