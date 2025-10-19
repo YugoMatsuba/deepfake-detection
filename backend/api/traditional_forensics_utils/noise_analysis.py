@@ -4,12 +4,21 @@ from io import BytesIO
 from PIL import Image
 import numpy as np
 from scipy.ndimage import gaussian_filter
+import cv2
 
-# Configuration constants
+# Configuration constants (Pass 1)
 NOISE_PCTL_LOW = 1
 NOISE_PCTL_HIGH = 99
 NOISE_MAX_WIDTH = 960
 NOISE_PNG_LEVEL = 9
+
+# Configuration constants (Pass 2 - blockwise scoring)
+NOISE_BLOCK_SIZE = 32
+NOISE_TOPK_PERCENT = 10
+NOISE_EDGE_MASK_PERCENTILE = 70
+NOISE_TEMP_NMS_WINDOW = 3
+NOISE_ZMAP_PCTL_LOW = 5
+NOISE_ZMAP_PCTL_HIGH = 95
 
 
 def stretch_to_uint8(arr, low_pct, high_pct):
@@ -49,8 +58,19 @@ def downscale_overlay(img, max_width=960):
 
 def compute_noise(frame_path):
     """
-    Compute spatial noise residual and anomaly score.
-    Returns residual image (PIL), and raw anomaly score.
+    Compute blockwise noise inconsistency score and z-map overlay.
+
+    Pass 2 algorithm:
+    1. Compute residual (Gaussian smoothing)
+    2. Build edge mask to exclude high-texture regions
+    3. Tile into blocks, compute std per block (excluding edges)
+    4. Build z-map: standardize block stds within frame
+    5. Frame score = mean of top-k blocks
+    6. Overlay = upscaled z-map (percentile stretched)
+
+    Returns:
+        score: float (mean of top-k block z-scores)
+        overlay_img: PIL Image (z-map visualization)
     """
     # Load frame and convert to grayscale
     img = Image.open(frame_path).convert("L")
@@ -62,16 +82,66 @@ def compute_noise(frame_path):
     # Noise residual
     residual = img_np - smoothed
 
-    # Create residual image with percentile-based contrast stretch
-    residual_u8 = stretch_to_uint8(residual, NOISE_PCTL_LOW, NOISE_PCTL_HIGH)
-    residual_img = Image.fromarray(residual_u8, mode='L')
+    # 1. Compute edge mask (Laplacian, threshold at percentile)
+    img_u8 = np.array(img, dtype=np.uint8)
+    laplacian = cv2.Laplacian(img_u8, cv2.CV_64F, ksize=3)
+    edge_mag = np.abs(laplacian)
+    edge_threshold = np.percentile(edge_mag, NOISE_EDGE_MASK_PERCENTILE)
+    edge_mask = edge_mag < edge_threshold  # True = not an edge (include in stats)
+
+    # 2. Tile into blocks
+    h, w = residual.shape
+    bs = NOISE_BLOCK_SIZE
+    n_rows = h // bs
+    n_cols = w // bs
+
+    # Trim to fit exact blocks
+    residual_trimmed = residual[:n_rows * bs, :n_cols * bs]
+    edge_mask_trimmed = edge_mask[:n_rows * bs, :n_cols * bs]
+
+    # Reshape into blocks: (n_rows, n_cols, bs, bs)
+    residual_blocks = residual_trimmed.reshape(n_rows, bs, n_cols, bs).transpose(0, 2, 1, 3)
+    edge_blocks = edge_mask_trimmed.reshape(n_rows, bs, n_cols, bs).transpose(0, 2, 1, 3)
+
+    # 3. Compute per-block std (excluding edge pixels, with fallback)
+    block_stds = np.zeros((n_rows, n_cols))
+    for i in range(n_rows):
+        for j in range(n_cols):
+            block_residual = residual_blocks[i, j]
+            block_edge_mask = edge_blocks[i, j]
+
+            # Use non-edge pixels; fallback to all if none remain
+            masked_pixels = block_residual[block_edge_mask]
+            if len(masked_pixels) > 0:
+                block_stds[i, j] = np.std(masked_pixels)
+            else:
+                block_stds[i, j] = np.std(block_residual)
+
+    # 4. Build z-map within frame
+    mean_std = np.mean(block_stds)
+    std_std = np.std(block_stds) + 1e-6
+    z_map = (block_stds - mean_std) / std_std
+
+    # 5. Frame score = mean of top-k blocks
+    k = max(1, int(np.ceil(n_rows * n_cols * NOISE_TOPK_PERCENT / 100.0)))
+    top_k_values = np.sort(z_map.ravel())[-k:]
+    score = float(np.mean(top_k_values))
+
+    # 6. Generate z-map overlay
+    # Upsample z-map to image size (nearest neighbor)
+    z_map_upsampled = np.kron(z_map, np.ones((bs, bs)))
+
+    # Crop to original trimmed size (in case of rounding)
+    z_map_upsampled = z_map_upsampled[:n_rows * bs, :n_cols * bs]
+
+    # Apply percentile stretch and convert to uint8
+    z_map_u8 = stretch_to_uint8(z_map_upsampled, NOISE_ZMAP_PCTL_LOW, NOISE_ZMAP_PCTL_HIGH)
+    overlay_img = Image.fromarray(z_map_u8, mode='L')
 
     # Downscale for efficient transport
-    residual_img = downscale_overlay(residual_img, NOISE_MAX_WIDTH)
+    overlay_img = downscale_overlay(overlay_img, NOISE_MAX_WIDTH)
 
-    # Anomaly score = standard deviation of residual
-    score = np.std(residual)
-    return score, residual_img
+    return score, overlay_img
 
 
 def encode_image_to_base64(image):
@@ -125,13 +195,29 @@ def run_noise_analysis(input_path, top_percent=10):
     std_score = np.std(scores_only) + 1e-6
 
     # Compute z-scores (no zero-clipping - negatives are meaningful)
-    normalized = [(f, (s - mean_score) / std_score, img)
-                  for f, s, img in results]
+    normalized = [(f, (s - mean_score) / std_score, img, idx)
+                  for idx, (f, s, img) in enumerate(results)]
     sorted_results = sorted(normalized, key=lambda x: x[1], reverse=True)
 
     # Cap at 32 frames to limit JSON payload size
     top_count = min(max(1, int(len(sorted_results) * top_percent / 100)), 32)
-    top_frames = sorted_results[:top_count]
+
+    # Temporal NMS: select frames with temporal diversity
+    selected_frames = []
+    selected_indices = []
+
+    for fname, z_score, img, idx in sorted_results:
+        # Check if this frame is too close to any already selected
+        too_close = any(abs(idx - sel_idx) <= NOISE_TEMP_NMS_WINDOW for sel_idx in selected_indices)
+
+        if not too_close:
+            selected_frames.append((fname, z_score, img))
+            selected_indices.append(idx)
+
+        if len(selected_frames) >= top_count:
+            break
+
+    top_frames = selected_frames
 
     # Return top frames JSON
     return {
