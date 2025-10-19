@@ -1,0 +1,65 @@
+name: Integration CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'tests/**'
+      - '.github/workflows/integration.yaml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'tests/**'
+      - '.github/workflows/integration.yaml'
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 ffmpeg
+
+    - name: Install backend dependencies
+      working-directory: backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      working-directory: frontend
+      run: npm ci
+
+    - name: Run backend API↔DB integration tests
+      working-directory: backend
+      run: |
+        python -m pytest tests/integration -v
+
+    - name: Run FE↔API integration tests
+      working-directory: frontend
+      env:
+        DATABASE_URL: sqlite:///instance/fe_integration_ci.db
+      run: |
+        npm run test:integration
