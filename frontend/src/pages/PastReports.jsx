@@ -8,6 +8,8 @@ export default function PastReports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -58,6 +60,26 @@ export default function PastReports() {
     }
   };
 
+  const handleDeleteAnalysis = async (analysisId) => {
+    setDeleting(analysisId);
+    try {
+      const response = await fetch(`/api/analyses/${analysisId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to delete analysis");
+
+      // Remove from local state
+      setReports(reports.filter((r) => r.analysis_id !== analysisId));
+      setDeleteConfirm(null);
+    } catch (err) {
+      setError(err.message || "Failed to delete analysis");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const formatDate = (isoString) => {
     if (!isoString) return "N/A";
     const date = new Date(isoString);
@@ -73,7 +95,7 @@ export default function PastReports() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="text-gray-600">Loading reports...</div>
         </div>
       </div>
@@ -82,7 +104,7 @@ export default function PastReports() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -121,23 +143,23 @@ export default function PastReports() {
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                     Video Filename
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                     Analysis Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                     Completed
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
                     Results
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[240px]">
                     Actions
                   </th>
                 </tr>
@@ -173,7 +195,7 @@ export default function PastReports() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
                       <button
                         onClick={() =>
                           downloadPDF(
@@ -183,17 +205,58 @@ export default function PastReports() {
                           )
                         }
                         disabled={downloading === report.analysis_id}
-                        className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs"
+                        className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs mr-2"
                       >
                         {downloading === report.analysis_id
                           ? "Downloading..."
                           : "Download PDF"}
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm(report.analysis_id)}
+                        disabled={deleting === report.analysis_id}
+                        className="px-3 py-1.5 rounded-lg border border-red-600 text-red-600 font-medium hover:bg-red-50 active:bg-red-100 transition disabled:opacity-50 text-xs"
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Delete Confirmation Popup */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+              <h2 className="text-xl font-bold text-red-600 mb-4">
+                Delete Analysis?
+              </h2>
+              <p className="text-gray-700 mb-6">
+                This will permanently delete this analysis record and all
+                associated files. This action cannot be undone.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleDeleteAnalysis(deleteConfirm)}
+                  disabled={deleting === deleteConfirm}
+                  className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50 transition"
+                >
+                  {deleting === deleteConfirm
+                    ? "Deleting..."
+                    : "Delete Permanently"}
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  disabled={deleting === deleteConfirm}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-50 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

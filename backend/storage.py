@@ -11,11 +11,13 @@ import os
 import shutil
 import subprocess
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
 import cv2
 
+logger = logging.getLogger(__name__)
 
 # Data root for all analysis artifacts
 DATA_ROOT = Path(os.getenv("DATA_DIR", "/data")) / "analyses"
@@ -181,3 +183,38 @@ def _probe_with_opencv(path: Path) -> dict:
         }
     finally:
         cap.release()
+
+
+def delete_analysis_files(analysis_id: str) -> bool:
+    """
+    Delete video files from disk while preserving database record.
+
+    This is called when user finishes analyzing - we keep the
+    analysis results in the database but free up disk space.
+
+    Deletes:
+    - /data/analyses/{analysis_id}/video.* (uploaded video)
+    - /data/analyses/{analysis_id}/ (entire directory)
+
+    Note: Frames are auto-cleaned via tempfile.TemporaryDirectory
+    in traditional_integration.py, so no separate frame cleanup needed.
+
+    Args:
+        analysis_id: UUID of the analysis
+
+    Returns:
+        bool: True if deleted successfully, False if directory didn't exist
+    """
+    analysis_dir = DATA_ROOT / analysis_id
+
+    if not analysis_dir.exists():
+        logger.warning(f"Analysis directory not found: {analysis_dir}")
+        return False
+
+    try:
+        shutil.rmtree(analysis_dir)
+        logger.info(f"Deleted analysis files: {analysis_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete analysis files for {analysis_id}: {e}")
+        return False
