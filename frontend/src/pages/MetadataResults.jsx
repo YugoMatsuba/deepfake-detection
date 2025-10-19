@@ -30,7 +30,7 @@ export function MetadataAnomaliesSummary({ metadata }) {
   return (
     <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
       <p className="text-yellow-800 font-semibold mb-2">
-        ⚠ {totalAnomalies} metadata anomaly(ies) detected
+        ⚠ {totalAnomalies} metadata {totalAnomalies === 1 ? 'anomaly' : 'anomalies'} detected
       </p>
 
       {/* Missing Fields */}
