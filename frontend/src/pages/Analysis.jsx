@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAnalysis } from "../app/AnalysisProvider";
 import { startAnalysis } from "../api/videos";
+import {
+  MetadataAnomaliesSummary,
+  IntegrityStatus,
+  FrameHashesSummary
+} from "./MetadataResults";
 
 const baseButton = "justify-center items-center mt-[15px] text-[17px] font-semibold px-10 py-3.5 rounded-lg shadow";
 
@@ -77,7 +82,7 @@ export default function Analysis() {
       const mlScores = Object.values(mlResults).map(r => r.score).filter(s => s != null);
       const avgScore = mlScores.length > 0
         ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
-        : 0;
+        : null;
 
       setFakeVideoPercentage(avgScore);
       setAnalysisResult(response);
@@ -122,29 +127,45 @@ export default function Analysis() {
   return (
     <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[100px]">
       <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
-        Initial Analysis: Synthetic Media Chance = {fakeVideoPercentage}%
+        Initial Analysis: Synthetic Media Chance = {fakeVideoPercentage !== null ? `${fakeVideoPercentage}%` : 'N/A'}
       </h1>
       {ela !== null && (
-        <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+        <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
           ELA Analysis Score = {ela}
-        </h1>
+        </h2>
       )}
 
       {noise !== null && (
-        <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+        <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
           Noise Analysis Confidence = {noise}
-        </h1>
+        </h2>
       )}
 
       {lbp !== null && (
-        <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
+        <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
           LBP Analysis Score = {lbp}
-        </h1>
+        </h2>
       )}
-      <h2 className="mt-[40px] text-4xl leading-none tracking-normal text-black">
-        Metadata anomalies: None found
-      </h2>
-      <h3 className="mt-[100px] text-4xl">
+
+      {/* Metadata Forensics Results */}
+      {analysisResult?.metadata && (
+        <div className="mt-[40px] w-full max-w-4xl px-4">
+          <h2 className="text-2xl font-bold text-gray-600 mb-4 text-center">
+            Metadata Forensics
+          </h2>
+
+          {/* Anomalies Summary */}
+          <MetadataAnomaliesSummary metadata={analysisResult.metadata} />
+
+          {/* Integrity Status */}
+          <IntegrityStatus metadata={analysisResult.metadata} />
+
+          {/* Frame Hashes Summary */}
+          <FrameHashesSummary metadata={analysisResult.metadata} />
+        </div>
+      )}
+
+      <h3 className="mt-[60px] text-4xl">
         Proceed to frame analysis?
       </h3>
 

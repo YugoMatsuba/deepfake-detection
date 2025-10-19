@@ -308,6 +308,82 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         story.append(trad_table)
         story.append(Spacer(1, 0.3 * inch))
 
+    # Metadata Forensics Results
+    metadata_result = result_json.get("metadata", {})
+    if metadata_result and not metadata_result.get("error"):
+        story.append(Paragraph("Metadata Forensics Analysis", heading_style))
+
+        metadata_data = [["Category", "Status / Findings"]]
+
+        # Anomalies
+        anomalies = metadata_result.get("metadata", {}).get("anomalies", {})
+        total_anomalies = (
+            len(anomalies.get("missing_fields", [])) +
+            len(anomalies.get("timestamp_issues", [])) +
+            len(anomalies.get("software_anomalies", [])) +
+            len(anomalies.get("gps_inconsistencies", []))
+        )
+
+        if total_anomalies == 0:
+            metadata_data.append(["Metadata Anomalies", "✓ None detected"])
+        else:
+            metadata_data.append(["Metadata Anomalies", f"⚠ {total_anomalies} detected"])
+
+            # List specific anomalies (first 5)
+            all_anomalies = []
+            for issue in anomalies.get("missing_fields", []):
+                all_anomalies.append(issue.get("note", "Unknown issue"))
+            for issue in anomalies.get("timestamp_issues", []):
+                all_anomalies.append(issue.get("note", "Unknown issue"))
+            for issue in anomalies.get("software_anomalies", []):
+                all_anomalies.append(issue.get("note", "Unknown issue"))
+            for issue in anomalies.get("gps_inconsistencies", []):
+                all_anomalies.append(issue.get("note", "Unknown issue"))
+
+            for idx, anomaly in enumerate(all_anomalies[:5]):
+                metadata_data.append(["", f"• {anomaly}"])
+
+            if len(all_anomalies) > 5:
+                metadata_data.append(["", f"... and {len(all_anomalies) - 5} more"])
+
+        # Container Integrity
+        integrity = metadata_result.get("integrity", {})
+        integrity_status = integrity.get("integrity_status", "UNKNOWN")
+
+        if integrity_status == "PASSED":
+            metadata_data.append(["Container Integrity", "✓ PASSED"])
+        elif integrity_status == "FAILED":
+            error_count = len(integrity.get("errors", []))
+            metadata_data.append(["Container Integrity", f"✗ FAILED ({error_count} errors)"])
+        else:
+            metadata_data.append(["Container Integrity", "? UNKNOWN"])
+
+        # Duplicate Frames
+        frame_hashes = metadata_result.get("frame_hashes", {})
+        duplicates = frame_hashes.get("duplicates", [])
+        total_frames = frame_hashes.get("count", 0)
+
+        if len(duplicates) == 0:
+            metadata_data.append(["Duplicate Frames", f"✓ None ({total_frames} unique)"])
+        else:
+            metadata_data.append(["Duplicate Frames", f"⚠ {len(duplicates)} patterns detected"])
+
+        metadata_table = Table(metadata_data, colWidths=[2.5 * inch, 4 * inch])
+        metadata_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),  # Orange header
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fef3c7')]),
+        ]))
+        story.append(metadata_table)
+        story.append(Spacer(1, 0.3 * inch))
+
     # Transparency & Provenance
     ml_provenance = meta_json.get("ml_provenance", {})
     if ml_provenance:
