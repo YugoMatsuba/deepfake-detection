@@ -33,6 +33,7 @@ const FrameViewer = ({
   const [durationFrames, setDurationFrames] = useState(0);
   const [analysisResult, setAnalysisResult] = useState(null);
   const[isAnalysing, setIsAnalysing] = useState(false);
+  const [currentAnalysisType, setCurrentAnalysisType] = useState(null);
   const [overlayResult, setOverlayResult] = useState(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null); 
   const [analysisPopupOpen, setAnalysisPopupOpen] = useState(false);
@@ -425,6 +426,7 @@ useEffect(() => {
     const targetFrame = Number.isFinite(currentFrame) ? currentFrame : 0;
 
     setIsAnalysing(true);
+    setCurrentAnalysisType(analysisType);
     setAnalysisResult(null);
 
     try {
@@ -510,6 +512,7 @@ useEffect(() => {
         });
 
         setIsAnalysing(false);
+        setCurrentAnalysisType(null);
         return;
       }
 
@@ -592,6 +595,7 @@ useEffect(() => {
       alert(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
     } finally {
       setIsAnalysing(false);
+      setCurrentAnalysisType(null);
     }
   };
 
@@ -947,7 +951,13 @@ const handleFinishAnalysis = async () => {
             if (frameRate && videoRef.current) {
               videoRef.current.currentTime = frameNum / frameRate;
               setCurrentFrame(frameNum);
-              setOverlayResult(null);
+              // Show overlay for traditional forensics (ML has no overlay)
+              const overlayData = frame.overlay || null;
+              setOverlayResult(
+                overlayData
+                  ? { analysis_type: type, overlay: overlayData }
+                  : null
+              );
             }
           }}
         />
@@ -1069,7 +1079,7 @@ const handleFinishAnalysis = async () => {
           disabled={isAnalysing}
           onClick={() => analyzeFrame(method)}
         >
-          {isAnalysing ? `Analyzing...` : `${method.toUpperCase()}`}
+          {isAnalysing && currentAnalysisType === method ? `Analyzing...` : `${method.toUpperCase()}`}
         </Button>
       ))}
     </CardContent>
@@ -1132,9 +1142,9 @@ const handleFinishAnalysis = async () => {
   const value = details.methods[type];
   if (typeof value !== "number") return <p key={type} className="text-sm text-gray-500">No score available for {type.toUpperCase()}.</p>;
 
-  const isPercentage = type === "noise";
-  const displayValue = isPercentage ? `${Math.round(value * 100)}%` : value.toFixed(2);
-  const barWidth = isPercentage ? Math.min(100, Math.max(0, Math.round(value * 100))) : Math.min(100, Math.max(0, value * 100));
+  // All methods now display z-scores (not percentages)
+  const displayValue = `z: ${value.toFixed(2)}`;
+  const barWidth = Math.min(100, Math.max(0, ((value + 3) / 6) * 100)); // Map z-score [-3, 3] to [0, 100]
 
   return (
     <div key={type} className="mb-3">

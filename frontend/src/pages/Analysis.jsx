@@ -131,19 +131,19 @@ export default function Analysis() {
       </h1>
       {ela !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          ELA Analysis Score = {ela}
+          ELA Z-score = {ela}
         </h2>
       )}
 
       {noise !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          Noise Analysis Confidence = {noise}
+          Noise Z-score = {noise}
         </h2>
       )}
 
       {lbp !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          LBP Analysis Score = {lbp}
+          LBP Z-score = {lbp}
         </h2>
       )}
 
