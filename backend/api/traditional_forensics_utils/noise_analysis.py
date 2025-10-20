@@ -3,7 +3,7 @@ import base64
 from io import BytesIO
 from PIL import Image
 import numpy as np
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, zoom
 import cv2
 
 # Configuration constants (Pass 1)
@@ -13,7 +13,8 @@ NOISE_MAX_WIDTH = 960
 NOISE_PNG_LEVEL = 9
 
 # Configuration constants (Pass 2 - blockwise scoring)
-NOISE_BLOCK_SIZE = 32
+NOISE_BLOCK_SIZE = 8  # Window size for variance computation
+NOISE_BLOCK_STRIDE = 2  # Stride for sliding window (2 = 75% overlap, reduces blockiness)
 NOISE_TOPK_PERCENT = 10
 NOISE_EDGE_MASK_PERCENTILE = 70
 NOISE_TEMP_NMS_WINDOW = 3
@@ -89,33 +90,31 @@ def compute_noise(frame_path):
     edge_threshold = np.percentile(edge_mag, NOISE_EDGE_MASK_PERCENTILE)
     edge_mask = edge_mag < edge_threshold  # True = not an edge (include in stats)
 
-    # 2. Tile into blocks
+    # 2. Sliding window with stride (for dense sampling, reduces blockiness)
     h, w = residual.shape
     bs = NOISE_BLOCK_SIZE
-    n_rows = h // bs
-    n_cols = w // bs
+    stride = NOISE_BLOCK_STRIDE
 
-    # Trim to fit exact blocks
-    residual_trimmed = residual[:n_rows * bs, :n_cols * bs]
-    edge_mask_trimmed = edge_mask[:n_rows * bs, :n_cols * bs]
+    # Calculate grid dimensions based on stride
+    n_rows = (h - bs) // stride + 1
+    n_cols = (w - bs) // stride + 1
 
-    # Reshape into blocks: (n_rows, n_cols, bs, bs)
-    residual_blocks = residual_trimmed.reshape(n_rows, bs, n_cols, bs).transpose(0, 2, 1, 3)
-    edge_blocks = edge_mask_trimmed.reshape(n_rows, bs, n_cols, bs).transpose(0, 2, 1, 3)
-
-    # 3. Compute per-block std (excluding edge pixels, with fallback)
+    # 3. Compute per-window std using sliding window (excluding edge pixels, with fallback)
     block_stds = np.zeros((n_rows, n_cols))
     for i in range(n_rows):
         for j in range(n_cols):
-            block_residual = residual_blocks[i, j]
-            block_edge_mask = edge_blocks[i, j]
+            # Extract window at strided position
+            row_start = i * stride
+            col_start = j * stride
+            window_residual = residual[row_start:row_start + bs, col_start:col_start + bs]
+            window_edge_mask = edge_mask[row_start:row_start + bs, col_start:col_start + bs]
 
             # Use non-edge pixels; fallback to all if none remain
-            masked_pixels = block_residual[block_edge_mask]
+            masked_pixels = window_residual[window_edge_mask]
             if len(masked_pixels) > 0:
                 block_stds[i, j] = np.std(masked_pixels)
             else:
-                block_stds[i, j] = np.std(block_residual)
+                block_stds[i, j] = np.std(window_residual)
 
     # 4. Build z-map within frame
     mean_std = np.mean(block_stds)
@@ -128,14 +127,30 @@ def compute_noise(frame_path):
     score = float(np.mean(top_k_values))
 
     # 6. Generate z-map overlay
-    # Upsample z-map to image size (nearest neighbor)
-    z_map_upsampled = np.kron(z_map, np.ones((bs, bs)))
+    # Upsample z-map to approximate original image size using bilinear interpolation
+    # Calculate scale factor based on stride
+    scale_factor = stride
+    z_map_upsampled = zoom(z_map, scale_factor, order=1)  # order=1 = bilinear
 
-    # Crop to original trimmed size (in case of rounding)
-    z_map_upsampled = z_map_upsampled[:n_rows * bs, :n_cols * bs]
+    # Crop/pad to match original image dimensions
+    target_h, target_w = h, w
+    current_h, current_w = z_map_upsampled.shape
+
+    # Crop if larger
+    z_map_upsampled = z_map_upsampled[:min(current_h, target_h), :min(current_w, target_w)]
+
+    # Pad if smaller (shouldn't happen with stride=2, but safety check)
+    if z_map_upsampled.shape[0] < target_h or z_map_upsampled.shape[1] < target_w:
+        padded = np.zeros((target_h, target_w))
+        padded[:z_map_upsampled.shape[0], :z_map_upsampled.shape[1]] = z_map_upsampled
+        z_map_upsampled = padded
 
     # Apply percentile stretch and convert to uint8
     z_map_u8 = stretch_to_uint8(z_map_upsampled, NOISE_ZMAP_PCTL_LOW, NOISE_ZMAP_PCTL_HIGH)
+
+    # Light blur to reduce visual noise and smooth heatmap
+    z_map_u8 = cv2.GaussianBlur(z_map_u8, (3, 3), 1.0)
+
     overlay_img = Image.fromarray(z_map_u8, mode='L')
 
     # Downscale for efficient transport
