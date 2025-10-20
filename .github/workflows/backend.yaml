@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9"]
+        python-version: ["3.11"]
 
     steps:
     - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'backend/requirements-test.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements-ci.txt', 'backend/requirements-test.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -44,8 +44,8 @@ jobs:
       working-directory: backend
       run: |
         python -m pip install --upgrade pip
-        # Install main dependencies from root requirements.txt (consolidated)
-        pip install -r ../requirements.txt
+        # Install CI dependencies (backend API only, no ML libraries)
+        pip install -r requirements-ci.txt
         # Then install test dependencies
         pip install -r requirements-test.txt
 
@@ -71,7 +71,7 @@ jobs:
         python -m pytest tests/ --cov=api --cov-report=xml --cov-report=html
 
     - name: Upload coverage to Codecov (optional)
-      if: matrix.python-version == '3.9'
+      if: matrix.python-version == '3.11'
       uses: codecov/codecov-action@v3
       with:
         file: ./backend/coverage.xml
@@ -87,7 +87,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.9"
+        python-version: "3.11"
 
     - name: Install security tools
       run: |
