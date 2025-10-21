@@ -10,11 +10,11 @@ import cv2
 NOISE_PCTL_LOW = 1
 NOISE_PCTL_HIGH = 99
 NOISE_MAX_WIDTH = 960
-NOISE_PNG_LEVEL = 9
+NOISE_PNG_LEVEL = 3  # Fast compression (3 = good balance, 9 = max but very slow)
 
 # Configuration constants (Pass 2 - blockwise scoring)
 NOISE_BLOCK_SIZE = 8  # Window size for variance computation
-NOISE_BLOCK_STRIDE = 2  # Stride for sliding window (2 = 75% overlap, reduces blockiness)
+NOISE_BLOCK_STRIDE = 4  # Stride for sliding window (4 = 50% overlap, 2 = 75% overlap)
 NOISE_TOPK_PERCENT = 10
 NOISE_EDGE_MASK_PERCENTILE = 70
 NOISE_TEMP_NMS_WINDOW = 3
