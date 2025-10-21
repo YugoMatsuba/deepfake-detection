@@ -253,7 +253,7 @@ useEffect(() => {
 
     // Add traditional forensics frames
     ["ela", "noise", "lbp"].forEach(t => {
-      const tFrames = (traditionalResults?.[t]?.frames || [])
+      const tFrames = (traditionalData?.[t]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -263,7 +263,7 @@ useEffect(() => {
     if (type === "ml") {
       frames = mlFrames;
     } else {
-      frames = (traditionalResults?.[type]?.frames || [])
+      frames = (traditionalData?.[type]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -293,7 +293,7 @@ const jumpToPreviousMarker = (type) => {
 
     // Add traditional forensics frames
     ["ela", "noise", "lbp"].forEach(t => {
-      const tFrames = (traditionalResults?.[t]?.frames || [])
+      const tFrames = (traditionalData?.[t]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -303,7 +303,7 @@ const jumpToPreviousMarker = (type) => {
     if (type === "ml") {
       frames = mlFrames;
     } else {
-      frames = (traditionalResults?.[type]?.frames || [])
+      frames = (traditionalData?.[type]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -1107,55 +1107,54 @@ const handleFinishAnalysis = async () => {
         </Button>
       </div>
 
-      {/* ML Detection */}
-{selectedMarkerType === "ml" && detailsFrame != null && (
-  <section>
-    <h4 className="text-sm font-medium text-gray-700 mb-2">ML Detection Score</h4>
-    {(() => {
-      const flaggedFrames = Object.entries(mlData || {}).map(([modelName, modelData]) => {
-        const frame = modelData.frames?.find(f => f.index === detailsFrame);
-        if (!frame || typeof frame.score !== "number") return null;
-        return {
-          model: modelName,
-          index: frame.index,
-          score: frame.score,
-          time: frame.time
-        };
-      }).filter(Boolean);
+      {/* ML Detection - Always show if data exists */}
+{(() => {
+  const flaggedFrames = Object.entries(mlData || {}).map(([modelName, modelData]) => {
+    const frame = modelData.frames?.find(f => f.index === detailsFrame);
+    if (!frame || typeof frame.score !== "number") return null;
+    return {
+      model: modelName,
+      index: frame.index,
+      score: frame.score,
+      time: frame.time
+    };
+  }).filter(Boolean);
 
-      if (flaggedFrames.length === 0) {
-        return <p className="text-sm text-gray-500">No ML score available for this frame.</p>;
-      }
+  if (flaggedFrames.length === 0) return null;  // Hide section if no data
 
-      return flaggedFrames.map(f => (
-        <div key={`${f.model}-${f.index}`} className="flex items-center justify-between text-sm">
+  return (
+    <section>
+      <h4 className="text-sm font-medium text-gray-700 mb-2">ML Detection Score</h4>
+      {flaggedFrames.map(f => (
+        <div key={`${f.model}-${f.index}`} className="flex items-center justify-between text-sm mb-1">
           <span>{f.model.toUpperCase()} — {f.time.toFixed(2)}s</span>
           <span className="font-bold text-blue-600">{Math.round(f.score * 100)}%</span>
         </div>
-      ));
-    })()}
-  </section>
-)}
+      ))}
+    </section>
+  );
+})()}
 
-{/* Forensic Methods */}
-{(["ela", "noise", "lbp"].filter(t => showAllMarkers || t === selectedMarkerType)).map((type) => {
+{/* Traditional Forensics - Always show all available methods */}
+{["ela", "noise", "lbp"].map((type) => {
   const value = details.methods[type];
-  if (typeof value !== "number") return <p key={type} className="text-sm text-gray-500">No score available for {type.toUpperCase()}.</p>;
+  if (typeof value !== "number") return null;  // Skip if no data for this method
 
   // All methods now display z-scores (not percentages)
   const displayValue = `z: ${value.toFixed(2)}`;
   const barWidth = Math.min(100, Math.max(0, ((value + 3) / 6) * 100)); // Map z-score [-3, 3] to [0, 100]
 
   return (
-    <div key={type} className="mb-3">
-      <div className="flex items-center justify-between text-sm">
-        <span>{type.toUpperCase()} Analysis</span>
-        <span className="text-gray-600">{displayValue}</span>
+    <section key={type} className="mt-4">
+      <h4 className="text-sm font-medium text-gray-700 mb-2">{type.toUpperCase()} Analysis</h4>
+      <div className="flex items-center justify-between text-sm mb-1">
+        <span>Z-score</span>
+        <span className="text-gray-600 font-semibold">{displayValue}</span>
       </div>
       <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
         <div className="h-full bg-gray-700" style={{ width: `${barWidth}%` }} />
       </div>
-    </div>
+    </section>
   );
 })}
 
