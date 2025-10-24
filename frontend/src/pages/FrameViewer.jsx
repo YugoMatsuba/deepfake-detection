@@ -538,51 +538,35 @@ useEffect(() => {
         throw new Error("Backend returned no data for the requested analysis.");
       }
 
-      const normalizedFrames = (methodResult.frames || []).map((frame) => ({
-        ...frame,
-        frame_number:
-          typeof frame?.frame_number === "number"
-            ? frame.frame_number
-            : result.frame_number,
-      }));
-
-      const existingMethod = traditionalData?.[analysisType] || {};
-      const mergedFrames = mergeFrames(existingMethod.frames || [], normalizedFrames);
-
-      const updatedMethod = {
-        ...existingMethod,
-        ...methodResult,
-        frames: mergedFrames,
-      };
-
+      // Backend now returns FULL updated method data (all frames with recalculated z-scores)
+      // No need to merge - just replace the entire method data
       const updatedTraditional = {
         ...traditionalData,
-        [analysisType]: updatedMethod,
+        [analysisType]: methodResult,
       };
 
       setTraditionalData(updatedTraditional);
       onTraditionalResultsUpdate(updatedTraditional);
 
-      const primaryFrame =
-        mergedFrames.find((frame) => frame.frame_number === result.frame_number) ||
-        mergedFrames[mergedFrames.length - 1] ||
-        null;
+      // Find the frame we just analyzed
+      const analyzedFrame = methodResult.frames?.find(
+        (frame) => frame.frame_number === result.frame_number
+      );
 
       // Use overlay_url from disk persistence
-      const overlayData = primaryFrame?.overlay_url ?? null;
+      const overlayData = analyzedFrame?.overlay_url ?? null;
       const primaryScore =
+        analyzedFrame?.score ??
+        analyzedFrame?.confidence ??
         methodResult.score ??
         methodResult.confidence ??
-        primaryFrame?.score ??
-        primaryFrame?.confidence ??
         null;
 
       setAnalysisResult({
         analysis_type: analysisType,
         frame_number: result.frame_number,
         score: primaryScore,
-        confidence:
-          methodResult.confidence ?? primaryFrame?.confidence ?? null,
+        confidence: analyzedFrame?.confidence ?? methodResult.confidence ?? null,
         overlay: overlayData,
       });
 

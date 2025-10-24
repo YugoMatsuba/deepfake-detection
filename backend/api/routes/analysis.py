@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import cv2
+import numpy as np
 from flask import Blueprint, jsonify, request, session
 from sqlalchemy import update
 from werkzeug.exceptions import HTTPException
@@ -409,6 +410,105 @@ def get_analysis(analysis_id: str):
         return jsonify(response), 200
 
 
+def _merge_and_recompute_traditional(
+    method_name: str,
+    new_frame_result: dict,
+    existing_data: dict,
+    frame_number: int,
+    analysis_id: str
+) -> dict:
+    """
+    Merge new frame analysis with existing data and recompute z-scores across ALL frames.
+
+    This ensures z-scores are computed with full statistical context, not just single-frame isolation.
+
+    Args:
+        method_name: "ela", "noise", or "lbp"
+        new_frame_result: Single-frame result from run_ela/run_noise_analysis/run_lbp_analysis
+                         e.g. {"mode": "single_frame", "frame": "...", "confidence": 2.8}
+        existing_data: Current data from DB (analysis.result_json["traditional"][method])
+                      e.g. {"score": 1.5, "frames": [{...}, {...}]}
+        frame_number: The frame number being analyzed
+        analysis_id: Analysis UUID for overlay URL generation
+
+    Returns:
+        Updated method data with recalculated z-scores for ALL frames (initial + ad-hoc)
+
+    Algorithm:
+        1. Extract raw score from new frame result
+        2. Merge new frame into existing frames list (replace if exists)
+        3. Collect all raw scores from all frames
+        4. Recompute z-scores: z = (raw - mean) / std for EVERY frame
+        5. Update overall score (mean of top N z-scores)
+    """
+    # 1. Extract raw score from new frame
+    if method_name == "noise":
+        raw_score = new_frame_result.get("confidence")
+    else:
+        raw_score = new_frame_result.get("score")
+
+    if raw_score is None:
+        raise ValueError(f"No score found in new frame result for {method_name}")
+
+    # 2. Build list of ALL frames (existing + new)
+    existing_frames = list(existing_data.get("frames", []))
+
+    # Check if frame already exists (replace if so)
+    frame_index = None
+    for idx, frame in enumerate(existing_frames):
+        if frame.get("frame_number") == frame_number:
+            frame_index = idx
+            break
+
+    # Create new frame entry
+    new_frame_entry = {
+        "frame_number": frame_number,
+        "raw_score": float(raw_score),
+        "overlay_url": f"/api/analyses/{analysis_id}/forensics/{method_name}/frames/{frame_number}/overlay"
+    }
+
+    if frame_index is not None:
+        # Replace existing frame
+        existing_frames[frame_index] = new_frame_entry
+    else:
+        # Add new frame
+        existing_frames.append(new_frame_entry)
+
+    # 3. Collect all raw scores
+    all_raw_scores = [frame["raw_score"] for frame in existing_frames]
+
+    # 4. Recompute z-scores across ALL frames
+    mean_score = float(np.mean(all_raw_scores))
+    std_score = float(np.std(all_raw_scores)) + 1e-6  # Avoid division by zero
+
+    for frame in existing_frames:
+        raw = frame["raw_score"]
+        z_score = (raw - mean_score) / std_score
+        frame["score"] = float(z_score)
+
+        # Noise also uses "confidence" field
+        if method_name == "noise":
+            frame["confidence"] = float(z_score)
+
+    # 5. Compute overall score (mean of top N frames, or all if < 10)
+    z_scores = [f["score"] for f in existing_frames]
+    z_scores_sorted = sorted(z_scores, reverse=True)
+    top_n = min(10, len(z_scores_sorted))
+    overall_score = float(np.mean(z_scores_sorted[:top_n]))
+
+    # 6. Return updated structure
+    result = {
+        "score": overall_score,
+        "frames": existing_frames
+    }
+
+    # Noise also has "confidence" at top level
+    if method_name == "noise":
+        result["confidence"] = overall_score
+
+    return result
+
+
 @analysis_bp.post("/analyses/<analysis_id>/frames/<int:frame_number>/forensics")
 @require_user
 def analyze_frame(analysis_id: str, frame_number: int):
@@ -475,6 +575,11 @@ def analyze_frame(analysis_id: str, frame_number: int):
                     output_path=frame_path
                 )
 
+                # Fetch current result_json from DB
+                current_json = analysis.result_json or {}
+                if "traditional" not in current_json:
+                    current_json["traditional"] = {}
+
                 # Run each requested forensics method on the single frame
                 results = {}
 
@@ -484,6 +589,7 @@ def analyze_frame(analysis_id: str, frame_number: int):
                         method_dir = DATA_ROOT / analysis.id / "forensics" / method
                         method_dir.mkdir(parents=True, exist_ok=True)
 
+                        # Run analysis and get raw single-frame result
                         if method == "ela":
                             raw_result = run_ela(
                                 frame_path,
@@ -491,7 +597,6 @@ def analyze_frame(analysis_id: str, frame_number: int):
                                 output_dir=str(method_dir),
                                 analysis_id=analysis.id
                             )
-                            transformed = transform_ela_result(raw_result, analysis.id)
 
                         elif method == "noise":
                             raw_result = run_noise_analysis(
@@ -500,7 +605,6 @@ def analyze_frame(analysis_id: str, frame_number: int):
                                 output_dir=str(method_dir),
                                 analysis_id=analysis.id
                             )
-                            transformed = transform_noise_result(raw_result, analysis.id)
 
                         elif method == "lbp":
                             raw_result = run_lbp_analysis(
@@ -509,24 +613,35 @@ def analyze_frame(analysis_id: str, frame_number: int):
                                 output_dir=str(method_dir),
                                 analysis_id=analysis.id
                             )
-                            transformed = transform_lbp_result(raw_result, analysis.id)
 
                         else:
                             continue
 
-                        # Annotate each frame entry with the requested frame number
-                        frames = transformed.get("frames", [])
-                        for entry in frames:
-                            entry.setdefault("frame_number", frame_number)
-                        transformed["frames"] = frames
+                        # Merge with existing data and recompute z-scores
+                        existing_method_data = current_json["traditional"].get(method, {})
+                        updated_method_data = _merge_and_recompute_traditional(
+                            method_name=method,
+                            new_frame_result=raw_result,
+                            existing_data=existing_method_data,
+                            frame_number=frame_number,
+                            analysis_id=analysis.id
+                        )
 
-                        results[method] = transformed
+                        # Update result_json with merged data
+                        current_json["traditional"][method] = updated_method_data
+
+                        # Return the FULL updated method data (not just single frame)
+                        results[method] = updated_method_data
 
                     except Exception as e:
                         results[method] = {
                             "score": None,
                             "error": f"Analysis failed: {str(e)}"
                         }
+
+                # Save updated result_json back to DB
+                analysis.result_json = current_json
+                db.commit()
 
                 response = {
                     "analysis_id": analysis.id,

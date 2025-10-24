@@ -193,8 +193,9 @@ def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=No
         _save_overlay(lbp_img, fname, output_dir)
         top_frames.append({
             "frame": fname,
-            "score": raw_score,
-            "normalized_score": norm_score
+            "raw_score": float(raw_score),  # Store raw score for z-score recalculation
+            "score": float(norm_score),     # Z-score (zero-clipped for LBP)
+            "normalized_score": float(norm_score)  # Keep for backward compatibility
         })
 
     return {

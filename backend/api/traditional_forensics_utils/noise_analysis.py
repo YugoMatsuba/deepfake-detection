@@ -263,9 +263,10 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
     std_score = np.std(scores_only) + 1e-6
 
     # Compute z-scores (no zero-clipping - negatives are meaningful)
-    normalized = [(f, (s - mean_score) / std_score, img, idx)
+    # Keep both raw scores and z-scores for persistence
+    normalized = [(f, s, (s - mean_score) / std_score, img, idx)
                   for idx, (f, s, img) in enumerate(results)]
-    sorted_results = sorted(normalized, key=lambda x: x[1], reverse=True)
+    sorted_results = sorted(normalized, key=lambda x: x[2], reverse=True)
 
     # Cap at 32 frames to limit JSON payload size
     top_count = min(max(1, int(len(sorted_results) * top_percent / 100)), 32)
@@ -274,12 +275,12 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
     selected_frames = []
     selected_indices = []
 
-    for fname, z_score, img, idx in sorted_results:
+    for fname, raw_score, z_score, img, idx in sorted_results:
         # Check if this frame is too close to any already selected
         too_close = any(abs(idx - sel_idx) <= NOISE_TEMP_NMS_WINDOW for sel_idx in selected_indices)
 
         if not too_close:
-            selected_frames.append((fname, z_score, img))
+            selected_frames.append((fname, raw_score, z_score, img))
             selected_indices.append(idx)
 
         if len(selected_frames) >= top_count:
@@ -289,12 +290,13 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
 
     # Save overlays and build response
     frame_list = []
-    for f, s, img in top_frames:
+    for f, raw_s, z_s, img in top_frames:
         # Save overlay to disk
         _save_overlay(img, f, output_dir)
         frame_list.append({
             "frame": f,
-            "score": float(s)
+            "raw_score": float(raw_s),  # NEW: Store raw score for z-score recalculation
+            "score": float(z_s)
         })
 
     # Return top frames JSON

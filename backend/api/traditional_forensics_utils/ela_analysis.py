@@ -181,27 +181,29 @@ def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
     print(f"[ELA Analysis] ✓ Completed processing {total_frames} frames")
 
     # Step 2: Normalize scores (z-scores, no zero-clipping - negatives are meaningful)
+    # Keep both raw scores and z-scores for persistence
     scores_only = [s for _, _, s, _ in results]
     mean_score = np.mean(scores_only)
     std_score = np.std(scores_only) + 1e-6
     normalized_results = [
-        (fname, fpath, (score - mean_score) / std_score, ela_img)
+        (fname, fpath, score, (score - mean_score) / std_score, ela_img)
         for fname, fpath, score, ela_img in results
     ]
 
     # Step 3: Sort and pick top frames
-    normalized_results.sort(key=lambda x: x[2], reverse=True)  # Sort by normalized score
+    normalized_results.sort(key=lambda x: x[3], reverse=True)  # Sort by z-score (index 3)
     top_count = min(max(1, int(len(normalized_results) * top_percent / 100)), 32)
     top_frames_data = normalized_results[:top_count]
 
     # Step 4: Save overlays for top frames and build response
     top_frames = []
-    for fname, fpath, norm_score, ela_img in top_frames_data:
+    for fname, fpath, raw_score, z_score, ela_img in top_frames_data:
         # Save overlay to disk
         _save_overlay(ela_img, fname, output_dir)
         top_frames.append({
             "frame": fname,
-            "score": float(norm_score)
+            "raw_score": float(raw_score),  # NEW: Store raw score for z-score recalculation
+            "score": float(z_score)
         })
 
     # Return JSON-ready dict

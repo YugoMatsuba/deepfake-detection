@@ -165,6 +165,7 @@ def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
             frame_number = _parse_frame_number(frame.get("frame"))
             frame_list.append({
                 "frame": frame.get("frame"),
+                "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # NEW: Preserve raw score
                 "score": frame.get("score", 0.0),
                 "frame_number": frame_number,
                 "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None
@@ -198,14 +199,18 @@ def transform_noise_result(raw_result: dict[str, Any], analysis_id: str) -> dict
         frame_list = []
         for frame in top_frames:
             frame_number = _parse_frame_number(frame.get("frame"))
+            z_score = frame.get("score", 0.0)
             frame_list.append({
                 "frame": frame.get("frame"),
-                "confidence": frame.get("score", 0.0),
+                "raw_score": frame.get("raw_score", z_score),  # NEW: Preserve raw score
+                "confidence": z_score,  # Z-score
+                "score": z_score,  # Also store as "score" for consistency
                 "frame_number": frame_number,
                 "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None
             })
         return {
             "confidence": frame_list[0]["confidence"],
+            "score": frame_list[0]["score"],
             "frames": frame_list
         }
 
@@ -235,6 +240,7 @@ def transform_lbp_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
             frame_number = _parse_frame_number(frame.get("frame"))
             frame_list.append({
                 "frame": frame.get("frame"),
+                "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # NEW: Preserve raw score
                 "score": frame.get("normalized_score", frame.get("score", 0.0)),
                 "frame_number": frame_number,
                 "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None
