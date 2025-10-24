@@ -3,12 +3,21 @@ import base64
 from io import BytesIO
 from PIL import Image, ImageChops, ImageEnhance
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Prevent thread oversubscription when multiprocessing
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 # Configuration constants
 ELA_PCTL_LOW = 5
 ELA_PCTL_HIGH = 95
 ELA_MAX_WIDTH = 960
 ELA_PNG_LEVEL = 9
+
+# Multiprocessing config (env-configurable)
+MAX_WORKERS = int(os.getenv("FORENSICS_WORKERS", os.cpu_count() or 4))
 
 
 def stretch_to_uint8(arr, low_pct, high_pct):
@@ -101,6 +110,20 @@ def compute_ela_base64(image_path, resave_quality=90):
     return score, ela_base64
 
 
+def _compute_ela_worker(path):
+    """
+    Worker function for multiprocessing.
+
+    Args:
+        path: Absolute path to frame image
+
+    Returns:
+        Tuple of (basename, path, score, ela_image) suitable for multiprocessing
+    """
+    score, ela_image = compute_ela_score(path)
+    return (os.path.basename(path), path, score, ela_image)
+
+
 def run_ela(input_path, top_percent=10):
     """
     Run ELA on a single image or folder.
@@ -137,10 +160,34 @@ def run_ela(input_path, top_percent=10):
 
     # Multi-frame case - optimize by only encoding top frames
     # Step 1: Compute scores for ALL frames (without base64 encoding)
-    results = []
-    for path in frame_paths:
-        score, ela_image = compute_ela_score(path)
-        results.append((os.path.basename(path), path, score, ela_image))
+    total_frames = len(frame_paths)
+    print(f"[ELA Analysis] Processing {total_frames} frames with {MAX_WORKERS} workers...")
+
+    # Use multiprocessing for multi-frame case
+    if len(frame_paths) > 1:
+        results = []
+        completed = 0
+        milestones = {total_frames // 4, total_frames // 2, (3 * total_frames) // 4}
+
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Submit all tasks
+            futures = {executor.submit(_compute_ela_worker, path): path
+                      for path in frame_paths}
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                results.append(future.result())
+                completed += 1
+
+                # Progress tracking
+                if completed % 10 == 0 or completed in milestones:
+                    progress_pct = (completed / total_frames) * 100
+                    print(f"[ELA Analysis] Progress: {completed}/{total_frames} frames ({progress_pct:.1f}%)")
+    else:
+        # Single frame: no multiprocessing overhead
+        results = [_compute_ela_worker(frame_paths[0])]
+
+    print(f"[ELA Analysis] ✓ Completed processing {total_frames} frames")
 
     # Step 2: Normalize scores (z-scores, no zero-clipping - negatives are meaningful)
     scores_only = [s for _, _, s, _ in results]

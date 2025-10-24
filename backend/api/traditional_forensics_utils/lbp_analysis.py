@@ -4,12 +4,21 @@ from io import BytesIO
 from PIL import Image
 import numpy as np
 from skimage.feature import local_binary_pattern
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Prevent thread oversubscription when multiprocessing
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 # Configuration constants
 LBP_PCTL_LOW = 1
 LBP_PCTL_HIGH = 99
 LBP_MAX_WIDTH = 960
 LBP_PNG_LEVEL = 9
+
+# Multiprocessing config (env-configurable)
+MAX_WORKERS = int(os.getenv("FORENSICS_WORKERS", os.cpu_count() or 4))
 
 
 def stretch_to_uint8(arr, low_pct, high_pct):
@@ -83,6 +92,19 @@ def compute_lbp_base64(frame_path, P=8, R=1):
     }
 
 
+def _compute_lbp_worker(path):
+    """
+    Worker function for multiprocessing.
+
+    Args:
+        path: Absolute path to frame image
+
+    Returns:
+        Dict with frame name, score, and base64 LBP image
+    """
+    return compute_lbp_base64(path)
+
+
 def run_lbp_analysis(input_path, top_percent=10):
     """
     Run LBP analysis on single image or folder.
@@ -103,7 +125,34 @@ def run_lbp_analysis(input_path, top_percent=10):
         return {"error": f"Invalid input path: {input_path}"}
 
     # Compute LBP for each frame
-    results = [compute_lbp_base64(fp) for fp in frame_paths]
+    total_frames = len(frame_paths)
+    print(f"[LBP Analysis] Processing {total_frames} frames with {MAX_WORKERS} workers...")
+
+    # Use multiprocessing for multi-frame case
+    if len(frame_paths) > 1:
+        results = []
+        completed = 0
+        milestones = {total_frames // 4, total_frames // 2, (3 * total_frames) // 4}
+
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Submit all tasks
+            futures = {executor.submit(_compute_lbp_worker, path): path
+                      for path in frame_paths}
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                results.append(future.result())
+                completed += 1
+
+                # Progress tracking
+                if completed % 10 == 0 or completed in milestones:
+                    progress_pct = (completed / total_frames) * 100
+                    print(f"[LBP Analysis] Progress: {completed}/{total_frames} frames ({progress_pct:.1f}%)")
+    else:
+        # Single frame: no multiprocessing overhead
+        results = [_compute_lbp_worker(frame_paths[0])]
+
+    print(f"[LBP Analysis] ✓ Completed processing {total_frames} frames")
 
     # Single frame case
     if len(results) == 1:

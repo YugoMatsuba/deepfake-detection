@@ -5,6 +5,12 @@ from PIL import Image
 import numpy as np
 from scipy.ndimage import gaussian_filter, zoom
 import cv2
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Prevent thread oversubscription when multiprocessing
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 # Configuration constants (Pass 1)
 NOISE_PCTL_LOW = 1
@@ -20,6 +26,9 @@ NOISE_EDGE_MASK_PERCENTILE = 70
 NOISE_TEMP_NMS_WINDOW = 3
 NOISE_ZMAP_PCTL_LOW = 5
 NOISE_ZMAP_PCTL_HIGH = 95
+
+# Multiprocessing config (env-configurable)
+MAX_WORKERS = int(os.getenv("FORENSICS_WORKERS", os.cpu_count() or 4))
 
 
 def stretch_to_uint8(arr, low_pct, high_pct):
@@ -167,6 +176,20 @@ def encode_image_to_base64(image):
     return f"data:image/png;base64,{base64_data}"
 
 
+def _compute_noise_worker(path):
+    """
+    Worker function for multiprocessing.
+
+    Args:
+        path: Absolute path to frame image
+
+    Returns:
+        Tuple of (basename, score, overlay_img) suitable for multiprocessing
+    """
+    score, overlay_img = compute_noise(path)
+    return (os.path.basename(path), score, overlay_img)
+
+
 def run_noise_analysis(input_path, top_percent=10):
     """
     Run noise analysis on a folder or single frame.
@@ -188,10 +211,34 @@ def run_noise_analysis(input_path, top_percent=10):
         return {"error": f"Invalid input path {input_path}"}
 
     # Compute noise scores
-    results = []
-    for path in frame_paths:
-        score, residual_img = compute_noise(path)
-        results.append((os.path.basename(path), score, residual_img))
+    total_frames = len(frame_paths)
+    print(f"[Noise Analysis] Processing {total_frames} frames with {MAX_WORKERS} workers...")
+
+    # Use multiprocessing for multi-frame case
+    if len(frame_paths) > 1:
+        results = []
+        completed = 0
+        milestones = {total_frames // 4, total_frames // 2, (3 * total_frames) // 4}
+
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Submit all tasks
+            futures = {executor.submit(_compute_noise_worker, path): path
+                      for path in frame_paths}
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                results.append(future.result())
+                completed += 1
+
+                # Progress tracking
+                if completed % 10 == 0 or completed in milestones:
+                    progress_pct = (completed / total_frames) * 100
+                    print(f"[Noise Analysis] Progress: {completed}/{total_frames} frames ({progress_pct:.1f}%)")
+    else:
+        # Single frame: no multiprocessing overhead
+        results = [_compute_noise_worker(frame_paths[0])]
+
+    print(f"[Noise Analysis] ✓ Completed processing {total_frames} frames")
 
     # Single frame case
     if len(results) == 1:
