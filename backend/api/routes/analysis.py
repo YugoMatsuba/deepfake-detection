@@ -528,21 +528,20 @@ def analyze_frame(analysis_id: str, frame_number: int):
                             "error": f"Analysis failed: {str(e)}"
                         }
 
-                    response = {
-                        "analysis_id": analysis.id,
-                        "frame_number": frame_number,
-                        "results": results
-                    }
+                response = {
+                    "analysis_id": analysis.id,
+                    "frame_number": frame_number,
+                    "results": results
+                }
 
-                    return jsonify(response), 200
+                return jsonify(response), 200
 
-                except ValueError as e:
-                    # Frame number out of range
-                    return jsonify(error=str(e)), 400
+            except ValueError as e:
+                # Frame number out of range
+                return jsonify(error=str(e)), 400
 
-                except Exception as e:
-                    return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
-            # Temp directory auto-cleaned up here
+            except Exception as e:
+                return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)
