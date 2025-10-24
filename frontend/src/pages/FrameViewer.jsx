@@ -603,15 +603,23 @@ useEffect(() => {
 // Determine color class based on analysis type and value
 const getColor = (type, value) => {
   if (type === 'ela') {
-    // For ELA: lower = better (green)
-    if (value < 20) return 'text-green-600';
-    if (value < 50) return 'text-yellow-500';
-    return 'text-red-600';
+    // For ELA: z-score interpretation (higher = more suspicious)
+    if (value >= 3.0) return 'text-red-600';
+    if (value >= 2.0) return 'text-orange-500';
+    if (value >= 1.0) return 'text-yellow-500';
+    return 'text-gray-600';
+  } else if (type === 'noise') {
+    // For Noise: z-score interpretation (higher = more suspicious)
+    if (value >= 3.0) return 'text-red-600';
+    if (value >= 2.0) return 'text-orange-500';
+    if (value >= 1.0) return 'text-yellow-500';
+    return 'text-gray-600';
   } else {
-    // For Noise & LBP: higher = better (green)
-    if (value > 0.8) return 'text-green-600';
-    if (value > 0.5) return 'text-yellow-500';
-    return 'text-red-600';
+    // For LBP: z-score interpretation (higher = more suspicious)
+    if (value >= 3.0) return 'text-red-600';
+    if (value >= 2.0) return 'text-orange-500';
+    if (value >= 1.0) return 'text-yellow-500';
+    return 'text-gray-600';
   }
 };
 
@@ -777,9 +785,11 @@ const handleFinishAnalysis = () => {
   }`}
 >
   {analysisResult.score !== undefined ? (
-  analysisResult.analysis_type === "ela" || analysisResult.analysis_type === "lbp"
-    ? analysisResult.score.toFixed(2) // raw value for ELA and LBP
-    : `${(analysisResult.score * 100).toFixed(2)}%` // percentage only for Noise
+  analysisResult.analysis_type === "noise"
+    ? `Noise (z): ${analysisResult.score.toFixed(2)}` // z-score for Noise
+    : analysisResult.analysis_type === "ela"
+    ? `ELA (z): ${analysisResult.score.toFixed(2)}` // z-score for ELA
+    : `LBP (z): ${analysisResult.score.toFixed(2)}` // z-score for LBP
 ) : (
   "No score available"
 )}
