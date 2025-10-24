@@ -118,7 +118,7 @@ def start_analysis(analysis_id: str):
       "traditional": {
         "ela": {
           "score": 0.65,
-          "overlay": "data:image/png;base64,..."  // EPHEMERAL, not in DB
+          "frames": [{"frame_number": 1, "score": 0.65, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/1/overlay"}]
         },
         ...
       },
@@ -127,7 +127,7 @@ def start_analysis(analysis_id: str):
     }
 
     Note: ML results include per-frame scores but NO overlays.
-          Traditional results include base64 overlays (ephemeral, not saved to DB).
+          Traditional results include overlay URLs (overlays persisted to disk).
 
     Response (400/403/404/500): error message
     """
@@ -261,11 +261,13 @@ def start_analysis(analysis_id: str):
                         "weights_hash": model_data.get("weights_hash")
                     }
 
-                # Traditional results: strip base64 overlays before saving
+                # Traditional results: save scores and frame metadata
                 for method_name, method_data in traditional_results.items():
                     result_json["traditional"][method_name] = {
-                        "score": method_data.get("score")
-                        # NOTE: "overlay" field intentionally omitted (not saved to DB)
+                        "score": method_data.get("score"),
+                        "confidence": method_data.get("confidence"),  # for noise
+                        "frames": method_data.get("frames", [])
+                        # NOTE: overlay URLs are included, overlays persisted to disk
                     }
 
                 # Update Analysis record with scores and provenance metadata
@@ -292,7 +294,7 @@ def start_analysis(analysis_id: str):
             # Build full response payload
             # Metadata: from upload (persisted in DB)
             # ML: scores + frames (no overlays)
-            # Traditional: scores + base64 overlays (ephemeral, not in DB)
+            # Traditional: scores + overlay URLs (overlays persisted to disk)
             response = {
                 "analysis_id": analysis.id,
                 "status": "succeeded",
@@ -362,7 +364,7 @@ def _get_video_metadata(video_path: str) -> Dict[str, Any]:
 @require_user
 def get_analysis(analysis_id: str):
     """
-    Fetch analysis status and results (scores only from DB, no base64).
+    Fetch analysis status and results (scores + overlay URLs from DB).
 
     Response (200):
     {
@@ -378,7 +380,10 @@ def get_analysis(analysis_id: str):
           ...
         },
         "traditional": {
-          "ela": {"score": 0.65},
+          "ela": {
+            "score": 0.65,
+            "frames": [{"frame_number": 1, "score": 0.65, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/1/overlay"}]
+          },
           ...
         }
       },
@@ -395,7 +400,7 @@ def get_analysis(analysis_id: str):
         response = {
             "analysis_id": analysis.id,
             "status": analysis.status,
-            "result": analysis.result_json,  # Scores only (no base64 overlays)
+            "result": analysis.result_json,  # Scores + overlay URLs
             "error": analysis.error,
             "created_at": analysis.created_at.isoformat(),
             "updated_at": analysis.updated_at.isoformat()
@@ -422,15 +427,15 @@ def analyze_frame(analysis_id: str, frame_number: int):
       "results": {
         "ela": {
           "score": 0.73,
-          "overlay": "data:image/jpeg;base64,..."
+          "frames": [{"frame_number": 42, "score": 0.73, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/42/overlay"}]
         },
         "noise": {
           "confidence": 0.68,
-          "overlay": "data:image/jpeg;base64,..."
+          "frames": [{"frame_number": 42, "confidence": 0.68, "overlay_url": "/api/analyses/{id}/forensics/noise/frames/42/overlay"}]
         },
         "lbp": {
           "score": 0.81,
-          "overlay": "data:image/jpeg;base64,..."
+          "frames": [{"frame_number": 42, "score": 0.81, "overlay_url": "/api/analyses/{id}/forensics/lbp/frames/42/overlay"}]
         }
       }
     }
