@@ -565,7 +565,8 @@ useEffect(() => {
         mergedFrames[mergedFrames.length - 1] ||
         null;
 
-      const overlayData = primaryFrame?.overlay ?? null;
+      // Use overlay_url if available (new disk persistence), fallback to base64 overlay for backwards compat
+      const overlayData = primaryFrame?.overlay_url ?? primaryFrame?.overlay ?? null;
       const primaryScore =
         methodResult.score ??
         methodResult.confidence ??
@@ -738,11 +739,17 @@ const handleFinishAnalysis = async () => {
 
             {/* Overlay image for ELA, LBP, or Noise */}
             {(() => {
-              const overlaySrc = overlayResult?.overlay
-                ? overlayResult.overlay
-                : overlayResult?.image_file
-                ? `http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`
-                : null;
+              // Handle both base64 (old) and URL (new) formats
+              let overlaySrc = overlayResult?.overlay;
+
+              // If overlay starts with /, it's a URL path - prepend API base
+              if (overlaySrc && overlaySrc.startsWith('/')) {
+                overlaySrc = `http://localhost:5050${overlaySrc}`;
+              }
+              // Fallback to old image_file format
+              else if (!overlaySrc && overlayResult?.image_file) {
+                overlaySrc = `http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`;
+              }
 
               if (!overlaySrc) {
                 return null;
@@ -832,11 +839,17 @@ const handleFinishAnalysis = async () => {
 </p>
 
       {(() => {
-        const overlaySrc = analysisResult.overlay
-          ? analysisResult.overlay
-          : analysisResult.image_file
-          ? `http://localhost:5050/${analysisResult.image_file.replace(/\\/g, "/")}`
-          : null;
+        // Handle both base64 (old) and URL (new) formats
+        let overlaySrc = analysisResult.overlay;
+
+        // If overlay starts with /, it's a URL path - prepend API base
+        if (overlaySrc && overlaySrc.startsWith('/')) {
+          overlaySrc = `http://localhost:5050${overlaySrc}`;
+        }
+        // Fallback to old image_file format
+        else if (!overlaySrc && analysisResult.image_file) {
+          overlaySrc = `http://localhost:5050/${analysisResult.image_file.replace(/\\/g, "/")}`;
+        }
 
         if (!overlaySrc) {
           return null;
