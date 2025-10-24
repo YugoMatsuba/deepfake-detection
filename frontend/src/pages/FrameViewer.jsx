@@ -661,16 +661,17 @@ const handleFinishAnalysis = async () => {
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
 
+      {/* DISABLED: Persistence overhaul - files are no longer auto-deleted */}
       {/* Finish Analysis Button - Top Right */}
-      <button
+      {/* <button
         onClick={() => setShowFinishPopup(true)}
         className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg"
       >
         Finish Analysis
-      </button>
+      </button> */}
 
       {/* Finish Analysis Popup */}
-      {showFinishPopup && (
+      {/* {showFinishPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md mx-4">
             <h2 className="text-xl font-bold mb-4">Finish Analysis?</h2>
@@ -679,7 +680,6 @@ const handleFinishAnalysis = async () => {
               Your analysis results will be saved and available in Past Reports.
             </p>
 
-            {/* Download PDF Option */}
             <button
               onClick={handleDownloadPDF}
               disabled={downloadingPDF}
@@ -688,7 +688,6 @@ const handleFinishAnalysis = async () => {
               {downloadingPDF ? "Downloading..." : "Download PDF Report"}
             </button>
 
-            {/* Finish & Delete Files */}
             <div className="flex gap-3">
               <button
                 onClick={handleFinishAnalysis}
@@ -707,7 +706,7 @@ const handleFinishAnalysis = async () => {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       <div className="flex flex-col items-center flex-1 space-y-1 p-3">
 

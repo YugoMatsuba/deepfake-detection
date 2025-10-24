@@ -161,7 +161,8 @@ def create_app() -> Flask:
 
     # --- Background Scheduler ---
     # Initialize scheduler for automatic cleanup of old analysis files
-    init_scheduler()
+    # DISABLED: Persistence overhaul - files are no longer auto-deleted
+    # init_scheduler()
 
     # --- CORS (dev only) ---
     # For dev Vite at http://localhost:5173. Tighten for prod.

@@ -613,37 +613,38 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
         return jsonify(error=str(e)), 500
 
 
-@analysis_bp.post("/analyses/<analysis_id>/cleanup")
-@require_user
-def cleanup_analysis_files_endpoint(analysis_id: str):
-    """
-    Delete video/frame files from disk while keeping database record.
-
-    Called when user finishes analysis in FrameViewer.
-    Database record persists so reports can still be generated.
-
-    Requires: Ownership or admin role
-    Returns: 204 No Content on success
-    """
-    try:
-        with get_db() as db:
-            # Check ownership
-            analysis = check_analysis_ownership(db, analysis_id)
-
-            # Delete files from disk
-            success = delete_analysis_files(analysis_id)
-
-            if not success:
-                logger.warning(f"Files already deleted for analysis {analysis_id}")
-                # Still return 204 - idempotent operation
-
-            return "", 204
-
-    except HTTPException:
-        raise  # Re-raise HTTP exceptions (401/403/404)
-    except Exception as e:
-        logger.error(f"Failed to cleanup analysis {analysis_id}: {e}")
-        return jsonify(error=str(e)), 500
+# DISABLED: Persistence overhaul - files are no longer auto-deleted
+# @analysis_bp.post("/analyses/<analysis_id>/cleanup")
+# @require_user
+# def cleanup_analysis_files_endpoint(analysis_id: str):
+#     """
+#     Delete video/frame files from disk while keeping database record.
+#
+#     Called when user finishes analysis in FrameViewer.
+#     Database record persists so reports can still be generated.
+#
+#     Requires: Ownership or admin role
+#     Returns: 204 No Content on success
+#     """
+#     try:
+#         with get_db() as db:
+#             # Check ownership
+#             analysis = check_analysis_ownership(db, analysis_id)
+#
+#             # Delete files from disk
+#             success = delete_analysis_files(analysis_id)
+#
+#             if not success:
+#                 logger.warning(f"Files already deleted for analysis {analysis_id}")
+#                 # Still return 204 - idempotent operation
+#
+#             return "", 204
+#
+#     except HTTPException:
+#         raise  # Re-raise HTTP exceptions (401/403/404)
+#     except Exception as e:
+#         logger.error(f"Failed to cleanup analysis {analysis_id}: {e}")
+#         return jsonify(error=str(e)), 500
 
 
 @analysis_bp.delete("/analyses/<analysis_id>")
