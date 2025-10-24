@@ -270,16 +270,16 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     if traditional_results:
         story.append(Paragraph("Traditional Forensics Analysis", heading_style))
 
-        trad_data = [["Method", "Score", "Assessment"]]
+        trad_data = [["Method", "Z-score", "Assessment"]]
 
         for method_name, method_data in traditional_results.items():
             score = method_data.get("score")
 
             if score is not None:
-                score_pct = f"{score * 100:.1f}%"
-                assessment = _get_assessment(score)
+                score_display = f"{score:.2f}"
+                assessment = _get_zscore_assessment(score)
             else:
-                score_pct = "N/A"
+                score_display = "N/A"
                 assessment = "Unknown"
 
             method_display = method_name.upper()
@@ -290,7 +290,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
             elif method_name == "lbp":
                 method_display = "LBP (Local Binary Pattern)"
 
-            trad_data.append([method_display, score_pct, assessment])
+            trad_data.append([method_display, score_display, assessment])
 
         trad_table = Table(trad_data, colWidths=[2.5 * inch, 1.5 * inch, 2.5 * inch])
         trad_table.setStyle(TableStyle([
@@ -440,6 +440,26 @@ def _get_assessment(score: float) -> str:
     elif score < 0.5:
         return "Medium Risk"
     elif score < 0.7:
+        return "High Risk"
+    else:
+        return "Critical"
+
+
+def _get_zscore_assessment(zscore: float) -> str:
+    """
+    Convert z-score to human-readable assessment.
+
+    Args:
+        zscore: Z-score value (typically -3 to +3, but can be outside this range)
+
+    Returns:
+        Assessment string: "Low Risk", "Medium Risk", "High Risk", "Critical"
+    """
+    if zscore < 1.0:
+        return "Low Risk"
+    elif zscore < 2.0:
+        return "Medium Risk"
+    elif zscore < 3.0:
         return "High Risk"
     else:
         return "Critical"

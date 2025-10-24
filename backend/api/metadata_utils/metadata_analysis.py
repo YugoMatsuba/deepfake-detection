@@ -151,10 +151,13 @@ def parse_frame_hashes(raw_hashes: list) -> list:
     for line in raw_hashes:
         if line.startswith('#'):
             continue
-        # Extract hash (32+ hex chars for MD5/SHA)
-        match = re.search(r'([a-f0-9]{32,})', line)
-        if match:
-            hashes.append(match.group(1))
+        # FFmpeg framemd5 format: stream_index, frame_number, frame_size, hash
+        # Parse by splitting on commas and extract 4th field (the hash)
+        parts = line.strip().split(',')
+        if len(parts) >= 4:
+            hash_val = parts[3].strip()
+            if hash_val and len(hash_val) >= 32:
+                hashes.append(hash_val)
 
     return hashes
 
