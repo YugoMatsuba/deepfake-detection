@@ -19,7 +19,6 @@ from flask_compress import Compress
 # DB/session utilities come from api package
 from api import init_engine, Base, engine as db_engine, get_db, hash_password  # type: ignore
 from api.routes.auth import bp as auth_bp  # type: ignore
-from api.routes.traditional_forensics import bp_forensics
 from api.routes.video_upload import video_bp
 from api.routes.analysis import analysis_bp
 from api.routes.admin import admin_bp  # Admin dashboard routes
@@ -186,7 +185,6 @@ def create_app() -> Flask:
     # --- Blueprints ---
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
-    app.register_blueprint(bp_forensics, url_prefix="/api/forensics")
     app.register_blueprint(video_bp, url_prefix="/api")
     app.register_blueprint(analysis_bp, url_prefix="/api")
     app.register_blueprint(reports_bp, url_prefix="/api")

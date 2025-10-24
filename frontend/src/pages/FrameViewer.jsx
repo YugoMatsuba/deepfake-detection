@@ -565,8 +565,8 @@ useEffect(() => {
         mergedFrames[mergedFrames.length - 1] ||
         null;
 
-      // Use overlay_url if available (new disk persistence), fallback to base64 overlay for backwards compat
-      const overlayData = primaryFrame?.overlay_url ?? primaryFrame?.overlay ?? null;
+      // Use overlay_url from disk persistence
+      const overlayData = primaryFrame?.overlay_url ?? null;
       const primaryScore =
         methodResult.score ??
         methodResult.confidence ??
@@ -739,16 +739,11 @@ const handleFinishAnalysis = async () => {
 
             {/* Overlay image for ELA, LBP, or Noise */}
             {(() => {
-              // Handle both base64 (old) and URL (new) formats
               let overlaySrc = overlayResult?.overlay;
 
               // If overlay starts with /, it's a URL path - prepend API base
               if (overlaySrc && overlaySrc.startsWith('/')) {
                 overlaySrc = `http://localhost:5050${overlaySrc}`;
-              }
-              // Fallback to old image_file format
-              else if (!overlaySrc && overlayResult?.image_file) {
-                overlaySrc = `http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`;
               }
 
               if (!overlaySrc) {
@@ -839,16 +834,11 @@ const handleFinishAnalysis = async () => {
 </p>
 
       {(() => {
-        // Handle both base64 (old) and URL (new) formats
         let overlaySrc = analysisResult.overlay;
 
         // If overlay starts with /, it's a URL path - prepend API base
         if (overlaySrc && overlaySrc.startsWith('/')) {
           overlaySrc = `http://localhost:5050${overlaySrc}`;
-        }
-        // Fallback to old image_file format
-        else if (!overlaySrc && analysisResult.image_file) {
-          overlaySrc = `http://localhost:5050/${analysisResult.image_file.replace(/\\/g, "/")}`;
         }
 
         if (!overlaySrc) {
