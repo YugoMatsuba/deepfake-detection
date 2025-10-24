@@ -140,29 +140,6 @@ def list_videos():
     return jsonify(videos), 200
 
 
-@video_bp.get("/videos/<analysis_id>")
-@cross_origin()
-def get_video(analysis_id: str):
-    """
-    Serve video file for a given analysis.
-
-    Used by frame viewer to stream video content.
-    Does NOT require authentication (public video serving).
-    """
-    # Find video file in analysis directory
-    video_dir = DATA_ROOT / analysis_id
-    if not video_dir.exists():
-        return jsonify(error="Analysis not found"), 404
-
-    # Find video file (any extension)
-    video_files = list(video_dir.glob("video.*"))
-    if not video_files:
-        return jsonify(error="Video file not found"), 404
-
-    video_path = video_files[0]
-    return send_file(video_path, mimetype="video/mp4")
-
-
 @video_bp.get("/analyses/<analysis_id>/video")
 @require_user
 def get_analysis_video(analysis_id: str):
@@ -229,10 +206,10 @@ def get_all_videos():
 
 
 @video_bp.get("/analyses/<analysis_id>/forensics/<method>/frames/<int:frame_number>/overlay")
-@cross_origin()
+@require_user
 def get_forensics_overlay(analysis_id: str, method: str, frame_number: int):
     """
-    Serve forensics overlay image for a specific frame.
+    Serve forensics overlay image for a specific frame with authentication and ownership check.
 
     Args:
         analysis_id: Analysis UUID
@@ -240,22 +217,29 @@ def get_forensics_overlay(analysis_id: str, method: str, frame_number: int):
         frame_number: Frame number (extracted from filename, e.g., frame_0001.jpg -> 1)
 
     Returns:
-        JPEG image file or 404 if not found
-
-    Does NOT require authentication (public overlay serving).
+        - 200: JPEG image file
+        - 400: Invalid method
+        - 401: Unauthorized (no session)
+        - 403: Forbidden (not owner)
+        - 404: Overlay not found
     """
-    # Validate method
-    if method not in ["noise", "ela", "lbp"]:
-        return jsonify(error=f"Invalid forensics method: {method}"), 400
+    with get_db() as db:
+        # Check ownership
+        from api.routes.analysis import check_analysis_ownership
+        analysis = check_analysis_ownership(db, analysis_id)
 
-    # Find overlay file
-    overlay_dir = DATA_ROOT / analysis_id / "forensics" / method
-    if not overlay_dir.exists():
-        return jsonify(error="Forensics data not found"), 404
+        # Validate method
+        if method not in ["noise", "ela", "lbp"]:
+            return jsonify(error=f"Invalid forensics method: {method}"), 400
 
-    # Look for overlay with this frame number
-    overlay_path = overlay_dir / f"frame_{frame_number:04d}.jpg"
-    if not overlay_path.exists():
-        return jsonify(error=f"Overlay not found for frame {frame_number}"), 404
+        # Find overlay file
+        overlay_dir = DATA_ROOT / analysis_id / "forensics" / method
+        if not overlay_dir.exists():
+            return jsonify(error="Forensics data not found"), 404
 
-    return send_file(overlay_path, mimetype="image/jpeg")
+        # Look for overlay with this frame number
+        overlay_path = overlay_dir / f"frame_{frame_number:04d}.jpg"
+        if not overlay_path.exists():
+            return jsonify(error=f"Overlay not found for frame {frame_number}"), 404
+
+        return send_file(overlay_path, mimetype="image/jpeg")
