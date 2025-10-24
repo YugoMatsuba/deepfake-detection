@@ -1,15 +1,14 @@
 import os
-import base64
-from io import BytesIO
+from pathlib import Path
 from PIL import Image
 import numpy as np
 from skimage.feature import local_binary_pattern
 
 
-def compute_lbp_base64(frame_path, P=8, R=1):
+def compute_lbp(frame_path, P=8, R=1):
     """
     Compute LBP image and anomaly score.
-    Returns dict with frame name, score, and Base64 LBP image.
+    Returns score and PIL image.
     """
     img = Image.open(frame_path).convert("L")
     img_np = np.array(img, dtype=np.uint8)
@@ -20,28 +19,32 @@ def compute_lbp_base64(frame_path, P=8, R=1):
     # Convert LBP to image (normalized)
     lbp_img = Image.fromarray(np.uint8((lbp / lbp.max()) * 255))
 
-    # Encode to Base64
-    buffer = BytesIO()
-    lbp_img.save(buffer, format="JPEG", quality=85)
-    lbp_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    lbp_base64 = f"data:image/jpeg;base64,{lbp_base64}"
-
     # Anomaly score = std deviation of LBP histogram
     n_bins = int(lbp.max() + 1)
     hist, _ = np.histogram(lbp.ravel(), bins=n_bins, range=(0, n_bins), density=True)
     score = float(np.std(hist))
 
-    return {
-        "frame": os.path.basename(frame_path),
-        "score": score,
-        "lbp_image_base64": lbp_base64
-    }
+    return score, lbp_img
 
 
-def run_lbp_analysis(input_path, top_percent=10):
+def _save_overlay(image, frame_filename, output_dir):
+    """Save overlay image to disk and return saved path."""
+    if output_dir:
+        # Parse frame number from filename (e.g., "frame_0001.jpg" -> "0001")
+        stem = Path(frame_filename).stem
+        digits = "".join(ch for ch in stem if ch.isdigit())
+        if digits:
+            out_path = Path(output_dir) / f"frame_{digits}.jpg"
+            image.save(out_path, "JPEG", quality=90)
+            return str(out_path)
+    return None
+
+
+def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=None):
     """
     Run LBP analysis on single image or folder.
-    Returns top frames JSON with Base64 LBP images.
+    Saves overlay images to output_dir if provided.
+    Returns top frames JSON (no base64, overlays saved to disk).
     """
     # Collect frame paths
     if os.path.isdir(input_path):
@@ -58,15 +61,23 @@ def run_lbp_analysis(input_path, top_percent=10):
         return {"error": f"Invalid input path: {input_path}"}
 
     # Compute LBP for each frame
-    results = [compute_lbp_base64(fp) for fp in frame_paths]
+    results = []
+    for fp in frame_paths:
+        score, lbp_img = compute_lbp(fp)
+        results.append({
+            "frame": os.path.basename(fp),
+            "score": score,
+            "lbp_img": lbp_img
+        })
 
     # Single frame case
     if len(results) == 1:
+        # Save overlay to disk
+        _save_overlay(results[0]["lbp_img"], results[0]["frame"], output_dir)
         return {
             "mode": "single_frame",
             "frame": results[0]["frame"],
-            "score": results[0]["score"],
-            "lbp_image_base64": results[0]["lbp_image_base64"]
+            "score": results[0]["score"]
         }
 
     # Multi-frame case
@@ -81,7 +92,18 @@ def run_lbp_analysis(input_path, top_percent=10):
 
     # Top frames (cap at 32 to limit JSON payload size)
     top_count = min(max(1, int(len(results_sorted) * top_percent / 100)), 32)
-    top_frames = results_sorted[:top_count]
+    top_frames_data = results_sorted[:top_count]
+
+    # Save overlays and build response
+    top_frames = []
+    for r in top_frames_data:
+        # Save overlay to disk
+        _save_overlay(r["lbp_img"], r["frame"], output_dir)
+        top_frames.append({
+            "frame": r["frame"],
+            "score": r["score"],
+            "normalized_score": r["normalized_score"]
+        })
 
     return {
         "mode": "multi_frame",

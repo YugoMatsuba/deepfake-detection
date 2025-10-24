@@ -7,7 +7,6 @@ Handles traditional forensics execution and output transformation for API respon
 """
 from __future__ import annotations
 import os
-import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
@@ -15,6 +14,7 @@ from api.traditional_forensics_utils.frame_extraction import extract_frames
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
 from api.traditional_forensics_utils.lbp_analysis import run_lbp_analysis
+from storage import DATA_ROOT
 
 
 def _parse_frame_number(frame_label: Optional[str]) -> Optional[int]:
@@ -35,27 +35,28 @@ def _parse_frame_number(frame_label: Optional[str]) -> Optional[int]:
     return None
 
 
-def run_traditional_forensics(video_path: str, modules: list[str]) -> dict[str, Any]:
+def run_traditional_forensics(video_path: str, modules: list[str], analysis_id: str) -> dict[str, Any]:
     """
     Run traditional forensics analysis on video.
 
     Args:
         video_path: Absolute path to video file
         modules: List of forensics module names (e.g., ["ela", "noise", "lbp"])
+        analysis_id: Analysis UUID for persistent storage
 
     Returns:
         {
             "ela": {
                 "score": 0.65,
-                "overlay": "data:image/jpeg;base64,..."  // ELA heatmap
+                "frames": [{"frame": "frame_0001.jpg", "frame_number": 1, "score": 0.65, "overlay_url": "/api/..."}]
             },
             "noise": {
                 "confidence": 0.42,
-                "overlay": "data:image/jpeg;base64,..."  // Noise residual
+                "frames": [{"frame": "frame_0001.jpg", "frame_number": 1, "confidence": 0.42, "overlay_url": "/api/..."}]
             },
             "lbp": {
                 "score": 0.73,
-                "overlay": "data:image/jpeg;base64,..."  // LBP pattern
+                "frames": [{"frame": "frame_0001.jpg", "frame_number": 1, "score": 0.73, "overlay_url": "/api/..."}]
             }
         }
 
@@ -65,66 +66,92 @@ def run_traditional_forensics(video_path: str, modules: list[str]) -> dict[str, 
     if not modules:
         return {}
 
-    # Extract frames to temporary directory
-    with tempfile.TemporaryDirectory(prefix="forensics_") as tmp_dir:
-        try:
-            frame_paths = extract_frames(video_path, output_base=tmp_dir)
-            if not frame_paths:
-                raise ValueError(f"No frames extracted from video: {video_path}")
+    # Extract frames to persistent directory
+    frames_dir = DATA_ROOT / analysis_id / "frames"
+    frames_dir.mkdir(parents=True, exist_ok=True)
 
-            # Use the frames folder (parent of first frame)
-            frames_folder = str(Path(frame_paths[0]).parent)
+    try:
+        frame_paths = extract_frames(video_path, output_base=str(frames_dir))
+        if not frame_paths:
+            raise ValueError(f"No frames extracted from video: {video_path}")
 
-            results = {}
+        # Use the frames folder (parent of first frame)
+        frames_folder = str(Path(frame_paths[0]).parent)
 
-            for module_name in modules:
-                try:
-                    if module_name == "ela":
-                        raw_result = run_ela(frames_folder, top_percent=10)
-                        results["ela"] = transform_ela_result(raw_result)
+        # Create forensics output directory
+        forensics_dir = DATA_ROOT / analysis_id / "forensics"
+        forensics_dir.mkdir(parents=True, exist_ok=True)
 
-                    elif module_name == "noise":
-                        raw_result = run_noise_analysis(frames_folder, top_percent=10)
-                        results["noise"] = transform_noise_result(raw_result)
+        results = {}
 
-                    elif module_name == "lbp":
-                        raw_result = run_lbp_analysis(frames_folder, top_percent=10)
-                        results["lbp"] = transform_lbp_result(raw_result)
+        for module_name in modules:
+            try:
+                # Create method-specific directory
+                method_dir = forensics_dir / module_name
+                method_dir.mkdir(parents=True, exist_ok=True)
 
-                    else:
-                        results[module_name] = {
-                            "score": None,
-                            "error": f"Unknown forensics module: {module_name}"
-                        }
+                if module_name == "ela":
+                    raw_result = run_ela(
+                        frames_folder,
+                        top_percent=10,
+                        output_dir=str(method_dir),
+                        analysis_id=analysis_id
+                    )
+                    results["ela"] = transform_ela_result(raw_result, analysis_id)
 
-                except Exception as e:
+                elif module_name == "noise":
+                    raw_result = run_noise_analysis(
+                        frames_folder,
+                        top_percent=10,
+                        output_dir=str(method_dir),
+                        analysis_id=analysis_id
+                    )
+                    results["noise"] = transform_noise_result(raw_result, analysis_id)
+
+                elif module_name == "lbp":
+                    raw_result = run_lbp_analysis(
+                        frames_folder,
+                        top_percent=10,
+                        output_dir=str(method_dir),
+                        analysis_id=analysis_id
+                    )
+                    results["lbp"] = transform_lbp_result(raw_result, analysis_id)
+
+                else:
                     results[module_name] = {
                         "score": None,
-                        "error": f"Analysis failed: {str(e)}"
+                        "error": f"Unknown forensics module: {module_name}"
                     }
 
-            return results
-
-        except Exception as e:
-            # If frame extraction fails, return error for all modules
-            return {
-                module: {
+            except Exception as e:
+                results[module_name] = {
                     "score": None,
-                    "error": f"Frame extraction failed: {str(e)}"
+                    "error": f"Analysis failed: {str(e)}"
                 }
-                for module in modules
+
+        return results
+
+    except Exception as e:
+        # If frame extraction fails, return error for all modules
+        return {
+            module: {
+                "score": None,
+                "error": f"Frame extraction failed: {str(e)}"
             }
+            for module in modules
+        }
 
 
-def transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
-    """Transform ELA result to API response format."""
+def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[str, Any]:
+    """Transform ELA result to API response format with overlay URLs."""
     if raw_result.get("mode") == "single_frame":
+        frame_number = _parse_frame_number(raw_result.get("frame"))
         frame_entry = {
             "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
-            "overlay": raw_result.get("ela_image_base64", "")
+            "frame_number": frame_number,
+            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None
         }
-        frame_entry["frame_number"] = _parse_frame_number(frame_entry.get("frame"))
         return {
             "score": frame_entry["score"],
             "frames": [frame_entry]
@@ -133,15 +160,15 @@ def transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     # Multi-frame: use first top frame as representative
     top_frames = raw_result.get("top_frames", [])
     if top_frames:
-        frame_list = [
-            {
+        frame_list = []
+        for frame in top_frames:
+            frame_number = _parse_frame_number(frame.get("frame"))
+            frame_list.append({
                 "frame": frame.get("frame"),
                 "score": frame.get("score", 0.0),
-                "overlay": frame.get("ela_image_base64", ""),
-                "frame_number": _parse_frame_number(frame.get("frame")),
-            }
-            for frame in top_frames
-        ]
+                "frame_number": frame_number,
+                "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None
+            })
         return {
             "score": frame_list[0]["score"],
             "frames": frame_list
@@ -150,15 +177,16 @@ def transform_ela_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     return {"score": 0.0, "frames": []}
 
 
-def transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
-    """Transform noise result to API response format."""
+def transform_noise_result(raw_result: dict[str, Any], analysis_id: str) -> dict[str, Any]:
+    """Transform noise result to API response format with overlay URLs."""
     if raw_result.get("mode") == "single_frame":
+        frame_number = _parse_frame_number(raw_result.get("frame"))
         frame_entry = {
             "frame": raw_result.get("frame"),
             "confidence": raw_result.get("confidence", 0.0),
-            "overlay": raw_result.get("residual_image_base64", "")
+            "frame_number": frame_number,
+            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None
         }
-        frame_entry["frame_number"] = _parse_frame_number(frame_entry.get("frame"))
         return {
             "confidence": frame_entry["confidence"],
             "frames": [frame_entry]
@@ -167,15 +195,15 @@ def transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     # Multi-frame: use first top frame
     top_frames = raw_result.get("top_frames", [])
     if top_frames:
-        frame_list = [
-            {
+        frame_list = []
+        for frame in top_frames:
+            frame_number = _parse_frame_number(frame.get("frame"))
+            frame_list.append({
                 "frame": frame.get("frame"),
                 "confidence": frame.get("score", 0.0),
-                "overlay": frame.get("residual_image_base64", ""),
-                "frame_number": _parse_frame_number(frame.get("frame")),
-            }
-            for frame in top_frames
-        ]
+                "frame_number": frame_number,
+                "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None
+            })
         return {
             "confidence": frame_list[0]["confidence"],
             "frames": frame_list
@@ -184,15 +212,16 @@ def transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     return {"confidence": 0.0, "frames": []}
 
 
-def transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
-    """Transform LBP result to API response format."""
+def transform_lbp_result(raw_result: dict[str, Any], analysis_id: str) -> dict[str, Any]:
+    """Transform LBP result to API response format with overlay URLs."""
     if raw_result.get("mode") == "single_frame":
+        frame_number = _parse_frame_number(raw_result.get("frame"))
         frame_entry = {
             "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
-            "overlay": raw_result.get("lbp_image_base64", "")
+            "frame_number": frame_number,
+            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None
         }
-        frame_entry["frame_number"] = _parse_frame_number(frame_entry.get("frame"))
         return {
             "score": frame_entry["score"],
             "frames": [frame_entry]
@@ -201,15 +230,15 @@ def transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
     # Multi-frame: use first top frame
     top_frames = raw_result.get("top_frames", [])
     if top_frames:
-        frame_list = [
-            {
+        frame_list = []
+        for frame in top_frames:
+            frame_number = _parse_frame_number(frame.get("frame"))
+            frame_list.append({
                 "frame": frame.get("frame"),
                 "score": frame.get("normalized_score", frame.get("score", 0.0)),
-                "overlay": frame.get("lbp_image_base64", ""),
-                "frame_number": _parse_frame_number(frame.get("frame")),
-            }
-            for frame in top_frames
-        ]
+                "frame_number": frame_number,
+                "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None
+            })
         return {
             "score": frame_list[0]["score"],
             "frames": frame_list

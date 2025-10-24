@@ -227,7 +227,8 @@ def start_analysis(analysis_id: str):
                 if traditional_modules:
                     traditional_results = run_traditional_forensics(
                         video_path=analysis.video_path,
-                        modules=traditional_modules
+                        modules=traditional_modules,
+                        analysis_id=analysis.id
                     )
 
                 # Run metadata forensics analysis (always run, fast ~1-3s)
@@ -456,50 +457,71 @@ def analyze_frame(analysis_id: str, frame_number: int):
                     error=f"Invalid methods: {', '.join(sorted(invalid_methods))}"
                 ), 400
 
-            # Extract frame to temporary directory (consistent with initial analysis pattern)
-            with tempfile.TemporaryDirectory(prefix=f"frame_{frame_number}_") as tmp_dir:
-                frame_path = os.path.join(tmp_dir, f"frame_{frame_number}.jpg")
+            # Extract frame to persistent directory
+            from storage import DATA_ROOT
+            frames_dir = DATA_ROOT / analysis.id / "frames"
+            frames_dir.mkdir(parents=True, exist_ok=True)
+            frame_path = str(frames_dir / f"frame_{frame_number:04d}.jpg")
 
-                try:
-                    extract_single_frame(
-                        video_path=analysis.video_path,
-                        frame_number=frame_number,
-                        output_path=frame_path
-                    )
+            try:
+                extract_single_frame(
+                    video_path=analysis.video_path,
+                    frame_number=frame_number,
+                    output_path=frame_path
+                )
 
-                    # Run each requested forensics method on the single frame
-                    results = {}
+                # Run each requested forensics method on the single frame
+                results = {}
 
-                    for method in methods:
-                        try:
-                            if method == "ela":
-                                raw_result = run_ela(frame_path, top_percent=10)
-                                transformed = transform_ela_result(raw_result)
+                for method in methods:
+                    try:
+                        # Create method-specific forensics directory
+                        method_dir = DATA_ROOT / analysis.id / "forensics" / method
+                        method_dir.mkdir(parents=True, exist_ok=True)
 
-                            elif method == "noise":
-                                raw_result = run_noise_analysis(frame_path, top_percent=10)
-                                transformed = transform_noise_result(raw_result)
+                        if method == "ela":
+                            raw_result = run_ela(
+                                frame_path,
+                                top_percent=10,
+                                output_dir=str(method_dir),
+                                analysis_id=analysis.id
+                            )
+                            transformed = transform_ela_result(raw_result, analysis.id)
 
-                            elif method == "lbp":
-                                raw_result = run_lbp_analysis(frame_path, top_percent=10)
-                                transformed = transform_lbp_result(raw_result)
+                        elif method == "noise":
+                            raw_result = run_noise_analysis(
+                                frame_path,
+                                top_percent=10,
+                                output_dir=str(method_dir),
+                                analysis_id=analysis.id
+                            )
+                            transformed = transform_noise_result(raw_result, analysis.id)
 
-                            else:
-                                continue
+                        elif method == "lbp":
+                            raw_result = run_lbp_analysis(
+                                frame_path,
+                                top_percent=10,
+                                output_dir=str(method_dir),
+                                analysis_id=analysis.id
+                            )
+                            transformed = transform_lbp_result(raw_result, analysis.id)
 
-                            # Annotate each frame entry with the requested frame number
-                            frames = transformed.get("frames", [])
-                            for entry in frames:
-                                entry.setdefault("frame_number", frame_number)
-                            transformed["frames"] = frames
+                        else:
+                            continue
 
-                            results[method] = transformed
+                        # Annotate each frame entry with the requested frame number
+                        frames = transformed.get("frames", [])
+                        for entry in frames:
+                            entry.setdefault("frame_number", frame_number)
+                        transformed["frames"] = frames
 
-                        except Exception as e:
-                            results[method] = {
-                                "score": None,
-                                "error": f"Analysis failed: {str(e)}"
-                            }
+                        results[method] = transformed
+
+                    except Exception as e:
+                        results[method] = {
+                            "score": None,
+                            "error": f"Analysis failed: {str(e)}"
+                        }
 
                     response = {
                         "analysis_id": analysis.id,

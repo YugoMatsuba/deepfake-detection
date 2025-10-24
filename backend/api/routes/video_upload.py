@@ -226,3 +226,36 @@ def get_all_videos():
                 })
 
     return jsonify(videos)
+
+
+@video_bp.get("/analyses/<analysis_id>/forensics/<method>/frames/<int:frame_number>/overlay")
+@cross_origin()
+def get_forensics_overlay(analysis_id: str, method: str, frame_number: int):
+    """
+    Serve forensics overlay image for a specific frame.
+
+    Args:
+        analysis_id: Analysis UUID
+        method: Forensics method ("noise", "ela", or "lbp")
+        frame_number: Frame number (extracted from filename, e.g., frame_0001.jpg -> 1)
+
+    Returns:
+        JPEG image file or 404 if not found
+
+    Does NOT require authentication (public overlay serving).
+    """
+    # Validate method
+    if method not in ["noise", "ela", "lbp"]:
+        return jsonify(error=f"Invalid forensics method: {method}"), 400
+
+    # Find overlay file
+    overlay_dir = DATA_ROOT / analysis_id / "forensics" / method
+    if not overlay_dir.exists():
+        return jsonify(error="Forensics data not found"), 404
+
+    # Look for overlay with this frame number
+    overlay_path = overlay_dir / f"frame_{frame_number:04d}.jpg"
+    if not overlay_path.exists():
+        return jsonify(error=f"Overlay not found for frame {frame_number}"), 404
+
+    return send_file(overlay_path, mimetype="image/jpeg")

@@ -24,7 +24,6 @@ from api.routes.video_upload import video_bp
 from api.routes.analysis import analysis_bp
 from api.routes.admin import admin_bp  # Admin dashboard routes
 from api.routes.reports import reports_bp  # PDF report generation
-from cleanup_scheduler import init_scheduler  # Background file cleanup
 # Models now in consolidated models.py (managed by Alembic)
 from models import User
 
@@ -158,11 +157,6 @@ def create_app() -> Flask:
     # --- Owner Bootstrap ---
     # Enforce single owner from env vars (after DB init, before serving requests)
     bootstrap_owner_from_env()
-
-    # --- Background Scheduler ---
-    # Initialize scheduler for automatic cleanup of old analysis files
-    # DISABLED: Persistence overhaul - files are no longer auto-deleted
-    # init_scheduler()
 
     # --- CORS (dev only) ---
     # For dev Vite at http://localhost:5173. Tighten for prod.
