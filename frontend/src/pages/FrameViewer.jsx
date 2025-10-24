@@ -728,10 +728,11 @@ const handleFinishAnalysis = async () => {
           <div className="relative w-full max-w-3xl min-h-[360px] flex items-center justify-center">
             <video
               ref={videoRef}
-              src={videoUrl || ""}
+              src={videoUrl || undefined}
               controls={Boolean(videoUrl)}
               width="640"
               height="360"
+              preload="metadata"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               className="rounded-lg border border-gray-300 bg-black"
