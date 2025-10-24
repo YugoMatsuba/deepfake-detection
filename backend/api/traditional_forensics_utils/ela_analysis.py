@@ -3,6 +3,57 @@ import base64
 from io import BytesIO
 from PIL import Image, ImageChops, ImageEnhance
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Prevent thread oversubscription when multiprocessing
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+
+# Configuration constants
+ELA_PCTL_LOW = 5
+ELA_PCTL_HIGH = 95
+ELA_MAX_WIDTH = 960
+ELA_PNG_LEVEL = 9
+
+# Multiprocessing config (env-configurable)
+MAX_WORKERS = int(os.getenv("FORENSICS_WORKERS", os.cpu_count() or 4))
+
+
+def stretch_to_uint8(arr, low_pct, high_pct):
+    """
+    Apply percentile-based contrast stretch to make subtle variations visible.
+
+    Args:
+        arr: 2D or 3D numpy array (float)
+        low_pct: Lower percentile (e.g., 5)
+        high_pct: Upper percentile (e.g., 95)
+
+    Returns:
+        uint8 array with values stretched to full 0-255 range
+    """
+    lo, hi = np.percentile(arr, (low_pct, high_pct))
+    vis = ((arr - lo) / max(hi - lo, 1e-6)) * 255.0
+    return np.clip(vis, 0, 255).astype(np.uint8)
+
+
+def downscale_overlay(img, max_width=960):
+    """
+    Downscale PIL image to max_width while preserving aspect ratio.
+
+    Args:
+        img: PIL Image
+        max_width: Maximum width in pixels
+
+    Returns:
+        Downscaled PIL Image (or original if already smaller)
+    """
+    if img.width > max_width:
+        ratio = max_width / img.width
+        new_h = int(img.height * ratio)
+        return img.resize((max_width, new_h), Image.BILINEAR)
+    return img
+
 
 def compute_ela_score(image_path, resave_quality=90):
     """
@@ -20,14 +71,15 @@ def compute_ela_score(image_path, resave_quality=90):
     # Difference
     ela_image = ImageChops.difference(original, compressed)
 
-    # Scale brightness
-    extrema = ela_image.getextrema()
-    max_diff = max([ex[1] for ex in extrema])
-    scale = 255.0 / max_diff if max_diff != 0 else 1
-    ela_image = ImageEnhance.Brightness(ela_image).enhance(scale)
-
-    # Compute anomaly score
+    # Apply percentile-based contrast stretch for better visibility
     ela_np = np.array(ela_image)
+    ela_stretched = stretch_to_uint8(ela_np, ELA_PCTL_LOW, ELA_PCTL_HIGH)
+    ela_image = Image.fromarray(ela_stretched, mode='RGB')
+
+    # Downscale for efficient transport
+    ela_image = downscale_overlay(ela_image, ELA_MAX_WIDTH)
+
+    # Compute anomaly score (use original ela_np before stretching)
     score = ela_np.std()
 
     return score, ela_image
@@ -35,12 +87,12 @@ def compute_ela_score(image_path, resave_quality=90):
 
 def encode_ela_to_base64(ela_image):
     """
-    Encode an ELA PIL image to base64 string.
+    Encode an ELA PIL image to base64 PNG string.
     """
     buffer = BytesIO()
-    ela_image.save(buffer, format="JPEG", quality=85)
+    ela_image.save(buffer, format="PNG", compress_level=ELA_PNG_LEVEL, optimize=True)
     ela_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    ela_base64 = f"data:image/jpeg;base64,{ela_base64}"
+    ela_base64 = f"data:image/png;base64,{ela_base64}"
     return ela_base64
 
 
@@ -56,6 +108,20 @@ def compute_ela_base64(image_path, resave_quality=90):
     score, ela_image = compute_ela_score(image_path, resave_quality)
     ela_base64 = encode_ela_to_base64(ela_image)
     return score, ela_base64
+
+
+def _compute_ela_worker(path):
+    """
+    Worker function for multiprocessing.
+
+    Args:
+        path: Absolute path to frame image
+
+    Returns:
+        Tuple of (basename, path, score, ela_image) suitable for multiprocessing
+    """
+    score, ela_image = compute_ela_score(path)
+    return (os.path.basename(path), path, score, ela_image)
 
 
 def run_ela(input_path, top_percent=10):
@@ -94,17 +160,41 @@ def run_ela(input_path, top_percent=10):
 
     # Multi-frame case - optimize by only encoding top frames
     # Step 1: Compute scores for ALL frames (without base64 encoding)
-    results = []
-    for path in frame_paths:
-        score, ela_image = compute_ela_score(path)
-        results.append((os.path.basename(path), path, score, ela_image))
+    total_frames = len(frame_paths)
+    print(f"[ELA Analysis] Processing {total_frames} frames with {MAX_WORKERS} workers...")
 
-    # Step 2: Normalize scores
+    # Use multiprocessing for multi-frame case
+    if len(frame_paths) > 1:
+        results = []
+        completed = 0
+        milestones = {total_frames // 4, total_frames // 2, (3 * total_frames) // 4}
+
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Submit all tasks
+            futures = {executor.submit(_compute_ela_worker, path): path
+                      for path in frame_paths}
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                results.append(future.result())
+                completed += 1
+
+                # Progress tracking
+                if completed % 10 == 0 or completed in milestones:
+                    progress_pct = (completed / total_frames) * 100
+                    print(f"[ELA Analysis] Progress: {completed}/{total_frames} frames ({progress_pct:.1f}%)")
+    else:
+        # Single frame: no multiprocessing overhead
+        results = [_compute_ela_worker(frame_paths[0])]
+
+    print(f"[ELA Analysis] ✓ Completed processing {total_frames} frames")
+
+    # Step 2: Normalize scores (z-scores, no zero-clipping - negatives are meaningful)
     scores_only = [s for _, _, s, _ in results]
     mean_score = np.mean(scores_only)
     std_score = np.std(scores_only) + 1e-6
     normalized_results = [
-        (fname, fpath, max((score - mean_score) / std_score, 0), ela_img)
+        (fname, fpath, (score - mean_score) / std_score, ela_img)
         for fname, fpath, score, ela_img in results
     ]
 

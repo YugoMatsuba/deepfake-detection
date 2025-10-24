@@ -33,6 +33,7 @@ const FrameViewer = ({
   const [durationFrames, setDurationFrames] = useState(0);
   const [analysisResult, setAnalysisResult] = useState(null);
   const[isAnalysing, setIsAnalysing] = useState(false);
+  const [currentAnalysisType, setCurrentAnalysisType] = useState(null);
   const [overlayResult, setOverlayResult] = useState(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState(null); 
   const [analysisPopupOpen, setAnalysisPopupOpen] = useState(false);
@@ -252,7 +253,7 @@ useEffect(() => {
 
     // Add traditional forensics frames
     ["ela", "noise", "lbp"].forEach(t => {
-      const tFrames = (traditionalResults?.[t]?.frames || [])
+      const tFrames = (traditionalData?.[t]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -262,7 +263,7 @@ useEffect(() => {
     if (type === "ml") {
       frames = mlFrames;
     } else {
-      frames = (traditionalResults?.[type]?.frames || [])
+      frames = (traditionalData?.[type]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -292,7 +293,7 @@ const jumpToPreviousMarker = (type) => {
 
     // Add traditional forensics frames
     ["ela", "noise", "lbp"].forEach(t => {
-      const tFrames = (traditionalResults?.[t]?.frames || [])
+      const tFrames = (traditionalData?.[t]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -302,7 +303,7 @@ const jumpToPreviousMarker = (type) => {
     if (type === "ml") {
       frames = mlFrames;
     } else {
-      frames = (traditionalResults?.[type]?.frames || [])
+      frames = (traditionalData?.[type]?.frames || [])
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -425,6 +426,7 @@ useEffect(() => {
     const targetFrame = Number.isFinite(currentFrame) ? currentFrame : 0;
 
     setIsAnalysing(true);
+    setCurrentAnalysisType(analysisType);
     setAnalysisResult(null);
 
     try {
@@ -510,6 +512,7 @@ useEffect(() => {
         });
 
         setIsAnalysing(false);
+        setCurrentAnalysisType(null);
         return;
       }
 
@@ -592,21 +595,30 @@ useEffect(() => {
       alert(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
     } finally {
       setIsAnalysing(false);
+      setCurrentAnalysisType(null);
     }
   };
 
 // Determine color class based on analysis type and value
 const getColor = (type, value) => {
   if (type === 'ela') {
-    // For ELA: lower = better (green)
-    if (value < 20) return 'text-green-600';
-    if (value < 50) return 'text-yellow-500';
-    return 'text-red-600';
+    // For ELA: z-score interpretation (higher = more suspicious)
+    if (value >= 3.0) return 'text-red-600';
+    if (value >= 2.0) return 'text-orange-500';
+    if (value >= 1.0) return 'text-yellow-500';
+    return 'text-gray-600';
+  } else if (type === 'noise') {
+    // For Noise: z-score interpretation (higher = more suspicious)
+    if (value >= 3.0) return 'text-red-600';
+    if (value >= 2.0) return 'text-orange-500';
+    if (value >= 1.0) return 'text-yellow-500';
+    return 'text-gray-600';
   } else {
-    // For Noise & LBP: higher = better (green)
-    if (value > 0.8) return 'text-green-600';
-    if (value > 0.5) return 'text-yellow-500';
-    return 'text-red-600';
+    // For LBP: z-score interpretation (higher = more suspicious)
+    if (value >= 3.0) return 'text-red-600';
+    if (value >= 2.0) return 'text-orange-500';
+    if (value >= 1.0) return 'text-yellow-500';
+    return 'text-gray-600';
   }
 };
 
@@ -716,10 +728,11 @@ const handleFinishAnalysis = async () => {
           <div className="relative w-full max-w-3xl min-h-[360px] flex items-center justify-center">
             <video
               ref={videoRef}
-              src={videoUrl || ""}
+              src={videoUrl || undefined}
               controls={Boolean(videoUrl)}
               width="640"
               height="360"
+              preload="metadata"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               className="rounded-lg border border-gray-300 bg-black"
@@ -823,9 +836,11 @@ const handleFinishAnalysis = async () => {
   }`}
 >
   {analysisResult.score !== undefined ? (
-  analysisResult.analysis_type === "ela" || analysisResult.analysis_type === "lbp"
-    ? analysisResult.score.toFixed(2) // raw value for ELA and LBP
-    : `${(analysisResult.score * 100).toFixed(2)}%` // percentage only for Noise
+  analysisResult.analysis_type === "noise"
+    ? `Noise (z): ${analysisResult.score.toFixed(2)}` // z-score for Noise
+    : analysisResult.analysis_type === "ela"
+    ? `ELA (z): ${analysisResult.score.toFixed(2)}` // z-score for ELA
+    : `LBP (z): ${analysisResult.score.toFixed(2)}` // z-score for LBP
 ) : (
   "No score available"
 )}
@@ -937,7 +952,13 @@ const handleFinishAnalysis = async () => {
             if (frameRate && videoRef.current) {
               videoRef.current.currentTime = frameNum / frameRate;
               setCurrentFrame(frameNum);
-              setOverlayResult(null);
+              // Show overlay for traditional forensics (ML has no overlay)
+              const overlayData = frame.overlay || null;
+              setOverlayResult(
+                overlayData
+                  ? { analysis_type: type, overlay: overlayData }
+                  : null
+              );
             }
           }}
         />
@@ -1059,7 +1080,7 @@ const handleFinishAnalysis = async () => {
           disabled={isAnalysing}
           onClick={() => analyzeFrame(method)}
         >
-          {isAnalysing ? `Analyzing...` : `${method.toUpperCase()}`}
+          {isAnalysing && currentAnalysisType === method ? `Analyzing...` : `${method.toUpperCase()}`}
         </Button>
       ))}
     </CardContent>
@@ -1087,55 +1108,54 @@ const handleFinishAnalysis = async () => {
         </Button>
       </div>
 
-      {/* ML Detection */}
-{selectedMarkerType === "ml" && detailsFrame != null && (
-  <section>
-    <h4 className="text-sm font-medium text-gray-700 mb-2">ML Detection Score</h4>
-    {(() => {
-      const flaggedFrames = Object.entries(mlData || {}).map(([modelName, modelData]) => {
-        const frame = modelData.frames?.find(f => f.index === detailsFrame);
-        if (!frame || typeof frame.score !== "number") return null;
-        return {
-          model: modelName,
-          index: frame.index,
-          score: frame.score,
-          time: frame.time
-        };
-      }).filter(Boolean);
+      {/* ML Detection - Always show if data exists */}
+{(() => {
+  const flaggedFrames = Object.entries(mlData || {}).map(([modelName, modelData]) => {
+    const frame = modelData.frames?.find(f => f.index === detailsFrame);
+    if (!frame || typeof frame.score !== "number") return null;
+    return {
+      model: modelName,
+      index: frame.index,
+      score: frame.score,
+      time: frame.time
+    };
+  }).filter(Boolean);
 
-      if (flaggedFrames.length === 0) {
-        return <p className="text-sm text-gray-500">No ML score available for this frame.</p>;
-      }
+  if (flaggedFrames.length === 0) return null;  // Hide section if no data
 
-      return flaggedFrames.map(f => (
-        <div key={`${f.model}-${f.index}`} className="flex items-center justify-between text-sm">
+  return (
+    <section>
+      <h4 className="text-sm font-medium text-gray-700 mb-2">ML Detection Score</h4>
+      {flaggedFrames.map(f => (
+        <div key={`${f.model}-${f.index}`} className="flex items-center justify-between text-sm mb-1">
           <span>{f.model.toUpperCase()} — {f.time.toFixed(2)}s</span>
           <span className="font-bold text-blue-600">{Math.round(f.score * 100)}%</span>
         </div>
-      ));
-    })()}
-  </section>
-)}
+      ))}
+    </section>
+  );
+})()}
 
-{/* Forensic Methods */}
-{(["ela", "noise", "lbp"].filter(t => showAllMarkers || t === selectedMarkerType)).map((type) => {
+{/* Traditional Forensics - Always show all available methods */}
+{["ela", "noise", "lbp"].map((type) => {
   const value = details.methods[type];
-  if (typeof value !== "number") return <p key={type} className="text-sm text-gray-500">No score available for {type.toUpperCase()}.</p>;
+  if (typeof value !== "number") return null;  // Skip if no data for this method
 
-  const isPercentage = type === "noise";
-  const displayValue = isPercentage ? `${Math.round(value * 100)}%` : value.toFixed(2);
-  const barWidth = isPercentage ? Math.min(100, Math.max(0, Math.round(value * 100))) : Math.min(100, Math.max(0, value * 100));
+  // All methods now display z-scores (not percentages)
+  const displayValue = `z: ${value.toFixed(2)}`;
+  const barWidth = Math.min(100, Math.max(0, ((value + 3) / 6) * 100)); // Map z-score [-3, 3] to [0, 100]
 
   return (
-    <div key={type} className="mb-3">
-      <div className="flex items-center justify-between text-sm">
-        <span>{type.toUpperCase()} Analysis</span>
-        <span className="text-gray-600">{displayValue}</span>
+    <section key={type} className="mt-4">
+      <h4 className="text-sm font-medium text-gray-700 mb-2">{type.toUpperCase()} Analysis</h4>
+      <div className="flex items-center justify-between text-sm mb-1">
+        <span>Z-score</span>
+        <span className="text-gray-600 font-semibold">{displayValue}</span>
       </div>
       <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
         <div className="h-full bg-gray-700" style={{ width: `${barWidth}%` }} />
       </div>
-    </div>
+    </section>
   );
 })}
 

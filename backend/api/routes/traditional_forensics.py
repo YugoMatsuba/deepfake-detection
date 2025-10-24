@@ -142,8 +142,8 @@ def analyze_frame_route():
             frame_data = frame_data.split(",")[1]
         img_data = base64.b64decode(frame_data)
 
-        # Save to temp file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        # Save to temp file as PNG (lossless)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
         temp_file.write(img_data)
         temp_file.close()
         temp_path = temp_file.name

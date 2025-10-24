@@ -238,7 +238,7 @@ def cleanup_old_analysis_files(retention_hours: int = 1) -> dict:
             "skipped": int   # Number already cleaned
         }
     """
-    from database import get_db
+    from api import get_db
     from models import Analysis
 
     stats = {"cleaned": 0, "errors": 0, "skipped": 0}

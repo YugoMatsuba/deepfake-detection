@@ -161,16 +161,18 @@ def transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
         frame_entry["frame_number"] = _parse_frame_number(frame_entry.get("frame"))
         return {
             "confidence": frame_entry["confidence"],
+            "score": frame_entry["confidence"],  # Also set "score" for DB compatibility
             "frames": [frame_entry]
         }
 
-    # Multi-frame: use first top frame
+    # Multi-frame: use first top frame (z-scores can be negative)
     top_frames = raw_result.get("top_frames", [])
     if top_frames:
         frame_list = [
             {
                 "frame": frame.get("frame"),
                 "confidence": frame.get("score", 0.0),
+                "score": frame.get("score", 0.0),  # Also set "score" for DB compatibility
                 "overlay": frame.get("residual_image_base64", ""),
                 "frame_number": _parse_frame_number(frame.get("frame")),
             }
@@ -178,10 +180,11 @@ def transform_noise_result(raw_result: dict[str, Any]) -> dict[str, Any]:
         ]
         return {
             "confidence": frame_list[0]["confidence"],
+            "score": frame_list[0]["score"],  # Also set "score" for DB compatibility
             "frames": frame_list
         }
 
-    return {"confidence": 0.0, "frames": []}
+    return {"confidence": 0.0, "score": 0.0, "frames": []}
 
 
 def transform_lbp_result(raw_result: dict[str, Any]) -> dict[str, Any]:
