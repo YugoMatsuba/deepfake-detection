@@ -73,11 +73,11 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
         filename, score, residual_img = results[0]
         # Save overlay to disk
         _save_overlay(residual_img, filename, output_dir)
-        confidence = float(np.tanh(score * 10))
+        # Return raw score, not tanh transformation
         return {
             "mode": "single_frame",
             "frame": filename,
-            "confidence": confidence
+            "confidence": float(score)
         }
 
     # Multi-frame case
