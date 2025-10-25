@@ -117,11 +117,27 @@ class TestAnalysisRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data['analysis_id'], 'test-analysis-id')
 
+    @patch('api.routes.analysis.DATA_ROOT')
     @patch('api.routes.analysis.get_db')
     @patch('api.routes.analysis.check_analysis_ownership')
     @patch('api.routes.analysis.extract_single_frame')
     @patch('api.routes.analysis.run_ela')
-    def test_analyze_frame(self, mock_ela, mock_extract, mock_ownership, mock_get_db):
+    def test_analyze_frame(self, mock_ela, mock_extract, mock_ownership, mock_get_db, mock_data_root):
+        # Mock DATA_ROOT path operations
+        mock_frames_dir = MagicMock()
+        mock_frames_dir.mkdir = MagicMock()
+        mock_method_dir = MagicMock()
+        mock_method_dir.mkdir = MagicMock()
+
+        def data_root_truediv(path):
+            if 'frames' in str(path):
+                return mock_frames_dir
+            else:
+                return mock_method_dir
+
+        mock_data_root.__truediv__ = MagicMock(side_effect=data_root_truediv)
+        mock_frames_dir.__truediv__ = MagicMock(return_value='/fake/frame_0042.jpg')
+
         mock_db = MagicMock()
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
