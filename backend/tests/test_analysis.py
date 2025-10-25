@@ -117,7 +117,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data['analysis_id'], 'test-analysis-id')
 
-    @patch('api.routes.analysis.DATA_ROOT')
+    @patch('storage.DATA_ROOT')
     @patch('api.routes.analysis.get_db')
     @patch('api.routes.analysis.check_analysis_ownership')
     @patch('api.routes.analysis.extract_single_frame')
