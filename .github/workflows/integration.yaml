@@ -78,6 +78,6 @@ jobs:
     - name: Run FE↔API integration tests
       working-directory: frontend
       env:
-        TEST_DATABASE_URL: postgresql+psycopg://deepfake:secret@localhost:5432
+        TEST_DATABASE_URL: postgresql+psycopg://deepfake:secret@localhost:5431
       run: |
         npm run test:integration
