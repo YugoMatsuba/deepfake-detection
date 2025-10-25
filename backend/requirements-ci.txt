@@ -1,0 +1,35 @@
+# CI-only dependencies for backend API testing
+# Python 3.11 compatible
+#
+# This file is used ONLY by GitHub Actions CI/CD workflows for testing the backend API.
+# It excludes ML dependencies (dlib, torch, torchvision) which:
+#   - Require C++ compilation (slow, error-prone in CI)
+#   - Are NOT needed for backend API tests (tests don't run ML inference)
+#
+# Production deployment uses root requirements.txt (Python 3.9 + ML dependencies)
+
+# Flask web framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-Compress==1.15
+
+# Database ORM and migrations
+SQLAlchemy==2.0.23
+alembic==1.13.1
+
+# Authentication and security
+Werkzeug==3.0.1
+argon2-cffi==23.1.0
+
+# Background task scheduling
+APScheduler==3.10.4
+
+# Image/scientific processing (backend API versions, NOT ML)
+opencv-python-headless==4.8.1.78
+Pillow==10.1.0
+numpy==1.24.4
+scipy==1.11.4
+scikit-image==0.22.0
+
+# PDF generation
+reportlab==4.0.4

@@ -43,8 +43,12 @@ def extract_single_frame(video_path: str, frame_number: int, output_path: str) -
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # Save frame
-        cv2.imwrite(output_path, frame)
+        # Save frame as PNG (lossless)
+        if output_path.lower().endswith('.png'):
+            cv2.imwrite(output_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 3])
+        else:
+            # Default to PNG if no specific extension
+            cv2.imwrite(output_path, frame)
         return output_path
 
     finally:
@@ -92,9 +96,9 @@ def extract_frames(video_path: str, output_base: str = "frames") -> list[str]:
         if not ret:
             break
         if count % frame_interval == 0:
-            frame_filename = f"{video_name}_frame{frame_no:03d}.jpg"
+            frame_filename = f"{video_name}_frame{frame_no:03d}.png"
             path = os.path.join(output_folder, frame_filename)
-            cv2.imwrite(path, frame)
+            cv2.imwrite(path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 3])
             saved_frames.append(path)
             frame_no += 1
         count += 1

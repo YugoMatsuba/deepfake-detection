@@ -198,6 +198,9 @@ def start_analysis(analysis_id: str):
                     ml_frames_meta = ml_output.get("frames", [])
                     ml_timing_meta = ml_output.get("timing_ms")
 
+                    # Log completion
+                    print(f"✓ ML analysis completed for {analysis.id} ({', '.join(ml_modules)})")
+
                     # Filter frames based on average score across all models > 0.5
                     if ml_results:
                         filtered_frames = []
@@ -226,11 +229,13 @@ def start_analysis(analysis_id: str):
 
                 # Run traditional forensics
                 if traditional_modules:
+                    print(f"[Analysis] Starting traditional forensics: {', '.join(traditional_modules)}")
                     traditional_results = run_traditional_forensics(
                         video_path=analysis.video_path,
                         modules=traditional_modules,
                         analysis_id=analysis.id
                     )
+                    print(f"✓ Traditional forensics completed for {analysis.id}")
 
                 # Run metadata forensics analysis (always run, fast ~1-3s)
                 metadata_result = {}
