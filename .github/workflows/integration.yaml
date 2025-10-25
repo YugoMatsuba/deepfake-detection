@@ -50,7 +50,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 ffmpeg
+        sudo apt-get install -y libgl1-mesa-dev libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 ffmpeg postgresql-client
 
     - name: Install backend dependencies
       working-directory: backend
@@ -77,18 +77,10 @@ jobs:
 
     - name: Prepare PostgreSQL database for FE integration tests
       env:
-        ADMIN_DATABASE_URL: postgresql+psycopg://deepfake:secret@localhost:5431/postgres
+        PGPASSWORD: secret
       run: |
-        python - <<'PY'
-import os
-from sqlalchemy import create_engine, text
-
-admin_url = os.environ["ADMIN_DATABASE_URL"]
-engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-with engine.connect() as conn:
-    conn.execute(text("DROP DATABASE IF EXISTS fe_integration_test"))
-    conn.execute(text("CREATE DATABASE fe_integration_test"))
-PY
+        psql -h localhost -p 5431 -U deepfake postgres -c "DROP DATABASE IF EXISTS fe_integration_test;"
+        psql -h localhost -p 5431 -U deepfake postgres -c "CREATE DATABASE fe_integration_test;"
 
     - name: Run FE↔API integration tests
       working-directory: frontend
