@@ -11,12 +11,15 @@
 # ML Dependencies (inference only)
 # =============================================================================
 
-# Core numerical/image processing (constrained by PyTorch 1.12.1)
-numpy==1.21.6
+# Core numerical/image processing (version split for Python 3.11+ compatibility)
+numpy==1.21.6; python_version < "3.11"
+numpy==1.26.4; python_version >= "3.11"
 pillow==9.5.0
 opencv-python-headless==4.6.0.66
-scipy==1.9.3
-scikit-image==0.19.2
+scipy==1.9.3; python_version < "3.11"
+scipy==1.11.4; python_version >= "3.11"
+scikit-image==0.19.2; python_version < "3.11"
+scikit-image==0.22.0; python_version >= "3.11"
 
 # ML-specific libraries
 dlib==19.24.0
@@ -57,8 +60,8 @@ APScheduler==3.10.4
 # Notes on Version Constraints
 # =============================================================================
 # - Python 3.9: Required for PyTorch 1.12.1+cu113 compatibility
-# - numpy 1.21.6: PyTorch 1.12.1 constraint (backend originally used 2.2.6)
+# - numpy split: legacy ML stack (<=Py3.10) still uses 1.21.6, Py3.11+ uses 1.26.4
 # - opencv 4.6.0.66-headless: ML constraint, headless variant for containers
 # - pillow 9.5.0: Conservative choice for PyTorch compatibility
-# - scipy 1.9.3: Compatible with numpy 1.21.6
-# - scikit-image 0.19.2: Compatible with older scipy/numpy versions
+# - scipy split mirrors numpy split to ensure wheels are available for Py3.11
+# - scikit-image split keeps compatibility across both dependency stacks
