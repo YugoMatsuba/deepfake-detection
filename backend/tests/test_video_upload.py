@@ -107,7 +107,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
         self.assertIsInstance(data, list)
 
     @patch('api.routes.video_upload.get_db')
-    @patch('api.routes.video_upload.check_analysis_ownership')
+    @patch('api.routes.analysis.check_analysis_ownership')  # Patch from where it's defined
     @patch('api.routes.video_upload.DATA_ROOT')
     @patch('api.routes.video_upload.send_file')
     def test_get_video(self, mock_send_file, mock_data_root, mock_ownership, mock_get_db):

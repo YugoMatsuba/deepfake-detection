@@ -121,8 +121,7 @@ class TestAnalysisRoutes(unittest.TestCase):
     @patch('api.routes.analysis.check_analysis_ownership')
     @patch('api.routes.analysis.extract_single_frame')
     @patch('api.routes.analysis.run_ela')
-    @patch('api.routes.analysis.transform_ela_result')
-    def test_analyze_frame(self, mock_transform, mock_ela, mock_extract, mock_ownership, mock_get_db):
+    def test_analyze_frame(self, mock_ela, mock_extract, mock_ownership, mock_get_db):
         mock_db = MagicMock()
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
@@ -133,10 +132,11 @@ class TestAnalysisRoutes(unittest.TestCase):
         mock_get_db.return_value.__enter__.return_value = mock_db
 
         mock_extract.return_value = None
-        mock_ela.return_value = {'score': 0.75}
-        mock_transform.return_value = {
-            'score': 0.75,
-            'frames': [{'frame_number': 42}]
+        # run_ela now returns single-frame result with raw score
+        mock_ela.return_value = {
+            'mode': 'single_frame',
+            'frame': 'frame_0042.jpg',
+            'score': 2.5  # Raw score
         }
 
         with self.client.session_transaction() as sess:
@@ -148,6 +148,8 @@ class TestAnalysisRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['frame_number'], 42)
+        self.assertIn('results', data)
+        self.assertIn('ela', data['results'])
 
     @patch('api.routes.analysis._get_video_metadata')
     def test_get_video_metadata(self, mock_metadata):
