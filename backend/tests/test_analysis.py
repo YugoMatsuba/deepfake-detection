@@ -127,6 +127,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
         mock_analysis.video_path = '/test/video.mp4'
+        mock_analysis.result_json = {}  # Initialize as empty dict for merge logic
 
         mock_ownership.return_value = mock_analysis
         mock_get_db.return_value.__enter__.return_value = mock_db
