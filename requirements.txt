@@ -24,7 +24,7 @@ scikit-image==0.22.0; python_version >= "3.11"
 # ML-specific libraries
 # dlib: use upstream wheel where available; fall back to dlib-bin for Py3.11+
 dlib==19.24.0; python_version < "3.11"
-dlib-bin==19.24.0; python_version >= "3.11"
+dlib-bin==19.24.2; python_version >= "3.11"
 imutils==0.5.4
 imageio==2.9.0; python_version < "3.11"
 imageio==2.31.3; python_version >= "3.11"
@@ -68,4 +68,4 @@ APScheduler==3.10.4
 # - pillow 9.5.0: Conservative choice for PyTorch compatibility
 # - scipy split mirrors numpy split to ensure wheels are available for Py3.11
 # - scikit-image split keeps compatibility across both dependency stacks
-# - dlib split: stock wheel for <=Py3.10, dlib-bin prebuilt wheels for Py3.11+
+# - dlib split: stock wheel for <=Py3.10, dlib-bin 19.24.2 wheels for Py3.11+
