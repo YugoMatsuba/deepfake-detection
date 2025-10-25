@@ -155,10 +155,9 @@ def parse_frame_hashes(raw_hashes: list) -> list:
         # Parse by splitting on commas and extract 4th field (the hash)
         parts = line.strip().split(',')
         if len(parts) >= 4:
-            hash_value = parts[3].strip()
-            # Validate it's a hex hash (32 for MD5, 64 for SHA-256)
-            if re.match(r'^[a-f0-9]{32,}$', hash_value):
-                hashes.append(hash_value)
+            hash_val = parts[3].strip()
+            if hash_val and len(hash_val) >= 32:
+                hashes.append(hash_val)
 
     return hashes
 

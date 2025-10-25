@@ -106,9 +106,19 @@ class TestVideoUploadRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertIsInstance(data, list)
 
+    @patch('api.routes.video_upload.get_db')
+    @patch('api.routes.analysis.check_analysis_ownership')  # Patch from where it's defined
     @patch('api.routes.video_upload.DATA_ROOT')
     @patch('api.routes.video_upload.send_file')
-    def test_get_video(self, mock_send_file, mock_data_root):
+    def test_get_video(self, mock_send_file, mock_data_root, mock_ownership, mock_get_db):
+        # Mock database and analysis ownership
+        mock_db = MagicMock()
+        mock_analysis = MagicMock()
+        mock_analysis.id = 'test-analysis-id'
+        mock_ownership.return_value = mock_analysis
+        mock_get_db.return_value.__enter__.return_value = mock_db
+
+        # Mock file system
         mock_video_dir = MagicMock()
         mock_video_dir.exists.return_value = True
         mock_video_dir.glob.return_value = ['/test/video.mp4']
@@ -116,7 +126,12 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
         mock_send_file.return_value = 'video content'
 
-        response = self.client.get('/api/videos/test-analysis-id')
+        # Add authentication session
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = self.test_user_id
+
+        # Use secure endpoint
+        response = self.client.get('/api/analyses/test-analysis-id/video')
         mock_send_file.assert_called_once()
 
     @patch('api.routes.video_upload.get_db')

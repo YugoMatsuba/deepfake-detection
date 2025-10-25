@@ -63,7 +63,10 @@ class TestAnalysisRoutes(unittest.TestCase):
         }
 
         mock_traditional.return_value = {
-            'ela': {'score': 0.65, 'overlay': 'base64-data'}
+            'ela': {
+                'score': 0.65,
+                'frames': [{'frame': 'frame_0001.jpg', 'frame_number': 1, 'score': 0.65, 'overlay_url': '/api/analyses/test-analysis-id/forensics/ela/frames/1/overlay'}]
+            }
         }
 
         with self.client.session_transaction() as sess:
@@ -114,25 +117,42 @@ class TestAnalysisRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data['analysis_id'], 'test-analysis-id')
 
+    @patch('storage.DATA_ROOT')
     @patch('api.routes.analysis.get_db')
     @patch('api.routes.analysis.check_analysis_ownership')
     @patch('api.routes.analysis.extract_single_frame')
     @patch('api.routes.analysis.run_ela')
-    @patch('api.routes.analysis.transform_ela_result')
-    def test_analyze_frame(self, mock_transform, mock_ela, mock_extract, mock_ownership, mock_get_db):
+    def test_analyze_frame(self, mock_ela, mock_extract, mock_ownership, mock_get_db, mock_data_root):
+        # Mock DATA_ROOT path operations
+        mock_frames_dir = MagicMock()
+        mock_frames_dir.mkdir = MagicMock()
+        mock_method_dir = MagicMock()
+        mock_method_dir.mkdir = MagicMock()
+
+        def data_root_truediv(path):
+            if 'frames' in str(path):
+                return mock_frames_dir
+            else:
+                return mock_method_dir
+
+        mock_data_root.__truediv__ = MagicMock(side_effect=data_root_truediv)
+        mock_frames_dir.__truediv__ = MagicMock(return_value='/fake/frame_0042.jpg')
+
         mock_db = MagicMock()
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
         mock_analysis.video_path = '/test/video.mp4'
+        mock_analysis.result_json = {}  # Initialize as empty dict for merge logic
 
         mock_ownership.return_value = mock_analysis
         mock_get_db.return_value.__enter__.return_value = mock_db
 
         mock_extract.return_value = None
-        mock_ela.return_value = {'score': 0.75}
-        mock_transform.return_value = {
-            'score': 0.75,
-            'frames': [{'frame_number': 42}]
+        # run_ela now returns single-frame result with raw score
+        mock_ela.return_value = {
+            'mode': 'single_frame',
+            'frame': 'frame_0042.jpg',
+            'score': 2.5  # Raw score
         }
 
         with self.client.session_transaction() as sess:
@@ -144,6 +164,8 @@ class TestAnalysisRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['frame_number'], 42)
+        self.assertIn('results', data)
+        self.assertIn('ela', data['results'])
 
     @patch('api.routes.analysis._get_video_metadata')
     def test_get_video_metadata(self, mock_metadata):

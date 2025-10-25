@@ -538,50 +538,35 @@ useEffect(() => {
         throw new Error("Backend returned no data for the requested analysis.");
       }
 
-      const normalizedFrames = (methodResult.frames || []).map((frame) => ({
-        ...frame,
-        frame_number:
-          typeof frame?.frame_number === "number"
-            ? frame.frame_number
-            : result.frame_number,
-      }));
-
-      const existingMethod = traditionalData?.[analysisType] || {};
-      const mergedFrames = mergeFrames(existingMethod.frames || [], normalizedFrames);
-
-      const updatedMethod = {
-        ...existingMethod,
-        ...methodResult,
-        frames: mergedFrames,
-      };
-
+      // Backend now returns FULL updated method data (all frames with recalculated z-scores)
+      // No need to merge - just replace the entire method data
       const updatedTraditional = {
         ...traditionalData,
-        [analysisType]: updatedMethod,
+        [analysisType]: methodResult,
       };
 
       setTraditionalData(updatedTraditional);
       onTraditionalResultsUpdate(updatedTraditional);
 
-      const primaryFrame =
-        mergedFrames.find((frame) => frame.frame_number === result.frame_number) ||
-        mergedFrames[mergedFrames.length - 1] ||
-        null;
+      // Find the frame we just analyzed
+      const analyzedFrame = methodResult.frames?.find(
+        (frame) => frame.frame_number === result.frame_number
+      );
 
-      const overlayData = primaryFrame?.overlay ?? null;
+      // Use overlay_url from disk persistence
+      const overlayData = analyzedFrame?.overlay_url ?? null;
       const primaryScore =
+        analyzedFrame?.score ??
+        analyzedFrame?.confidence ??
         methodResult.score ??
         methodResult.confidence ??
-        primaryFrame?.score ??
-        primaryFrame?.confidence ??
         null;
 
       setAnalysisResult({
         analysis_type: analysisType,
         frame_number: result.frame_number,
         score: primaryScore,
-        confidence:
-          methodResult.confidence ?? primaryFrame?.confidence ?? null,
+        confidence: analyzedFrame?.confidence ?? methodResult.confidence ?? null,
         overlay: overlayData,
       });
 
@@ -648,22 +633,9 @@ const handleDownloadPDF = async () => {
   }
 };
 
-const handleFinishAnalysis = async () => {
-  setCleaning(true);
-  try {
-    const response = await fetch(`/api/analyses/${analysisId}/cleanup`, {
-      method: "POST",
-      credentials: "include",
-    });
-
-    if (!response.ok) throw new Error("Failed to cleanup files");
-
-    // Success - navigate to upload page
-    navigate("/upload");
-  } catch (err) {
-    alert("Failed to cleanup: " + err.message);
-    setCleaning(false);
-  }
+const handleFinishAnalysis = () => {
+  // Just navigate back to upload page, no cleanup
+  navigate("/upload");
 };
 
 
@@ -675,51 +647,11 @@ const handleFinishAnalysis = async () => {
 
       {/* Finish Analysis Button - Top Right */}
       <button
-        onClick={() => setShowFinishPopup(true)}
+        onClick={handleFinishAnalysis}
         className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg"
       >
         Finish Analysis
       </button>
-
-      {/* Finish Analysis Popup */}
-      {showFinishPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-            <h2 className="text-xl font-bold mb-4">Finish Analysis?</h2>
-            <p className="text-gray-700 mb-6">
-              This will delete video files from our servers to free up space.
-              Your analysis results will be saved and available in Past Reports.
-            </p>
-
-            {/* Download PDF Option */}
-            <button
-              onClick={handleDownloadPDF}
-              disabled={downloadingPDF}
-              className="w-full mb-3 px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 transition"
-            >
-              {downloadingPDF ? "Downloading..." : "Download PDF Report"}
-            </button>
-
-            {/* Finish & Delete Files */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleFinishAnalysis}
-                disabled={cleaning}
-                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
-              >
-                {cleaning ? "Finishing..." : "Finish & Clean Up"}
-              </button>
-              <button
-                onClick={() => setShowFinishPopup(false)}
-                disabled={cleaning}
-                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-50 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-col items-center flex-1 space-y-1 p-3">
 
@@ -752,11 +684,12 @@ const handleFinishAnalysis = async () => {
 
             {/* Overlay image for ELA, LBP, or Noise */}
             {(() => {
-              const overlaySrc = overlayResult?.overlay
-                ? overlayResult.overlay
-                : overlayResult?.image_file
-                ? `http://localhost:5050/${overlayResult.image_file.replace(/\\/g, "/")}`
-                : null;
+              let overlaySrc = overlayResult?.overlay;
+
+              // If overlay starts with /, it's a URL path - prepend API base
+              if (overlaySrc && overlaySrc.startsWith('/')) {
+                overlaySrc = `http://localhost:5050${overlaySrc}`;
+              }
 
               if (!overlaySrc) {
                 return null;
@@ -848,11 +781,12 @@ const handleFinishAnalysis = async () => {
 </p>
 
       {(() => {
-        const overlaySrc = analysisResult.overlay
-          ? analysisResult.overlay
-          : analysisResult.image_file
-          ? `http://localhost:5050/${analysisResult.image_file.replace(/\\/g, "/")}`
-          : null;
+        let overlaySrc = analysisResult.overlay;
+
+        // If overlay starts with /, it's a URL path - prepend API base
+        if (overlaySrc && overlaySrc.startsWith('/')) {
+          overlaySrc = `http://localhost:5050${overlaySrc}`;
+        }
 
         if (!overlaySrc) {
           return null;
@@ -953,7 +887,7 @@ const handleFinishAnalysis = async () => {
               videoRef.current.currentTime = frameNum / frameRate;
               setCurrentFrame(frameNum);
               // Show overlay for traditional forensics (ML has no overlay)
-              const overlayData = frame.overlay || null;
+              const overlayData = frame.overlay || frame.overlay_url || null;
               setOverlayResult(
                 overlayData
                   ? { analysis_type: type, overlay: overlayData }

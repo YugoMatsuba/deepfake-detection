@@ -1,5 +1,5 @@
 import os
-import base64
+from pathlib import Path
 from io import BytesIO
 from PIL import Image, ImageChops, ImageEnhance
 import numpy as np
@@ -85,29 +85,17 @@ def compute_ela_score(image_path, resave_quality=90):
     return score, ela_image
 
 
-def encode_ela_to_base64(ela_image):
-    """
-    Encode an ELA PIL image to base64 PNG string.
-    """
-    buffer = BytesIO()
-    ela_image.save(buffer, format="PNG", compress_level=ELA_PNG_LEVEL, optimize=True)
-    ela_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    ela_base64 = f"data:image/png;base64,{ela_base64}"
-    return ela_base64
-
-
-def compute_ela_base64(image_path, resave_quality=90):
-    """
-    Compute ELA image and anomaly score with base64 encoding.
-    Returns score and base64-encoded ELA image.
-
-    This is a convenience wrapper that combines score calculation and encoding.
-    For better performance when processing many frames, use compute_ela_score()
-    and encode_ela_to_base64() separately.
-    """
-    score, ela_image = compute_ela_score(image_path, resave_quality)
-    ela_base64 = encode_ela_to_base64(ela_image)
-    return score, ela_base64
+def _save_overlay(image, frame_filename, output_dir):
+    """Save overlay image to disk and return saved path."""
+    if output_dir:
+        # Parse frame number from filename (e.g., "frame_0001.jpg" -> "0001")
+        stem = Path(frame_filename).stem
+        digits = "".join(ch for ch in stem if ch.isdigit())
+        if digits:
+            out_path = Path(output_dir) / f"frame_{digits}.jpg"
+            image.save(out_path, "JPEG", quality=90)
+            return str(out_path)
+    return None
 
 
 def _compute_ela_worker(path):
@@ -124,15 +112,16 @@ def _compute_ela_worker(path):
     return (os.path.basename(path), path, score, ela_image)
 
 
-def run_ela(input_path, top_percent=10):
+def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
     """
     Run ELA on a single image or folder.
-    Returns top frames as JSON with Base64-encoded ELA images.
+    Saves overlay images to output_dir if provided.
+    Returns top frames as JSON (no base64, overlays saved to disk).
 
     PERFORMANCE OPTIMIZATION:
     - Computes scores for ALL frames
     - Sorts and selects top N frames
-    - Only encodes top N frames to base64 (not all frames)
+    - Only saves overlays for top N frames (not all frames)
     """
     # Collect frames
     if os.path.isdir(input_path):
@@ -148,18 +137,20 @@ def run_ela(input_path, top_percent=10):
     else:
         raise FileNotFoundError(f"Invalid path: {input_path}")
 
-    # Single frame case - compute score and encode immediately
+    # Single frame case - compute score and save overlay
     if len(frame_paths) == 1:
-        score, ela_base64 = compute_ela_base64(frame_paths[0])
+        score, ela_image = compute_ela_score(frame_paths[0])
+        filename = os.path.basename(frame_paths[0])
+        # Save overlay to disk
+        _save_overlay(ela_image, filename, output_dir)
         return {
             "mode": "single_frame",
-            "frame": os.path.basename(frame_paths[0]),
-            "score": float(score),
-            "ela_image_base64": ela_base64
+            "frame": filename,
+            "score": float(score)
         }
 
-    # Multi-frame case - optimize by only encoding top frames
-    # Step 1: Compute scores for ALL frames (without base64 encoding)
+    # Multi-frame case - optimize by only saving overlays for top frames
+    # Step 1: Compute scores for ALL frames (without saving overlays yet)
     total_frames = len(frame_paths)
     print(f"[ELA Analysis] Processing {total_frames} frames with {MAX_WORKERS} workers...")
 
@@ -190,27 +181,29 @@ def run_ela(input_path, top_percent=10):
     print(f"[ELA Analysis] ✓ Completed processing {total_frames} frames")
 
     # Step 2: Normalize scores (z-scores, no zero-clipping - negatives are meaningful)
+    # Keep both raw scores and z-scores for persistence
     scores_only = [s for _, _, s, _ in results]
     mean_score = np.mean(scores_only)
     std_score = np.std(scores_only) + 1e-6
     normalized_results = [
-        (fname, fpath, (score - mean_score) / std_score, ela_img)
+        (fname, fpath, score, (score - mean_score) / std_score, ela_img)
         for fname, fpath, score, ela_img in results
     ]
 
     # Step 3: Sort and pick top frames
-    normalized_results.sort(key=lambda x: x[2], reverse=True)  # Sort by normalized score
+    normalized_results.sort(key=lambda x: x[3], reverse=True)  # Sort by z-score (index 3)
     top_count = min(max(1, int(len(normalized_results) * top_percent / 100)), 32)
     top_frames_data = normalized_results[:top_count]
 
-    # Step 4: Only NOW encode the top frames to base64
+    # Step 4: Save overlays for top frames and build response
     top_frames = []
-    for fname, fpath, norm_score, ela_img in top_frames_data:
-        ela_base64 = encode_ela_to_base64(ela_img)
+    for fname, fpath, raw_score, z_score, ela_img in top_frames_data:
+        # Save overlay to disk
+        _save_overlay(ela_img, fname, output_dir)
         top_frames.append({
             "frame": fname,
-            "score": float(norm_score),
-            "ela_image_base64": ela_base64
+            "raw_score": float(raw_score),  # NEW: Store raw score for z-score recalculation
+            "score": float(z_score)
         })
 
     # Return JSON-ready dict

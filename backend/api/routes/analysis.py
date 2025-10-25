@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import cv2
+import numpy as np
 from flask import Blueprint, jsonify, request, session
 from sqlalchemy import update
 from werkzeug.exceptions import HTTPException
@@ -118,7 +119,7 @@ def start_analysis(analysis_id: str):
       "traditional": {
         "ela": {
           "score": 0.65,
-          "overlay": "data:image/png;base64,..."  // EPHEMERAL, not in DB
+          "frames": [{"frame_number": 1, "score": 0.65, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/1/overlay"}]
         },
         ...
       },
@@ -127,7 +128,7 @@ def start_analysis(analysis_id: str):
     }
 
     Note: ML results include per-frame scores but NO overlays.
-          Traditional results include base64 overlays (ephemeral, not saved to DB).
+          Traditional results include overlay URLs (overlays persisted to disk).
 
     Response (400/403/404/500): error message
     """
@@ -231,7 +232,8 @@ def start_analysis(analysis_id: str):
                     print(f"[Analysis] Starting traditional forensics: {', '.join(traditional_modules)}")
                     traditional_results = run_traditional_forensics(
                         video_path=analysis.video_path,
-                        modules=traditional_modules
+                        modules=traditional_modules,
+                        analysis_id=analysis.id
                     )
                     print(f"✓ Traditional forensics completed for {analysis.id}")
 
@@ -265,11 +267,13 @@ def start_analysis(analysis_id: str):
                         "weights_hash": model_data.get("weights_hash")
                     }
 
-                # Traditional results: strip base64 overlays before saving
+                # Traditional results: save scores and frame metadata
                 for method_name, method_data in traditional_results.items():
                     result_json["traditional"][method_name] = {
-                        "score": method_data.get("score")
-                        # NOTE: "overlay" field intentionally omitted (not saved to DB)
+                        "score": method_data.get("score"),
+                        "confidence": method_data.get("confidence"),  # for noise
+                        "frames": method_data.get("frames", [])
+                        # NOTE: overlay URLs are included, overlays persisted to disk
                     }
 
                 # Update Analysis record with scores and provenance metadata
@@ -296,7 +300,7 @@ def start_analysis(analysis_id: str):
             # Build full response payload
             # Metadata: from upload (persisted in DB)
             # ML: scores + frames (no overlays)
-            # Traditional: scores + base64 overlays (ephemeral, not in DB)
+            # Traditional: scores + overlay URLs (overlays persisted to disk)
             response = {
                 "analysis_id": analysis.id,
                 "status": "succeeded",
@@ -366,7 +370,7 @@ def _get_video_metadata(video_path: str) -> Dict[str, Any]:
 @require_user
 def get_analysis(analysis_id: str):
     """
-    Fetch analysis status and results (scores only from DB, no base64).
+    Fetch analysis status and results (scores + overlay URLs from DB).
 
     Response (200):
     {
@@ -382,7 +386,10 @@ def get_analysis(analysis_id: str):
           ...
         },
         "traditional": {
-          "ela": {"score": 0.65},
+          "ela": {
+            "score": 0.65,
+            "frames": [{"frame_number": 1, "score": 0.65, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/1/overlay"}]
+          },
           ...
         }
       },
@@ -399,13 +406,112 @@ def get_analysis(analysis_id: str):
         response = {
             "analysis_id": analysis.id,
             "status": analysis.status,
-            "result": analysis.result_json,  # Scores only (no base64 overlays)
+            "result": analysis.result_json,  # Scores + overlay URLs
             "error": analysis.error,
             "created_at": analysis.created_at.isoformat(),
             "updated_at": analysis.updated_at.isoformat()
         }
 
         return jsonify(response), 200
+
+
+def _merge_and_recompute_traditional(
+    method_name: str,
+    new_frame_result: dict,
+    existing_data: dict,
+    frame_number: int,
+    analysis_id: str
+) -> dict:
+    """
+    Merge new frame analysis with existing data and recompute z-scores across ALL frames.
+
+    This ensures z-scores are computed with full statistical context, not just single-frame isolation.
+
+    Args:
+        method_name: "ela", "noise", or "lbp"
+        new_frame_result: Single-frame result from run_ela/run_noise_analysis/run_lbp_analysis
+                         e.g. {"mode": "single_frame", "frame": "...", "confidence": 2.8}
+        existing_data: Current data from DB (analysis.result_json["traditional"][method])
+                      e.g. {"score": 1.5, "frames": [{...}, {...}]}
+        frame_number: The frame number being analyzed
+        analysis_id: Analysis UUID for overlay URL generation
+
+    Returns:
+        Updated method data with recalculated z-scores for ALL frames (initial + ad-hoc)
+
+    Algorithm:
+        1. Extract raw score from new frame result
+        2. Merge new frame into existing frames list (replace if exists)
+        3. Collect all raw scores from all frames
+        4. Recompute z-scores: z = (raw - mean) / std for EVERY frame
+        5. Update overall score (mean of top N z-scores)
+    """
+    # 1. Extract raw score from new frame
+    if method_name == "noise":
+        raw_score = new_frame_result.get("confidence")
+    else:
+        raw_score = new_frame_result.get("score")
+
+    if raw_score is None:
+        raise ValueError(f"No score found in new frame result for {method_name}")
+
+    # 2. Build list of ALL frames (existing + new)
+    existing_frames = list(existing_data.get("frames", []))
+
+    # Check if frame already exists (replace if so)
+    frame_index = None
+    for idx, frame in enumerate(existing_frames):
+        if frame.get("frame_number") == frame_number:
+            frame_index = idx
+            break
+
+    # Create new frame entry
+    new_frame_entry = {
+        "frame_number": frame_number,
+        "raw_score": float(raw_score),
+        "overlay_url": f"/api/analyses/{analysis_id}/forensics/{method_name}/frames/{frame_number}/overlay"
+    }
+
+    if frame_index is not None:
+        # Replace existing frame
+        existing_frames[frame_index] = new_frame_entry
+    else:
+        # Add new frame
+        existing_frames.append(new_frame_entry)
+
+    # 3. Collect all raw scores
+    all_raw_scores = [frame["raw_score"] for frame in existing_frames]
+
+    # 4. Recompute z-scores across ALL frames
+    mean_score = float(np.mean(all_raw_scores))
+    std_score = float(np.std(all_raw_scores)) + 1e-6  # Avoid division by zero
+
+    for frame in existing_frames:
+        raw = frame["raw_score"]
+        z_score = (raw - mean_score) / std_score
+        frame["score"] = float(z_score)
+
+        # Noise also uses "confidence" field
+        if method_name == "noise":
+            frame["confidence"] = float(z_score)
+
+    # 5. Compute overall score (mean of top N frames, or all if < 10)
+    z_scores = [f["score"] for f in existing_frames]
+    z_scores_sorted = sorted(z_scores, reverse=True)
+    top_n = min(10, len(z_scores_sorted))
+    overall_score = float(np.mean(z_scores_sorted[:top_n]))
+
+    # 6. Return updated structure
+    result = {
+        "score": overall_score,
+        "frames": existing_frames
+    }
+
+    # Noise also has "confidence" at top level
+    if method_name == "noise":
+        result["confidence"] = overall_score
+
+    return result
 
 
 @analysis_bp.post("/analyses/<analysis_id>/frames/<int:frame_number>/forensics")
@@ -426,15 +532,15 @@ def analyze_frame(analysis_id: str, frame_number: int):
       "results": {
         "ela": {
           "score": 0.73,
-          "overlay": "data:image/jpeg;base64,..."
+          "frames": [{"frame_number": 42, "score": 0.73, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/42/overlay"}]
         },
         "noise": {
           "confidence": 0.68,
-          "overlay": "data:image/jpeg;base64,..."
+          "frames": [{"frame_number": 42, "confidence": 0.68, "overlay_url": "/api/analyses/{id}/forensics/noise/frames/42/overlay"}]
         },
         "lbp": {
           "score": 0.81,
-          "overlay": "data:image/jpeg;base64,..."
+          "frames": [{"frame_number": 42, "score": 0.81, "overlay_url": "/api/analyses/{id}/forensics/lbp/frames/42/overlay"}]
         }
       }
     }
@@ -461,66 +567,101 @@ def analyze_frame(analysis_id: str, frame_number: int):
                     error=f"Invalid methods: {', '.join(sorted(invalid_methods))}"
                 ), 400
 
-            # Extract frame to temporary directory (consistent with initial analysis pattern)
-            with tempfile.TemporaryDirectory(prefix=f"frame_{frame_number}_") as tmp_dir:
-                frame_path = os.path.join(tmp_dir, f"frame_{frame_number}.jpg")
+            # Extract frame to persistent directory
+            from storage import DATA_ROOT
+            frames_dir = DATA_ROOT / analysis.id / "frames"
+            frames_dir.mkdir(parents=True, exist_ok=True)
+            frame_path = str(frames_dir / f"frame_{frame_number:04d}.jpg")
 
-                try:
-                    extract_single_frame(
-                        video_path=analysis.video_path,
-                        frame_number=frame_number,
-                        output_path=frame_path
-                    )
+            try:
+                extract_single_frame(
+                    video_path=analysis.video_path,
+                    frame_number=frame_number,
+                    output_path=frame_path
+                )
 
-                    # Run each requested forensics method on the single frame
-                    results = {}
+                # Fetch current result_json from DB
+                current_json = analysis.result_json or {}
+                if "traditional" not in current_json:
+                    current_json["traditional"] = {}
 
-                    for method in methods:
-                        try:
-                            if method == "ela":
-                                raw_result = run_ela(frame_path, top_percent=10)
-                                transformed = transform_ela_result(raw_result)
+                # Run each requested forensics method on the single frame
+                results = {}
 
-                            elif method == "noise":
-                                raw_result = run_noise_analysis(frame_path, top_percent=10)
-                                transformed = transform_noise_result(raw_result)
+                for method in methods:
+                    try:
+                        # Create method-specific forensics directory
+                        method_dir = DATA_ROOT / analysis.id / "forensics" / method
+                        method_dir.mkdir(parents=True, exist_ok=True)
 
-                            elif method == "lbp":
-                                raw_result = run_lbp_analysis(frame_path, top_percent=10)
-                                transformed = transform_lbp_result(raw_result)
+                        # Run analysis and get raw single-frame result
+                        if method == "ela":
+                            raw_result = run_ela(
+                                frame_path,
+                                top_percent=10,
+                                output_dir=str(method_dir),
+                                analysis_id=analysis.id
+                            )
 
-                            else:
-                                continue
+                        elif method == "noise":
+                            raw_result = run_noise_analysis(
+                                frame_path,
+                                top_percent=10,
+                                output_dir=str(method_dir),
+                                analysis_id=analysis.id
+                            )
 
-                            # Annotate each frame entry with the requested frame number
-                            frames = transformed.get("frames", [])
-                            for entry in frames:
-                                entry.setdefault("frame_number", frame_number)
-                            transformed["frames"] = frames
+                        elif method == "lbp":
+                            raw_result = run_lbp_analysis(
+                                frame_path,
+                                top_percent=10,
+                                output_dir=str(method_dir),
+                                analysis_id=analysis.id
+                            )
 
-                            results[method] = transformed
+                        else:
+                            continue
 
-                        except Exception as e:
-                            results[method] = {
-                                "score": None,
-                                "error": f"Analysis failed: {str(e)}"
-                            }
+                        # Merge with existing data and recompute z-scores
+                        existing_method_data = current_json["traditional"].get(method, {})
+                        updated_method_data = _merge_and_recompute_traditional(
+                            method_name=method,
+                            new_frame_result=raw_result,
+                            existing_data=existing_method_data,
+                            frame_number=frame_number,
+                            analysis_id=analysis.id
+                        )
 
-                    response = {
-                        "analysis_id": analysis.id,
-                        "frame_number": frame_number,
-                        "results": results
-                    }
+                        # Update result_json with merged data
+                        current_json["traditional"][method] = updated_method_data
 
-                    return jsonify(response), 200
+                        # Return the FULL updated method data (not just single frame)
+                        results[method] = updated_method_data
 
-                except ValueError as e:
-                    # Frame number out of range
-                    return jsonify(error=str(e)), 400
+                    except Exception as e:
+                        results[method] = {
+                            "score": None,
+                            "error": f"Analysis failed: {str(e)}"
+                        }
 
-                except Exception as e:
-                    return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
-            # Temp directory auto-cleaned up here
+                # Save updated result_json back to DB
+                analysis.result_json = current_json
+                db.commit()
+
+                response = {
+                    "analysis_id": analysis.id,
+                    "frame_number": frame_number,
+                    "results": results
+                }
+
+                return jsonify(response), 200
+
+            except ValueError as e:
+                # Frame number out of range
+                return jsonify(error=str(e)), 400
+
+            except Exception as e:
+                return jsonify(error=f"Frame extraction failed: {str(e)}"), 500
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)
@@ -618,37 +759,38 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
         return jsonify(error=str(e)), 500
 
 
-@analysis_bp.post("/analyses/<analysis_id>/cleanup")
-@require_user
-def cleanup_analysis_files_endpoint(analysis_id: str):
-    """
-    Delete video/frame files from disk while keeping database record.
-
-    Called when user finishes analysis in FrameViewer.
-    Database record persists so reports can still be generated.
-
-    Requires: Ownership or admin role
-    Returns: 204 No Content on success
-    """
-    try:
-        with get_db() as db:
-            # Check ownership
-            analysis = check_analysis_ownership(db, analysis_id)
-
-            # Delete files from disk
-            success = delete_analysis_files(analysis_id)
-
-            if not success:
-                logger.warning(f"Files already deleted for analysis {analysis_id}")
-                # Still return 204 - idempotent operation
-
-            return "", 204
-
-    except HTTPException:
-        raise  # Re-raise HTTP exceptions (401/403/404)
-    except Exception as e:
-        logger.error(f"Failed to cleanup analysis {analysis_id}: {e}")
-        return jsonify(error=str(e)), 500
+# DISABLED: Persistence overhaul - files are no longer auto-deleted
+# @analysis_bp.post("/analyses/<analysis_id>/cleanup")
+# @require_user
+# def cleanup_analysis_files_endpoint(analysis_id: str):
+#     """
+#     Delete video/frame files from disk while keeping database record.
+#
+#     Called when user finishes analysis in FrameViewer.
+#     Database record persists so reports can still be generated.
+#
+#     Requires: Ownership or admin role
+#     Returns: 204 No Content on success
+#     """
+#     try:
+#         with get_db() as db:
+#             # Check ownership
+#             analysis = check_analysis_ownership(db, analysis_id)
+#
+#             # Delete files from disk
+#             success = delete_analysis_files(analysis_id)
+#
+#             if not success:
+#                 logger.warning(f"Files already deleted for analysis {analysis_id}")
+#                 # Still return 204 - idempotent operation
+#
+#             return "", 204
+#
+#     except HTTPException:
+#         raise  # Re-raise HTTP exceptions (401/403/404)
+#     except Exception as e:
+#         logger.error(f"Failed to cleanup analysis {analysis_id}: {e}")
+#         return jsonify(error=str(e)), 500
 
 
 @analysis_bp.delete("/analyses/<analysis_id>")

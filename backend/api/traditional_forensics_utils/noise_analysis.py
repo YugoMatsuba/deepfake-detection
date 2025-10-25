@@ -1,6 +1,5 @@
 import os
-import base64
-from io import BytesIO
+from pathlib import Path
 from PIL import Image
 import numpy as np
 from scipy.ndimage import gaussian_filter, zoom
@@ -168,12 +167,17 @@ def compute_noise(frame_path):
     return score, overlay_img
 
 
-def encode_image_to_base64(image):
-    """Convert PIL image to Base64 PNG (with MIME prefix)."""
-    buffer = BytesIO()
-    image.save(buffer, format="PNG", compress_level=NOISE_PNG_LEVEL, optimize=True)
-    base64_data = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{base64_data}"
+def _save_overlay(image, frame_filename, output_dir):
+    """Save overlay image to disk and return saved path."""
+    if output_dir:
+        # Parse frame number from filename (e.g., "frame_0001.jpg" -> "0001")
+        stem = Path(frame_filename).stem
+        digits = "".join(ch for ch in stem if ch.isdigit())
+        if digits:
+            out_path = Path(output_dir) / f"frame_{digits}.jpg"
+            image.save(out_path, "JPEG", quality=90)
+            return str(out_path)
+    return None
 
 
 def _compute_noise_worker(path):
@@ -190,10 +194,11 @@ def _compute_noise_worker(path):
     return (os.path.basename(path), score, overlay_img)
 
 
-def run_noise_analysis(input_path, top_percent=10):
+def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=None):
     """
     Run noise analysis on a folder or single frame.
-    Returns JSON with top frames and their Base64 residuals.
+    Saves overlay images to output_dir if provided.
+    Returns JSON with top frames (no base64, overlays saved to disk).
     """
 
     # Collect frame paths
@@ -243,12 +248,13 @@ def run_noise_analysis(input_path, top_percent=10):
     # Single frame case
     if len(results) == 1:
         filename, score, residual_img = results[0]
-        confidence = float(np.tanh(score * 10))
+        # Save overlay to disk
+        _save_overlay(residual_img, filename, output_dir)
+        # Return raw score (NO tanh transformation)
         return {
             "mode": "single_frame",
             "frame": filename,
-            "confidence": confidence,
-            "residual_image_base64": encode_image_to_base64(residual_img)
+            "confidence": float(score)
         }
 
     # Multi-frame case
@@ -257,9 +263,10 @@ def run_noise_analysis(input_path, top_percent=10):
     std_score = np.std(scores_only) + 1e-6
 
     # Compute z-scores (no zero-clipping - negatives are meaningful)
-    normalized = [(f, (s - mean_score) / std_score, img, idx)
+    # Keep both raw scores and z-scores for persistence
+    normalized = [(f, s, (s - mean_score) / std_score, img, idx)
                   for idx, (f, s, img) in enumerate(results)]
-    sorted_results = sorted(normalized, key=lambda x: x[1], reverse=True)
+    sorted_results = sorted(normalized, key=lambda x: x[2], reverse=True)
 
     # Cap at 32 frames to limit JSON payload size
     top_count = min(max(1, int(len(sorted_results) * top_percent / 100)), 32)
@@ -268,12 +275,12 @@ def run_noise_analysis(input_path, top_percent=10):
     selected_frames = []
     selected_indices = []
 
-    for fname, z_score, img, idx in sorted_results:
+    for fname, raw_score, z_score, img, idx in sorted_results:
         # Check if this frame is too close to any already selected
         too_close = any(abs(idx - sel_idx) <= NOISE_TEMP_NMS_WINDOW for sel_idx in selected_indices)
 
         if not too_close:
-            selected_frames.append((fname, z_score, img))
+            selected_frames.append((fname, raw_score, z_score, img))
             selected_indices.append(idx)
 
         if len(selected_frames) >= top_count:
@@ -281,16 +288,19 @@ def run_noise_analysis(input_path, top_percent=10):
 
     top_frames = selected_frames
 
+    # Save overlays and build response
+    frame_list = []
+    for f, raw_s, z_s, img in top_frames:
+        # Save overlay to disk
+        _save_overlay(img, f, output_dir)
+        frame_list.append({
+            "frame": f,
+            "raw_score": float(raw_s),  # NEW: Store raw score for z-score recalculation
+            "score": float(z_s)
+        })
+
     # Return top frames JSON
     return {
         "mode": "multi_frame",
-        "top_frames": [
-            {
-                "frame": f,
-                "score": float(s),
-                "residual_image_base64": encode_image_to_base64(img)
-            }
-            for f, s, img in top_frames
-        ]
+        "top_frames": frame_list
     }
-
