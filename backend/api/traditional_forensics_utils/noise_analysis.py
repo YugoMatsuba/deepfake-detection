@@ -27,7 +27,7 @@ NOISE_ZMAP_PCTL_LOW = 5
 NOISE_ZMAP_PCTL_HIGH = 95
 
 # Multiprocessing config (env-configurable)
-MAX_WORKERS = int(os.getenv("FORENSICS_WORKERS", os.cpu_count() or 4))
+MAX_WORKERS = int(os.getenv("FORENSICS_WORKERS") or os.cpu_count() or 4)
 
 
 def stretch_to_uint8(arr, low_pct, high_pct):

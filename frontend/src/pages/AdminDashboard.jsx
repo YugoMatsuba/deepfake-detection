@@ -357,6 +357,7 @@ function AnalysesTab() {
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">ID</th>
+              <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Filename</th>
               <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">User</th>
               <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Status</th>
               <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Created</th>
@@ -367,6 +368,13 @@ function AnalysesTab() {
             {analyses.map((analysis) => (
               <tr key={analysis.id} className="border-b border-gray-100 even:bg-gray-50">
                 <td className="px-4 py-2 text-sm font-mono">{analysis.id.slice(0, 8)}...</td>
+                <td className="px-4 py-2 text-sm" title={analysis.original_filename || 'N/A'}>
+                  {analysis.original_filename
+                    ? (analysis.original_filename.length > 30
+                        ? `${analysis.original_filename.slice(0, 27)}...`
+                        : analysis.original_filename)
+                    : '-'}
+                </td>
                 <td className="px-4 py-2 text-sm">{analysis.username}</td>
                 <td className="px-4 py-2">
                   <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(analysis.status)}`}>

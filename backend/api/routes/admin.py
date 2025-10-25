@@ -225,6 +225,7 @@ def get_all_analyses():
             "id": a.id,
             "user_id": a.user_id,
             "username": username,
+            "original_filename": a.original_filename,
             "status": a.status,
             "created_at": a.created_at.isoformat(),
             "updated_at": a.updated_at.isoformat()

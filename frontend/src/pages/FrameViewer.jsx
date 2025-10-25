@@ -773,7 +773,11 @@ const handleFinishAnalysis = () => {
     ? `Noise (z): ${analysisResult.score.toFixed(2)}` // z-score for Noise
     : analysisResult.analysis_type === "ela"
     ? `ELA (z): ${analysisResult.score.toFixed(2)}` // z-score for ELA
-    : `LBP (z): ${analysisResult.score.toFixed(2)}` // z-score for LBP
+    : analysisResult.analysis_type === "lbp"
+    ? `LBP (z): ${analysisResult.score.toFixed(2)}` // z-score for LBP
+    : analysisResult.analysis_type === "ml"
+    ? `ML Score: ${(analysisResult.score * 100).toFixed(1)}%` // ML uses 0-1 range, not z-score
+    : `Score: ${analysisResult.score.toFixed(2)}` // Generic fallback
 ) : (
   "No score available"
 )}

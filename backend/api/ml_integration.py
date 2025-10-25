@@ -48,28 +48,46 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
         }
 
     Raises:
-        Exception: If ML analysis fails
+        Exception: If ML analysis fails (with user-friendly error codes when possible)
     """
     # Determine device
     if device is None:
         device = os.getenv("DEVICE", "cpu")  # Default to cpu
 
-    # Import ML runner
+    # Import ML runner and error handling
     from ml.runner import run
+    from ml.errors import classify_error, MLAnalysisError
 
-    # Run inference
-    results = run(
-        video_path=video_path,
-        models=modules,
-        device=device,
-        weights=None,  # Will use defaults from constants
-        compute_hashes=True
-    )
+    try:
+        # Run inference
+        results = run(
+            video_path=video_path,
+            models=modules,
+            device=device,
+            weights=None,  # Will use defaults from constants
+            compute_hashes=True
+        )
 
-    # Check for errors
-    if results.get("error"):
-        error = results["error"]
-        raise Exception(f"ML inference failed at stage '{error['stage']}': {error['message']}")
+        # Check for errors
+        if results.get("error"):
+            error = results["error"]
+            # Classify the error for user-friendly message
+            try:
+                # Try to create a proper exception from the error dict
+                exc = Exception(error.get("message", "Unknown error"))
+                ml_error = classify_error(exc, error.get("stage", "unknown"))
+                raise Exception(f"{ml_error.message} (Code: {ml_error.error_code})")
+            except Exception:
+                # Fallback to original format
+                raise Exception(f"ML inference failed at stage '{error['stage']}': {error['message']}")
+
+    except MLAnalysisError:
+        # Re-raise MLAnalysisError as-is
+        raise
+    except Exception as e:
+        # Classify unexpected errors
+        ml_error = classify_error(e, "inference")
+        raise Exception(f"{ml_error.message} (Code: {ml_error.error_code})") from e
 
     # Transform output format for API
     # ML runner returns: {"models": [{"name": "Xception", "score": 0.87, "frames": [...]}, ...], ...}
@@ -122,28 +140,45 @@ def run_single_frame_ml_analysis(
         }
 
     Raises:
-        Exception: If ML analysis fails
+        Exception: If ML analysis fails (with user-friendly error codes when possible)
     """
     # Determine device
     if device is None:
         device = os.getenv("DEVICE", "cpu")  # Default to cpu
 
-    # Import ML runner
+    # Import ML runner and error handling
     from ml.runner import analyze_single_frame
+    from ml.errors import classify_error, MLAnalysisError
 
-    # Run single frame inference
-    results = analyze_single_frame(
-        video_path=video_path,
-        frame_number=frame_number,
-        models=models,
-        device=device,
-        weights=None  # Will use defaults from constants
-    )
+    try:
+        # Run single frame inference
+        results = analyze_single_frame(
+            video_path=video_path,
+            frame_number=frame_number,
+            models=models,
+            device=device,
+            weights=None  # Will use defaults from constants
+        )
 
-    # Check for errors
-    if results.get("error"):
-        error = results["error"]
-        raise Exception(f"ML single frame analysis failed: {error.get('message', 'Unknown error')}")
+        # Check for errors
+        if results.get("error"):
+            error = results["error"]
+            # Classify the error for user-friendly message
+            try:
+                exc = Exception(error.get("message", "Unknown error"))
+                ml_error = classify_error(exc, error.get("stage", "unknown"))
+                raise Exception(f"{ml_error.message} (Code: {ml_error.error_code})")
+            except Exception:
+                # Fallback to original format
+                raise Exception(f"ML single frame analysis failed: {error.get('message', 'Unknown error')}")
+
+    except MLAnalysisError:
+        # Re-raise MLAnalysisError as-is
+        raise
+    except Exception as e:
+        # Classify unexpected errors
+        ml_error = classify_error(e, "single_frame")
+        raise Exception(f"{ml_error.message} (Code: {ml_error.error_code})") from e
 
     # Transform output format for API
     # ML runner returns: {"frame_number": 42, "time": 1.4, "models": {"xception": {"score": 0.856}, ...}, ...}
