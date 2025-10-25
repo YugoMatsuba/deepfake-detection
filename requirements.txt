@@ -24,7 +24,8 @@ scikit-image==0.22.0; python_version >= "3.11"
 # ML-specific libraries
 dlib==19.24.0
 imutils==0.5.4
-imageio==2.9.0
+imageio==2.9.0; python_version < "3.11"
+imageio==2.31.3; python_version >= "3.11"
 
 # Utilities
 tqdm==4.64.1
