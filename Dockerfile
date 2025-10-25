@@ -65,8 +65,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy requirements and install remaining dependencies
 COPY requirements.txt .
+COPY backend/requirements-test.txt backend/requirements-test.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements.txt
+    python -m pip install -r requirements.txt && \
+    python -m pip install -r backend/requirements-test.txt
 
 # Create ML directories
 RUN mkdir -p /ml/weights /ml/dlib /ml/data
@@ -122,8 +124,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy requirements and install remaining dependencies
 COPY requirements.txt .
+COPY backend/requirements-test.txt backend/requirements-test.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements.txt
+    python -m pip install -r requirements.txt && \
+    python -m pip install -r backend/requirements-test.txt
 
 # Create ML directories
 RUN mkdir -p /ml/weights /ml/dlib /ml/data
