@@ -13,6 +13,29 @@ const BASE_URL = 'http://127.0.0.1:6001';
 
 jest.setTimeout(120000);
 
+// Determine database URL with fallback strategy
+function getDatabaseUrl() {
+  // Priority 1: Environment variable (for CI)
+  if (process.env.TEST_DATABASE_URL) {
+    return process.env.TEST_DATABASE_URL + '/fe_integration_test';
+  }
+
+  // Priority 2: Check if PostgreSQL might be available
+  const postgresUrl = 'postgresql+psycopg://deepfake:secret@localhost:5431/fe_integration_test';
+
+  // Priority 3: Fall back to SQLite for local development
+  const sqliteUrl = 'sqlite:///instance/fe_integration.db';
+
+  // For CI environments (detected by CI env var), prefer PostgreSQL
+  if (process.env.CI) {
+    console.log('CI environment detected, using PostgreSQL');
+    return postgresUrl;
+  } else {
+    console.log('Local development, falling back to SQLite');
+    return sqliteUrl;
+  }
+}
+
 async function waitForHealthcheck(timeoutMs = 60000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -29,13 +52,16 @@ async function waitForHealthcheck(timeoutMs = 60000) {
 
 describe('FE↔API integration', () => {
   beforeAll(async () => {
+    const databaseUrl = getDatabaseUrl();
+    console.log(`Starting backend with database: ${databaseUrl}`);
+
     serverProcess = spawn('python', ['app.py'], {
       cwd: backendDir,
       env: {
         ...process.env,
         FLASK_APP: 'app.py',
         PORT: '6001',
-        DATABASE_URL: 'sqlite:///instance/fe_integration.db',
+        DATABASE_URL: databaseUrl,
         DB_BOOTSTRAP: '1',
       },
       stdio: 'inherit',

@@ -26,7 +26,7 @@ from api.routes.reports import reports_bp  # PDF report generation
 # Models now in consolidated models.py (managed by Alembic)
 from models import User
 
-DEFAULT_DB_URL = "sqlite:///instance/app.db"
+DEFAULT_DB_URL = "postgresql+psycopg://deepfake:secret@localhost:5431/deepfake_dev"
 
 
 def bootstrap_owner_from_env():
@@ -142,8 +142,9 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
     db_url = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
-    # Ensure instance dir exists for SQLite file
-    Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+    # Ensure instance dir exists for SQLite file (only when using SQLite)
+    if db_url.startswith("sqlite"):
+        Path(app.instance_path).mkdir(parents=True, exist_ok=True)
 
     # --- DB init ---
     init_engine(db_url=db_url)

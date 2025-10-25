@@ -6,9 +6,8 @@ No complex SAVEPOINT transactions - just clean DB state before each test.
 
 import os
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import sys
 from pathlib import Path
@@ -25,24 +24,61 @@ PROJECT_ROOT = Path(__file__).parent.parent
 @pytest.fixture(scope="session")
 def engine():
     """
-    Single in-memory SQLite DB shared by all tests.
-    Uses StaticPool to keep the same connection alive.
+    Database engine shared by all tests in session.
+    Tries PostgreSQL first, falls back to SQLite if PostgreSQL isn't available.
     """
-    eng = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        future=True,
-    )
+    import uuid
+    import tempfile
 
-    # Enable foreign keys for SQLite
-    @event.listens_for(eng, "connect")
-    def set_sqlite_pragma(dbapi_conn, connection_record):
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+    test_db_url = os.getenv("TEST_DATABASE_URL")
 
-    return eng
+    if test_db_url and test_db_url.startswith("postgresql"):
+        try:
+            print(f"Attempting PostgreSQL connection for integration tests: {test_db_url}")
+
+            # Generate unique database name for this test session
+            test_db_name = f"integration_test_{uuid.uuid4().hex[:8]}"
+            base_url = test_db_url
+
+            # Extract connection parts to create/drop test database
+            from sqlalchemy import text
+            admin_url = f"{base_url}/postgres"
+            test_url = f"{base_url}/{test_db_name}"
+
+            # Create test database
+            admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+            with admin_engine.connect() as conn:
+                conn.execute(text(f"CREATE DATABASE {test_db_name}"))
+            admin_engine.dispose()
+
+            # Create test engine
+            eng = create_engine(test_url, future=True, pool_pre_ping=True)
+            print(f"✓ PostgreSQL integration test database created: {test_db_name}")
+
+            yield eng
+
+            # Cleanup: drop test database
+            eng.dispose()
+            admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+            with admin_engine.connect() as conn:
+                # Terminate connections to test database before dropping
+                conn.execute(text(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{test_db_name}'"))
+                conn.execute(text(f"DROP DATABASE {test_db_name}"))
+            admin_engine.dispose()
+            print(f"✓ PostgreSQL integration test database dropped: {test_db_name}")
+            return
+
+        except Exception as e:
+            print(f"PostgreSQL setup failed for integration tests: {e}")
+            print("Falling back to SQLite for integration tests...")
+
+    # Fallback to SQLite
+    print("Using SQLite for integration tests")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'integration_test.db')
+        eng = create_engine(f'sqlite:///{db_path}', future=True)
+        yield eng
+        eng.dispose()
 
 
 @pytest.fixture(scope="session")

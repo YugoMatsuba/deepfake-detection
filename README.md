@@ -119,6 +119,62 @@ python app.py  # Runs on port 5050
 
 ---
 
+## 🧱 Deepfake AI Backend Setup Guide
+
+Follow these steps if you want to run the Flask API against PostgreSQL locally or inside the dev container.
+
+### 1️⃣ Start the PostgreSQL Database
+```bash
+docker run --name deepfake-db \
+  -p 5431:5432 \
+  -e POSTGRES_USER=deepfake \
+  -e POSTGRES_PASSWORD=secret \
+  -e POSTGRES_DB=deepfake_dev \
+  -d postgres:16
+```
+
+### 2️⃣ Open the Dev Container
+In VS Code, open the project and reopen it in the provided container  
+`⇧⌘P → Dev Containers: Reopen in Container`
+
+### 3️⃣ Install Dependencies
+Inside the dev container shell:
+```bash
+pip install -r requirements.txt
+```
+
+### 4️⃣ Set Environment Variables
+```bash
+cd backend
+export DATABASE_URL="postgresql+psycopg://deepfake:secret@host.docker.internal:5431/deepfake_dev"
+export TEST_DATABASE_URL="postgresql+psycopg://deepfake:secret@host.docker.internal:5431"
+```
+
+### 5️⃣ Apply Database Migrations
+```bash
+alembic upgrade head
+```
+
+### 6️⃣ Start the Flask Server
+```bash
+python app.py
+```
+
+The API will be available at http://localhost:5050 and connected to PostgreSQL.
+
+### 🧭 Optional: pgAdmin Setup
+
+1. Install pgAdmin 4 from https://www.pgadmin.org/download/  
+2. In pgAdmin, create a new server with:
+   - **Name**: `it-project`  
+   - **Host**: `localhost`  
+   - **Port**: `5431`  
+   - **Username**: `deepfake`  
+   - **Password**: `secret`
+3. Expand `Servers → localhost → Databases → deepfake_dev` to inspect tables and run queries.
+
+---
+
 ## 🔍 Traditional Forensics Component
 
 **Technology Stack:** OpenCV + PIL + NumPy + scikit-image

@@ -10,8 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, Index, text, CheckConstraint
-from sqlalchemy.dialects.sqlite import JSON as SQLITE_JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, Index, text, CheckConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api import Base
@@ -55,7 +54,7 @@ class User(Base):
         Boolean,
         nullable=False,
         default=True,
-        server_default=text("1")
+        server_default=text("true")
     )
 
     # New field: approval workflow
@@ -63,7 +62,7 @@ class User(Base):
         Boolean,
         nullable=False,
         default=True,
-        server_default=text("1")
+        server_default=text("true")
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -94,7 +93,7 @@ class AuditLog(Base):
 
     # New field: structured details for admin actions
     details_json: Mapped[Optional[dict]] = mapped_column(
-        SQLITE_JSON,
+        JSON,
         nullable=True,
         default=None
     )
@@ -155,9 +154,11 @@ class Analysis(Base):
 
     # Status tracking
     status: Mapped[str] = mapped_column(
-        Enum("created", "running", "succeeded", "failed", name="analysis_status"),
+        String(16),
+        CheckConstraint("status IN ('created', 'running', 'succeeded', 'failed')", name='ck_analysis_status'),
         nullable=False,
         default="created",
+        server_default="created",
         index=True
     )
 
@@ -182,15 +183,17 @@ class Analysis(Base):
 
     # JSON payloads
     meta_json: Mapped[dict] = mapped_column(
-        SQLITE_JSON,
+        JSON,
         nullable=False,
-        default=dict
+        default=dict,
+        server_default="{}"
     )  # Contains: {schema_version, device, code_commit, fps, frame_count, width, height}
 
     result_json: Mapped[dict] = mapped_column(
-        SQLITE_JSON,
+        JSON,
         nullable=False,
-        default=dict
+        default=dict,
+        server_default="{}"
     )  # Contains: SCORES ONLY (no base64 images) - {ml: {...}, traditional: {...}}
 
     # Error tracking
