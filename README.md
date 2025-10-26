@@ -36,18 +36,26 @@ The system consists of four main components:
 ### Key Components:
 - `App.jsx` - Main application routing and layout
 - `AuthProvider.jsx` - Authentication context and state management
+- `AnalysisProvider.jsx` - Analysis state management and context
 - `FileUploader.jsx` - Multi-format video upload with validation
-- `FrameViewer.jsx` - Interactive video frame analysis viewer
-- `Analysis.jsx` - Results dashboard with multiple analysis methods
-- `Dashboard.jsx` - Main user interface after login
+- `FrameViewer.jsx` - Interactive video frame analysis viewer with timeline markers
+- `FrameViewerRetrieval.jsx` - Frame viewer data fetching wrapper
+- `Analysis.jsx` - Analysis results dashboard with ML scores
+- `Landing.jsx` - Main user landing page after login
+- `AdminDashboard.jsx` - Admin user management interface
+- `PastReports.jsx` - Historical analysis reports browser
+- `MetadataResults.jsx` - Metadata forensics results display
 
 ### Routes:
-- `/` - Protected dashboard (requires authentication)
+- `/` - Landing page (requires authentication)
 - `/login` - User authentication
 - `/signup` - New user registration
 - `/upload` - Video file upload interface
-- `/analysis` - Analysis results and visualization
-- `/frame-viewer` - Detailed frame-by-frame inspection
+- `/analysis` - Analysis results and ML scores visualization
+- `/frame-viewer` - Detailed frame-by-frame inspection with forensics overlays
+- `/reports` - Past analysis reports (requires authentication)
+- `/admin` - Admin dashboard (requires admin/owner role)
+- `/role-select` - User role management (requires admin/owner role)
 
 ### Development:
 ```bash
@@ -73,20 +81,27 @@ npm run dev  # Runs on port 5173
 
 #### Authentication (`/api/auth`)
 - `POST /login` - User authentication
+- `POST /signup` - User registration
 - `POST /logout` - Session termination
 - `GET /me` - Current user info
 
-#### Traditional Forensics (`/api/forensics`)
-- `POST /extract_frames` - Extract frames from uploaded video
-- `POST /ela_analysis` - Error Level Analysis for compression artifacts
-- `POST /noise_analysis` - Statistical noise pattern analysis
-- `POST /lbp_analysis` - Local Binary Pattern texture analysis
-- `POST /cmfd_analysis` - Copy-Move Forgery Detection
-- `POST /temporal_analysis` - Temporal consistency analysis
+#### Video Upload (`/api/videos`)
+- `POST /videos` - Upload video and create analysis record
 
-#### Video Management
-- `POST /api/upload` - Video file upload and validation
-- `GET /api/videos` - List user's uploaded videos
+#### Analysis (`/api/analyses`)
+- `POST /analyses/<id>/start` - Run full analysis (ML + traditional + metadata)
+- `GET /analyses/<id>` - Get analysis status and results
+- `POST /analyses/<id>/frames/<frame>/forensics` - On-demand traditional forensics for single frame (ELA, noise, LBP)
+- `POST /analyses/<id>/frames/<frame>/ml` - On-demand ML analysis for single frame
+- `DELETE /analyses/<id>` - Delete analysis and associated files
+
+#### Reports (`/api/reports`)
+- `GET /reports/<id>/pdf` - Generate PDF forensics report
+
+#### Admin (`/api/admin`)
+- `GET /admin/users` - List all users (admin/owner only)
+- `POST /admin/users/<id>/approve` - Approve pending user (admin/owner only)
+- `POST /admin/users/<id>/role` - Change user role (owner only)
 
 ### Configuration:
 - **Database**: SQLite (dev) with planned PostgreSQL migration
@@ -113,41 +128,43 @@ python app.py  # Runs on port 5050
 #### 1. **Error Level Analysis (ELA)**
 - **Purpose**: Detects JPEG compression inconsistencies
 - **Method**: Compares original vs. recompressed images to find editing artifacts
-- **Output**: ELA heatmap images + anomaly scores
+- **Output**: ELA heatmap overlay + anomaly scores per frame
 - **Use Case**: Identifies areas that have been digitally manipulated
+- **Location**: `backend/api/traditional_forensics_utils/ela_analysis.py`
 
 #### 2. **Noise Analysis**
 - **Purpose**: Analyzes statistical noise patterns across video frames
 - **Method**: Computes noise variance, SNR, and pattern consistency
 - **Output**: Noise level metrics and temporal consistency scores
 - **Use Case**: Detects frame insertion, replacement, or generation artifacts
+- **Location**: `backend/api/traditional_forensics_utils/noise_analysis.py`
 
 #### 3. **Local Binary Pattern (LBP) Analysis**
 - **Purpose**: Examines texture patterns for manipulation detection
 - **Method**: Computes LBP histograms and texture uniformity metrics
 - **Output**: Texture consistency scores and pattern analysis
 - **Use Case**: Identifies texture inconsistencies from face swapping or generation
+- **Location**: `backend/api/traditional_forensics_utils/lbp_analysis.py`
 
-#### 4. **Copy-Move Forgery Detection (CMFD)**
-- **Purpose**: Detects duplicated or moved regions within frames
-- **Method**: SIFT feature matching to find copied areas
-- **Output**: Similarity maps highlighting duplicated regions
-- **Use Case**: Identifies copy-paste manipulations and object removal
-
-#### 5. **Temporal Analysis**
-- **Purpose**: Analyzes frame-to-frame consistency over time
-- **Method**: Optical flow, frame differencing, and motion analysis
-- **Output**: Temporal consistency metrics and anomaly detection
-- **Use Case**: Detects frame insertion, deletion, or temporal manipulations
-
-#### 6. **Frame Extraction**
-- **Purpose**: Extracts individual frames from video files
-- **Method**: OpenCV-based video processing with metadata preservation
-- **Output**: Individual frame images with temporal information
-- **Use Case**: Prepares video data for frame-level analysis
+#### 4. **Metadata Forensics Analysis**
+- **Purpose**: Validates video file metadata and structural integrity
+- **Method**: ExifTool extraction, FFmpeg integrity checks, frame hash generation
+- **Techniques**:
+  - EXIF/metadata extraction and validation
+  - Missing metadata detection (device info, timestamps)
+  - Timestamp consistency analysis
+  - Editing software detection
+  - GPS coordinate validation
+  - Container structural integrity (FFmpeg error detection)
+  - Per-frame MD5 hash generation
+  - Duplicate frame detection
+  - Whole-file SHA-256 hash for chain of custody
+- **Output**: Metadata anomalies, integrity status, frame hashes, duplicates
+- **Use Case**: Detects metadata tampering, file corruption, and basic forgery indicators
+- **Location**: `backend/api/metadata_utils/metadata_analysis.py`
 
 ### Integration:
-All traditional forensics methods are exposed through the Flask API and can be chained together for comprehensive analysis. Results are aggregated and presented through the frontend dashboard.
+Traditional forensics and metadata analysis run automatically during full analysis (`POST /analyses/<id>/start`). Individual methods can also be invoked on-demand for specific frames via the frame analysis endpoints. Results are stored in the database and presented through the frontend dashboard.
 
 ---
 
@@ -380,9 +397,24 @@ python runner.py data/sample.mp4  # Run inference
 pytest tests/ -v  # Run test suite
 ```
 
-### Default Credentials:
-- **Username**: `admin`
-- **Password**: `testpass123`
+### Owner Bootstrap:
+The system uses environment variable-based owner account creation instead of hardcoded credentials.
+
+**First-time setup:**
+```bash
+# Set owner credentials via environment variables
+export OWNER_USERNAME=admin
+export OWNER_SEED_PASSWORD=your_secure_password
+
+# Run backend - owner account will be created automatically
+cd backend
+python app.py
+```
+
+**Environment Variables:**
+- `OWNER_USERNAME` - Username for the owner account
+- `OWNER_SEED_PASSWORD` - Password for owner (only needed on first boot or password reset)
+- `ALLOW_OWNER_TRANSFER` - Set to "1" to allow changing owner (default "0" for security)
 
 ---
 

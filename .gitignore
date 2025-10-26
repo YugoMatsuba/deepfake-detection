@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 .vscode/
 .claude/
+.idea/
+.DS_Store
+.coverage
+htmlcov/
 venv/
 
 # Database files
