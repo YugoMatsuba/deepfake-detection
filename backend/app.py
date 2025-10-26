@@ -25,6 +25,9 @@ from api.routes.admin import admin_bp  # Admin dashboard routes
 from api.routes.reports import reports_bp  # PDF report generation
 # Models now in consolidated models.py (managed by Alembic)
 from models import User
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DEFAULT_DB_URL = "postgresql+psycopg://deepfake:secret@localhost:5431/deepfake_dev"
 
