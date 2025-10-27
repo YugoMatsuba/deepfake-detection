@@ -10,6 +10,7 @@ export default function PastReports() {
   const [downloading, setDownloading] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [reopening, setReopening] = useState(null);
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -77,6 +78,58 @@ export default function PastReports() {
       setError(err.message || "Failed to delete analysis");
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleRerunAnalysis = async (analysisId) => {
+    try {
+      setReopening(analysisId);
+      setError(null);
+
+      // Fetch full analysis data
+      const response = await fetch(`/api/analyses/${analysisId}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load analysis");
+      }
+
+      const analysisData = await response.json();
+
+      // Extract data in format expected by FrameViewer
+      const mlResults = analysisData.result?.ml || {};
+      const traditionalResults = analysisData.result?.traditional || {};
+
+      // Get ML frames (filter by score > 0.5 OR requested_adhoc)
+      const mlFrames = [];
+      Object.values(mlResults).forEach((model) => {
+        if (model.frames) {
+          model.frames.forEach((f) => {
+            if (
+              (f.score > 0.5 || f.requested_adhoc) &&
+              !mlFrames.includes(f.index)
+            ) {
+              mlFrames.push(f.index);
+            }
+          });
+        }
+      });
+
+      // Navigate to frame viewer with data
+      navigate("/frame-viewer", {
+        state: {
+          analysisId: analysisData.analysis_id,
+          fps: analysisData.result?.video?.fps || null,
+          mlFrames: mlFrames.sort((a, b) => a - b),
+          mlModels: mlResults,
+          traditional: traditionalResults,
+        },
+      });
+    } catch (err) {
+      setError(err.message || "Failed to reopen analysis");
+    } finally {
+      setReopening(null);
     }
   };
 
@@ -196,6 +249,15 @@ export default function PastReports() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
+                      <button
+                        onClick={() => handleRerunAnalysis(report.analysis_id)}
+                        disabled={reopening === report.analysis_id}
+                        className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs mr-2"
+                      >
+                        {reopening === report.analysis_id
+                          ? "Opening..."
+                          : "Rerun Analysis"}
+                      </button>
                       <button
                         onClick={() =>
                           downloadPDF(
