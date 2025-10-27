@@ -101,18 +101,50 @@ export default function PastReports() {
       const mlResults = analysisData.result?.ml || {};
       const traditionalResults = analysisData.result?.traditional || {};
 
-      // Get ML frames (filter by score > 0.5 OR requested_adhoc)
+      // Get ML frames (filter by average score > 0.5 OR requested_adhoc)
+      // Match backend's filtering logic: average score across all models
       const mlFrames = [];
+
+      // Collect all unique frame indices
+      const allFrameIndices = new Set();
       Object.values(mlResults).forEach((model) => {
         if (model.frames) {
           model.frames.forEach((f) => {
-            if (
-              (f.score > 0.5 || f.requested_adhoc) &&
-              !mlFrames.includes(f.index)
-            ) {
-              mlFrames.push(f.index);
+            if (typeof f.index === 'number') {
+              allFrameIndices.add(f.index);
             }
           });
+        }
+      });
+
+      // For each frame, calculate average score across all models
+      allFrameIndices.forEach((frameIndex) => {
+        const scores = [];
+        let isRequestedAdhoc = false;
+
+        // Collect scores from all models for this frame
+        Object.values(mlResults).forEach((model) => {
+          if (model.frames) {
+            const frameData = model.frames.find((f) => f.index === frameIndex);
+            if (frameData) {
+              if (typeof frameData.score === 'number') {
+                scores.push(frameData.score);
+              }
+              if (frameData.requested_adhoc === true) {
+                isRequestedAdhoc = true;
+              }
+            }
+          }
+        });
+
+        // Calculate average score
+        const avgScore = scores.length > 0
+          ? scores.reduce((a, b) => a + b, 0) / scores.length
+          : 0;
+
+        // Show frame if average score > 0.5 OR explicitly requested via ad-hoc
+        if (avgScore > 0.5 || isRequestedAdhoc) {
+          mlFrames.push(frameIndex);
         }
       });
 
