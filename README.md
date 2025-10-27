@@ -162,6 +162,21 @@ python app.py
 
 The API will be available at http://localhost:5050 and connected to PostgreSQL.
 
+### 🚀 Production: Run with Gunicorn
+
+For production or containerized runs, use Gunicorn with the provided WSGI entrypoint and config:
+
+```bash
+# From repo root
+pip install -r requirements.txt  # ensures gunicorn is installed
+gunicorn --config backend/gunicorn.conf.py --chdir backend wsgi:app
+```
+
+Notes:
+- Configure port via `PORT` env var (defaults to 5050)
+- Set worker/threads via `WEB_CONCURRENCY` and `GUNICORN_THREADS`
+- Gunicorn is Linux/macOS oriented; use Docker/WSL on Windows
+
 ### 🧭 Optional: pgAdmin Setup
 
 1. Install pgAdmin 4 from https://www.pgadmin.org/download/  

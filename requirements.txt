@@ -42,6 +42,9 @@ Flask==3.0.3
 Flask-Cors==4.0.1
 Flask-Compress==1.15
 
+# Production WSGI server
+gunicorn==21.2.0
+
 # PDF generation
 reportlab==4.0.7
 
