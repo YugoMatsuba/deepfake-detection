@@ -19,10 +19,23 @@ class TestFrameRateRoutes(unittest.TestCase):
         self.app.register_blueprint(frame_rate_bp, url_prefix='/api')
         self.client = self.app.test_client()
 
+        # Create a test user for @require_user decorated routes
+        with get_db() as db:
+            self.test_user = User(
+                username='testuser_framerate',
+                password_hash=hash_password('password123'),
+                role='user',
+                active=True,
+                pending_approval=False
+            )
+            db.add(self.test_user)
+            db.flush()  # Get the ID without committing
+            self.test_user_id = self.test_user.id
+
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
     @patch('api.routes.framerate.cv2.VideoCapture')
-    def test_get_frame_rate_success(self, mock_cv2, mock_data_root, mock_get_db, test_user):
+    def test_get_frame_rate_success(self, mock_cv2, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
         mock_analysis = MagicMock()
@@ -48,7 +61,7 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
         response = self.client.get('/api/framerate')
 
@@ -59,7 +72,7 @@ class TestFrameRateRoutes(unittest.TestCase):
         self.assertEqual(data['frame_rate'], 29.97)
 
     @patch('api.routes.framerate.get_db')
-    def test_get_frame_rate_no_videos(self, mock_get_db, test_user):
+    def test_get_frame_rate_no_videos(self, mock_get_db):
         # Mock database with no analyses
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
@@ -67,7 +80,7 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
         response = self.client.get('/api/framerate')
 
@@ -77,7 +90,7 @@ class TestFrameRateRoutes(unittest.TestCase):
 
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
-    def test_get_frame_rate_video_file_not_found(self, mock_data_root, mock_get_db, test_user):
+    def test_get_frame_rate_video_file_not_found(self, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
         mock_analysis = MagicMock()
@@ -93,7 +106,7 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
         response = self.client.get('/api/framerate')
 
@@ -104,7 +117,7 @@ class TestFrameRateRoutes(unittest.TestCase):
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
     @patch('api.routes.framerate.cv2.VideoCapture')
-    def test_get_frame_rate_video_cannot_open(self, mock_cv2, mock_data_root, mock_get_db, test_user):
+    def test_get_frame_rate_video_cannot_open(self, mock_cv2, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
         mock_analysis = MagicMock()
@@ -127,7 +140,7 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
         response = self.client.get('/api/framerate')
 

@@ -19,10 +19,35 @@ class TestAnalysisRoutes(unittest.TestCase):
         self.app.register_blueprint(analysis_bp, url_prefix='/api')
         self.client = self.app.test_client()
 
+        # Create a test user for @require_user decorated routes
+        with get_db() as db:
+            self.test_user = User(
+                username='testuser',
+                password_hash=hash_password('password123'),
+                role='user',
+                active=True,
+                pending_approval=False
+            )
+            db.add(self.test_user)
+            db.flush()  # Get the ID without committing
+            self.test_user_id = self.test_user.id
+
+    @patch('api.routes.analysis.get_db')
+    @patch('api.routes.analysis.check_analysis_ownership_or_admin')
     @patch('api.routes.analysis.run_ml_analysis')
     @patch('api.routes.analysis.run_traditional_forensics')
-    def test_start_analysis_success(self, mock_traditional, mock_ml, test_user, test_analysis):
-        # Real analysis exists in DB from pytest fixtures
+    def test_start_analysis_success(self, mock_traditional, mock_ml, mock_ownership, mock_get_db):
+        mock_db = MagicMock()
+        mock_analysis = MagicMock()
+        mock_analysis.id = 'test-analysis-id'
+        mock_analysis.video_path = '/test/video.mp4'
+        mock_analysis.status = 'created'
+        mock_analysis.created_at.isoformat.return_value = '2023-01-01T00:00:00'
+        mock_analysis.updated_at.isoformat.return_value = '2023-01-01T00:01:00'
+
+        mock_ownership.return_value = mock_analysis
+        mock_get_db.return_value.__enter__.return_value = mock_db
+        mock_db.execute.return_value.rowcount = 1
 
         mock_ml.return_value = {
             'models': {
@@ -45,7 +70,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         }
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/analyses/test-analysis-id/start',
                                   json={'modules': ['xception'], 'traditional': ['ela']})
@@ -55,31 +80,55 @@ class TestAnalysisRoutes(unittest.TestCase):
         self.assertEqual(data['analysis_id'], 'test-analysis-id')
         self.assertEqual(data['status'], 'succeeded')
 
-    def test_start_analysis_no_modules(self, test_user, test_analysis):
-        # Real analysis exists in DB from pytest fixtures
+    @patch('api.routes.analysis.get_db')
+    @patch('api.routes.analysis.check_analysis_ownership_or_admin')
+    def test_start_analysis_no_modules(self, mock_ownership, mock_get_db):
+        mock_db = MagicMock()
+        mock_analysis = MagicMock()
+        mock_ownership.return_value = mock_analysis
+        mock_get_db.return_value.__enter__.return_value = mock_db
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
-        response = self.client.post('/api/analyses/test-analysis-id/start', json={})
+        response = self.client.post('/api/analyses/test-id/start', json={})
         self.assertEqual(response.status_code, 400)
 
-    def test_get_analysis(self, test_user, test_analysis):
-        # Real analysis exists in DB from pytest fixtures
+    @patch('api.routes.analysis.get_db')
+    @patch('api.routes.analysis.check_analysis_ownership_or_admin')
+    def test_get_analysis(self, mock_ownership, mock_get_db):
+        mock_db = MagicMock()
+        mock_analysis = MagicMock()
+        mock_analysis.id = 'test-analysis-id'
+        mock_analysis.status = 'created'
+        mock_analysis.created_at.isoformat.return_value = '2023-01-01T00:00:00'
+        mock_analysis.updated_at.isoformat.return_value = '2023-01-01T00:01:00'
+        mock_analysis.result_json = {}
+        mock_analysis.meta_json = {}
+
+        mock_ownership.return_value = mock_analysis
+        mock_get_db.return_value.__enter__.return_value = mock_db
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
         response = self.client.get('/api/analyses/test-analysis-id')
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data['analysis_id'], 'test-analysis-id')
 
+    @patch('api.routes.analysis.get_db')
+    @patch('api.routes.analysis.check_analysis_ownership_or_admin')
     @patch('storage.DATA_ROOT')
     @patch('api.routes.analysis.extract_single_frame')
     @patch('api.routes.analysis.run_ela')
-    def test_analyze_frame(self, mock_ela, mock_extract, mock_data_root, test_user, test_analysis):
-        # Real analysis exists in DB from pytest fixtures
+    def test_analyze_frame(self, mock_ela, mock_extract, mock_data_root, mock_ownership, mock_get_db):
+        mock_db = MagicMock()
+        mock_analysis = MagicMock()
+        mock_analysis.video_path = '/test/video.mp4'
+
+        mock_ownership.return_value = mock_analysis
+        mock_get_db.return_value.__enter__.return_value = mock_db
 
         # Mock DATA_ROOT path operations
         mock_frames_dir = MagicMock()
@@ -105,7 +154,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         }
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = test_user
+            sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/analyses/test-analysis-id/frames/42/forensics',
                                   json={'methods': ['ela']})
