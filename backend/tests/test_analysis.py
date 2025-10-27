@@ -100,11 +100,11 @@ class TestAnalysisRoutes(unittest.TestCase):
         mock_db = MagicMock()
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
-        mock_analysis.status = 'created'
+        mock_analysis.status = 'succeeded'
+        mock_analysis.result_json = {'ml': {}, 'traditional': {}}
+        mock_analysis.error = None
         mock_analysis.created_at.isoformat.return_value = '2023-01-01T00:00:00'
         mock_analysis.updated_at.isoformat.return_value = '2023-01-01T00:01:00'
-        mock_analysis.result_json = {}
-        mock_analysis.meta_json = {}
 
         mock_ownership.return_value = mock_analysis
         mock_get_db.return_value.__enter__.return_value = mock_db
@@ -117,19 +117,12 @@ class TestAnalysisRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data['analysis_id'], 'test-analysis-id')
 
+    @patch('storage.DATA_ROOT')
     @patch('api.routes.analysis.get_db')
     @patch('api.routes.analysis.check_analysis_ownership_or_admin')
-    @patch('storage.DATA_ROOT')
     @patch('api.routes.analysis.extract_single_frame')
     @patch('api.routes.analysis.run_ela')
-    def test_analyze_frame(self, mock_ela, mock_extract, mock_data_root, mock_ownership, mock_get_db):
-        mock_db = MagicMock()
-        mock_analysis = MagicMock()
-        mock_analysis.video_path = '/test/video.mp4'
-
-        mock_ownership.return_value = mock_analysis
-        mock_get_db.return_value.__enter__.return_value = mock_db
-
+    def test_analyze_frame(self, mock_ela, mock_extract, mock_ownership, mock_get_db, mock_data_root):
         # Mock DATA_ROOT path operations
         mock_frames_dir = MagicMock()
         mock_frames_dir.mkdir = MagicMock()
@@ -144,6 +137,15 @@ class TestAnalysisRoutes(unittest.TestCase):
 
         mock_data_root.__truediv__ = MagicMock(side_effect=data_root_truediv)
         mock_frames_dir.__truediv__ = MagicMock(return_value='/fake/frame_0042.jpg')
+
+        mock_db = MagicMock()
+        mock_analysis = MagicMock()
+        mock_analysis.id = 'test-analysis-id'
+        mock_analysis.video_path = '/test/video.mp4'
+        mock_analysis.result_json = {}  # Initialize as empty dict for merge logic
+
+        mock_ownership.return_value = mock_analysis
+        mock_get_db.return_value.__enter__.return_value = mock_db
 
         mock_extract.return_value = None
         # run_ela now returns single-frame result with raw score
