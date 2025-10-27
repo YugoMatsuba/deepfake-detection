@@ -93,27 +93,25 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
     @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.DATA_ROOT')
-    def test_list_videos(self, mock_data_root, mock_get_db):
+    @patch('api.auth_utils.current_user')
+    def test_list_videos(self, mock_current_user, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
         mock_user = MagicMock()
         mock_user.id = self.test_user_id
         mock_user.role = 'user'
+        mock_current_user.return_value = mock_user
         mock_get_db.return_value.__enter__.return_value = mock_db
         mock_db.query.return_value.filter.return_value.all.return_value = []
 
-        # Mock g.user for auth
-        with patch('api.auth_utils.g') as mock_g:
-            mock_g.user = mock_user
+        # Set session for auth
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = self.test_user_id
 
-            # Set session for auth
-            with self.client.session_transaction() as sess:
-                sess['user_id'] = self.test_user_id
-
-            response = self.client.get('/api/videos/all')
-            self.assertEqual(response.status_code, 200)
-            data = response.get_json()
-            self.assertIsInstance(data, list)
+        response = self.client.get('/api/videos/all')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIsInstance(data, list)
 
     @patch('api.routes.video_upload.get_db')
     @patch('api.auth_utils.check_analysis_ownership_or_admin')

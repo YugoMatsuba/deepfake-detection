@@ -36,8 +36,14 @@ class TestAnalysisRoutes(unittest.TestCase):
     @patch('api.auth_utils.check_analysis_ownership_or_admin')
     @patch('api.routes.analysis.run_ml_analysis')
     @patch('api.routes.analysis.run_traditional_forensics')
-    def test_start_analysis_success(self, mock_traditional, mock_ml, mock_ownership, mock_get_db):
+    @patch('api.auth_utils.current_user')
+    def test_start_analysis_success(self, mock_current_user, mock_traditional, mock_ml, mock_ownership, mock_get_db):
         mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = self.test_user_id
+        mock_user.pending_approval = False
+        mock_current_user.return_value = mock_user
+
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
         mock_analysis.video_path = '/test/video.mp4'
@@ -82,8 +88,14 @@ class TestAnalysisRoutes(unittest.TestCase):
 
     @patch('api.routes.analysis.get_db')
     @patch('api.auth_utils.check_analysis_ownership_or_admin')
-    def test_start_analysis_no_modules(self, mock_ownership, mock_get_db):
+    @patch('api.auth_utils.current_user')
+    def test_start_analysis_no_modules(self, mock_current_user, mock_ownership, mock_get_db):
         mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = self.test_user_id
+        mock_user.pending_approval = False
+        mock_current_user.return_value = mock_user
+
         mock_analysis = MagicMock()
         mock_ownership.return_value = mock_analysis
         mock_get_db.return_value.__enter__.return_value = mock_db
@@ -96,8 +108,14 @@ class TestAnalysisRoutes(unittest.TestCase):
 
     @patch('api.routes.analysis.get_db')
     @patch('api.auth_utils.check_analysis_ownership_or_admin')
-    def test_get_analysis(self, mock_ownership, mock_get_db):
+    @patch('api.auth_utils.current_user')
+    def test_get_analysis(self, mock_current_user, mock_ownership, mock_get_db):
         mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = self.test_user_id
+        mock_user.pending_approval = False
+        mock_current_user.return_value = mock_user
+
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
         mock_analysis.status = 'succeeded'
@@ -122,7 +140,13 @@ class TestAnalysisRoutes(unittest.TestCase):
     @patch('api.auth_utils.check_analysis_ownership_or_admin')
     @patch('api.routes.analysis.extract_single_frame')
     @patch('api.routes.analysis.run_ela')
-    def test_analyze_frame(self, mock_ela, mock_extract, mock_ownership, mock_get_db, mock_data_root):
+    @patch('api.auth_utils.current_user')
+    def test_analyze_frame(self, mock_current_user, mock_ela, mock_extract, mock_ownership, mock_get_db, mock_data_root):
+        mock_user = MagicMock()
+        mock_user.id = self.test_user_id
+        mock_user.pending_approval = False
+        mock_current_user.return_value = mock_user
+
         # Mock DATA_ROOT path operations
         mock_frames_dir = MagicMock()
         mock_frames_dir.mkdir = MagicMock()
