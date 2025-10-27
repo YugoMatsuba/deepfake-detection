@@ -45,6 +45,7 @@ export default function FrameViewerPage() {
 
   const mlModels = analysisData?.result?.ml || {};
   const traditionalResults = analysisData?.result?.traditional || {};
+  const metadata = analysisData?.result?.metadata || null;
   const fps = analysisData?.result?.video?.fps || null;
 
   const handleTraditionalResultsUpdate = useCallback(
@@ -166,6 +167,7 @@ export default function FrameViewerPage() {
         deepfakeFrames={flaggedFrameIndices}
         deepfakeMeta={mlModels}
         traditionalResults={traditionalResults}
+        metadata={metadata}
         analysisId={analysisId}
         onTraditionalResultsUpdate={handleTraditionalResultsUpdate}
         onMLResultsUpdate={handleMLResultsUpdate}

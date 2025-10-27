@@ -33,8 +33,8 @@ def list_reports():
     """
     List available analysis reports for current user.
 
-    Regular users see only their own reports.
-    Admin/owner users see all reports.
+    Regular users see only their own reports (no username field).
+    Admin/owner users see all reports with username field.
 
     Response (200):
     [
@@ -45,7 +45,8 @@ def list_reports():
         "created_at": "2025-10-19T...",
         "completed_at": "2025-10-19T...",
         "has_ml_results": true,
-        "has_traditional_results": true
+        "has_traditional_results": true,
+        "username": "john_doe"  // Only present for admin/owner users
       },
       ...
     ]
@@ -54,26 +55,33 @@ def list_reports():
     """
     with get_db() as db:
         user = g.user  # Set by @require_user decorator
+        is_admin = user.role in ("admin", "owner")
 
-        # Build query based on role
-        query = select(Analysis).where(Analysis.status == "succeeded")
-
-        # Regular users: only their own analyses
-        if user.role not in ("admin", "owner"):
-            query = query.where(Analysis.user_id == user.id)
-
-        # Admin/owner: all succeeded analyses (no filter needed)
-
-        # Execute query and order by most recent first
-        query = query.order_by(Analysis.created_at.desc())
-        analyses = db.execute(query).scalars().all()
+        # Build query based on role - join with User table if admin
+        if is_admin:
+            # Admin: get all analyses with username
+            query = (
+                select(Analysis, User.username)
+                .join(User, Analysis.user_id == User.id)
+                .where(Analysis.status == "succeeded")
+                .order_by(Analysis.created_at.desc())
+            )
+            results = db.execute(query).all()
+        else:
+            # Regular users: only their own analyses, no need for username
+            query = (
+                select(Analysis)
+                .where(Analysis.status == "succeeded", Analysis.user_id == user.id)
+                .order_by(Analysis.created_at.desc())
+            )
+            results = [(analysis, None) for analysis in db.execute(query).scalars().all()]
 
         # Build response
         reports = []
-        for analysis in analyses:
+        for analysis, username in results:
             result_json = analysis.result_json or {}
 
-            reports.append({
+            report = {
                 "analysis_id": analysis.id,
                 "original_filename": analysis.original_filename or "unknown.mp4",
                 "status": analysis.status,
@@ -81,7 +89,13 @@ def list_reports():
                 "completed_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
                 "has_ml_results": bool(result_json.get("ml")),
                 "has_traditional_results": bool(result_json.get("traditional"))
-            })
+            }
+
+            # Only include username for admins
+            if is_admin and username:
+                report["username"] = username
+
+            reports.append(report)
 
         return jsonify(reports), 200
 

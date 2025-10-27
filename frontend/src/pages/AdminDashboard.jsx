@@ -30,7 +30,7 @@ export default function AdminDashboard() {
               onClick={() => navigate("/reports")}
               className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:opacity-95 transition font-medium"
             >
-              Past Reports
+              Past Analyses
             </button>
             <button
               onClick={() => navigate("/upload")}

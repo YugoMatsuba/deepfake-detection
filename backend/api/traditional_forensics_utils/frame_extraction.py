@@ -96,7 +96,7 @@ def extract_frames(video_path: str, output_base: str = "frames") -> list[str]:
         if not ret:
             break
         if count % frame_interval == 0:
-            frame_filename = f"{video_name}_frame{frame_no:03d}.png"
+            frame_filename = f"{video_name}_frame{count}.png"
             path = os.path.join(output_folder, frame_filename)
             cv2.imwrite(path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 3])
             saved_frames.append(path)
