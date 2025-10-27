@@ -10,7 +10,6 @@ export default function PastReports() {
   const [downloading, setDownloading] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [reopening, setReopening] = useState(null);
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -81,88 +80,13 @@ export default function PastReports() {
     }
   };
 
-  const handleRerunAnalysis = async (analysisId) => {
-    try {
-      setReopening(analysisId);
-      setError(null);
-
-      // Fetch full analysis data
-      const response = await fetch(`/api/analyses/${analysisId}`, {
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load analysis");
-      }
-
-      const analysisData = await response.json();
-
-      // Extract data in format expected by FrameViewer
-      const mlResults = analysisData.result?.ml || {};
-      const traditionalResults = analysisData.result?.traditional || {};
-
-      // Get ML frames (filter by average score > 0.5 OR requested_adhoc)
-      // Match backend's filtering logic: average score across all models
-      const mlFrames = [];
-
-      // Collect all unique frame indices
-      const allFrameIndices = new Set();
-      Object.values(mlResults).forEach((model) => {
-        if (model.frames) {
-          model.frames.forEach((f) => {
-            if (typeof f.index === 'number') {
-              allFrameIndices.add(f.index);
-            }
-          });
-        }
-      });
-
-      // For each frame, calculate average score across all models
-      allFrameIndices.forEach((frameIndex) => {
-        const scores = [];
-        let isRequestedAdhoc = false;
-
-        // Collect scores from all models for this frame
-        Object.values(mlResults).forEach((model) => {
-          if (model.frames) {
-            const frameData = model.frames.find((f) => f.index === frameIndex);
-            if (frameData) {
-              if (typeof frameData.score === 'number') {
-                scores.push(frameData.score);
-              }
-              if (frameData.requested_adhoc === true) {
-                isRequestedAdhoc = true;
-              }
-            }
-          }
-        });
-
-        // Calculate average score
-        const avgScore = scores.length > 0
-          ? scores.reduce((a, b) => a + b, 0) / scores.length
-          : 0;
-
-        // Show frame if average score > 0.5 OR explicitly requested via ad-hoc
-        if (avgScore > 0.5 || isRequestedAdhoc) {
-          mlFrames.push(frameIndex);
-        }
-      });
-
-      // Navigate to frame viewer with data
-      navigate("/frame-viewer", {
-        state: {
-          analysisId: analysisData.analysis_id,
-          fps: analysisData.result?.video?.fps || null,
-          mlFrames: mlFrames.sort((a, b) => a - b),
-          mlModels: mlResults,
-          traditional: traditionalResults,
-        },
-      });
-    } catch (err) {
-      setError(err.message || "Failed to reopen analysis");
-    } finally {
-      setReopening(null);
-    }
+  const handleRerunAnalysis = (analysisId) => {
+    // Just navigate with analysisId - FrameViewer will fetch all data from backend
+    navigate("/frame-viewer", {
+      state: {
+        analysisId: analysisId,
+      },
+    });
   };
 
   const formatDate = (isoString) => {
@@ -283,12 +207,9 @@ export default function PastReports() {
                     <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
                       <button
                         onClick={() => handleRerunAnalysis(report.analysis_id)}
-                        disabled={reopening === report.analysis_id}
-                        className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs mr-2"
+                        className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition text-xs mr-2"
                       >
-                        {reopening === report.analysis_id
-                          ? "Opening..."
-                          : "Rerun Analysis"}
+                        Rerun Analysis
                       </button>
                       <button
                         onClick={() =>
