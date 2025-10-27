@@ -21,27 +21,10 @@ class TestVideoUploadRoutes(unittest.TestCase):
         self.app.register_blueprint(video_bp, url_prefix='/api')
         self.client = self.app.test_client()
 
-        # Create a test user for @require_user decorated routes
-        with get_db() as db:
-            self.test_user = User(
-                username='testuser_video',
-                password_hash=hash_password('password123'),
-                role='user',
-                active=True,
-                pending_approval=False
-            )
-            db.add(self.test_user)
-            # Commit is handled automatically by get_db context manager
-
-        # Fetch the user ID after commit
-        with get_db() as db:
-            user = db.query(User).filter(User.username == 'testuser_video').first()
-            self.test_user_id = user.id if user else None
-
     @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.save_video_for_analysis')
     @patch('api.routes.video_upload.probe_video_metadata')
-    def test_upload_video_success(self, mock_probe, mock_save, mock_get_db):
+    def test_upload_video_success(self, mock_probe, mock_save, mock_get_db, test_user):
         mock_db = MagicMock()
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
@@ -60,7 +43,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
         )
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess['user_id'] = test_user
 
         response = self.client.post('/api/videos',
                                   data={'file': file_obj},
@@ -71,14 +54,14 @@ class TestVideoUploadRoutes(unittest.TestCase):
         self.assertIn('analysis_id', data)
         self.assertIn('video_sha256', data)
 
-    def test_upload_video_no_file(self):
+    def test_upload_video_no_file(self, test_user):
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess['user_id'] = test_user
 
         response = self.client.post('/api/videos')
         self.assertEqual(response.status_code, 400)
 
-    def test_upload_video_unsupported_mimetype(self):
+    def test_upload_video_unsupported_mimetype(self, test_user):
         data = b'fake data'
         file_obj = FileStorage(
             stream=io.BytesIO(data),
@@ -87,7 +70,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
         )
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess['user_id'] = test_user
 
         response = self.client.post('/api/videos',
                                   data={'file': file_obj},
@@ -97,7 +80,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
     @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.DATA_ROOT')
-    def test_list_videos(self, mock_data_root, mock_get_db):
+    def test_list_videos(self, mock_data_root, mock_get_db, test_user):
         # Mock database
         mock_db = MagicMock()
         mock_get_db.return_value.__enter__.return_value = mock_db
@@ -105,7 +88,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess['user_id'] = test_user
 
         response = self.client.get('/api/videos/all')
         self.assertEqual(response.status_code, 200)
@@ -115,7 +98,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
     @patch('api.auth_utils.check_analysis_ownership_or_admin')
     @patch('api.routes.video_upload.DATA_ROOT')
     @patch('api.routes.video_upload.send_file')
-    def test_get_video(self, mock_send_file, mock_data_root, mock_ownership):
+    def test_get_video(self, mock_send_file, mock_data_root, mock_ownership, test_user):
         # Mock analysis ownership
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
@@ -131,7 +114,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
         # Add authentication session
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess['user_id'] = test_user
 
         # Use secure endpoint
         response = self.client.get('/api/analyses/test-analysis-id/video')
@@ -139,7 +122,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
     @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.DATA_ROOT')
-    def test_get_analysis_video_not_found(self, mock_data_root, mock_get_db):
+    def test_get_analysis_video_not_found(self, mock_data_root, mock_get_db, test_user):
         mock_db = MagicMock()
         # Mock database query to return None (analysis not found)
         mock_db.query().filter().first.return_value = None
@@ -150,7 +133,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
         mock_data_root.__truediv__.return_value = mock_video_dir
 
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess['user_id'] = test_user
 
         response = self.client.get('/api/analyses/nonexistent/video')
         self.assertEqual(response.status_code, 404)
