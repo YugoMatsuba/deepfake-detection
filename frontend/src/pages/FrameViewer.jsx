@@ -488,17 +488,49 @@ useEffect(() => {
             const freshMLFrames = [];
 
             // Extract frame indices that should be displayed:
-            // (score > 0.5) OR (requested_adhoc === true)
+            // Calculate average score across all models for each frame (like backend does)
+            // Show if: (average score > 0.5) OR (requested_adhoc === true)
+
+            // First, collect all unique frame indices
+            const allFrameIndices = new Set();
             Object.values(freshML).forEach(modelData => {
               if (modelData.frames) {
                 modelData.frames.forEach(f => {
-                  if (typeof f.index === 'number' && !freshMLFrames.includes(f.index)) {
-                    // Show frame if score > 0.5 OR user requested it via ad-hoc analysis
-                    if (f.score > 0.5 || f.requested_adhoc === true) {
-                      freshMLFrames.push(f.index);
-                    }
+                  if (typeof f.index === 'number') {
+                    allFrameIndices.add(f.index);
                   }
                 });
+              }
+            });
+
+            // For each frame, calculate average score across all models
+            allFrameIndices.forEach(frameIndex => {
+              const scores = [];
+              let isRequestedAdhoc = false;
+
+              // Collect scores from all models for this frame
+              Object.values(freshML).forEach(modelData => {
+                if (modelData.frames) {
+                  const frameData = modelData.frames.find(f => f.index === frameIndex);
+                  if (frameData) {
+                    if (typeof frameData.score === 'number') {
+                      scores.push(frameData.score);
+                    }
+                    if (frameData.requested_adhoc === true) {
+                      isRequestedAdhoc = true;
+                    }
+                  }
+                }
+              });
+
+              // Calculate average score
+              const avgScore = scores.length > 0
+                ? scores.reduce((a, b) => a + b, 0) / scores.length
+                : 0;
+
+              // Show frame if average score > 0.5 OR explicitly requested via ad-hoc
+              if (avgScore > 0.5 || isRequestedAdhoc) {
+                freshMLFrames.push(frameIndex);
               }
             });
 
