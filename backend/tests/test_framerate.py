@@ -21,15 +21,9 @@ class TestFrameRateRoutes(unittest.TestCase):
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
     @patch('api.routes.framerate.cv2.VideoCapture')
-    @patch('api.auth_utils.current_user')
-    def test_get_frame_rate_success(self, mock_current_user, mock_cv2, mock_data_root, mock_get_db):
+    def test_get_frame_rate_success(self, mock_cv2, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
-        mock_user = MagicMock()
-        mock_user.id = self.test_user_id
-        mock_user.role = 'user'
-        mock_current_user.return_value = mock_user
-
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
         mock_analysis.original_filename = 'test_video.mp4'
@@ -64,15 +58,9 @@ class TestFrameRateRoutes(unittest.TestCase):
         self.assertEqual(data['frame_rate'], 29.97)
 
     @patch('api.routes.framerate.get_db')
-    @patch('api.auth_utils.current_user')
-    def test_get_frame_rate_no_videos(self, mock_current_user, mock_get_db):
+    def test_get_frame_rate_no_videos(self, mock_get_db):
         # Mock database with no analyses
         mock_db = MagicMock()
-        mock_user = MagicMock()
-        mock_user.id = self.test_user_id
-        mock_user.role = 'user'
-        mock_current_user.return_value = mock_user
-
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
         mock_get_db.return_value.__enter__.return_value = mock_db
 
@@ -88,15 +76,9 @@ class TestFrameRateRoutes(unittest.TestCase):
 
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
-    @patch('api.auth_utils.current_user')
-    def test_get_frame_rate_video_file_not_found(self, mock_current_user, mock_data_root, mock_get_db):
+    def test_get_frame_rate_video_file_not_found(self, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
-        mock_user = MagicMock()
-        mock_user.id = self.test_user_id
-        mock_user.role = 'user'
-        mock_current_user.return_value = mock_user
-
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
 
@@ -121,15 +103,9 @@ class TestFrameRateRoutes(unittest.TestCase):
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
     @patch('api.routes.framerate.cv2.VideoCapture')
-    @patch('api.auth_utils.current_user')
-    def test_get_frame_rate_video_cannot_open(self, mock_current_user, mock_cv2, mock_data_root, mock_get_db):
+    def test_get_frame_rate_video_cannot_open(self, mock_cv2, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
-        mock_user = MagicMock()
-        mock_user.id = self.test_user_id
-        mock_user.role = 'user'
-        mock_current_user.return_value = mock_user
-
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
 
