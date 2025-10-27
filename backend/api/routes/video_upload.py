@@ -111,33 +111,44 @@ def upload_video():
 
 
 @video_bp.get("/videos/all")
-@cross_origin()
+@require_user
 def list_videos():
     """
-    List all uploaded videos from analysis storage.
+    List uploaded videos accessible to current user.
 
-    Used by frame viewer to show available videos.
-    Returns array of {id: analysis_id, ...metadata}.
+    Regular users see only their own videos.
+    Admin/owner users see all videos.
+
+    Returns:
+    - 200: [{id: analysis_id, path: video_url}, ...]
+    - 401: Unauthorized (no session)
     """
-    videos = []
+    with get_db() as db:
+        from flask import g
+        from api.auth_utils import current_user
 
-    # Iterate through all analysis directories
-    if DATA_ROOT.exists():
-        for analysis_dir in DATA_ROOT.iterdir():
-            if not analysis_dir.is_dir():
-                continue
+        user = current_user(db)
+        videos = []
 
-            analysis_id = analysis_dir.name
+        # Admin/owner can see all videos
+        if user.role in ("admin", "owner"):
+            analyses = db.query(Analysis).all()
+        else:
+            # Regular users see only their own
+            analyses = db.query(Analysis).filter(Analysis.user_id == user.id).all()
 
-            # Check if video exists
-            video_files = list(analysis_dir.glob("video.*"))
-            if video_files:
-                videos.append({
-                    "id": analysis_id,
-                    "path": f"/api/videos/{analysis_id}"
-                })
+        for analysis in analyses:
+            # Check if video file exists on disk
+            analysis_dir = DATA_ROOT / analysis.id
+            if analysis_dir.exists():
+                video_files = list(analysis_dir.glob("video.*"))
+                if video_files:
+                    videos.append({
+                        "id": analysis.id,
+                        "path": f"/api/analyses/{analysis.id}/video"
+                    })
 
-    return jsonify(videos), 200
+        return jsonify(videos), 200
 
 
 @video_bp.get("/analyses/<analysis_id>/video")
@@ -172,37 +183,6 @@ def get_analysis_video(analysis_id: str):
 
         video_path = video_files[0]
         return send_file(video_path, mimetype="video/mp4")
-
-
-def get_all_videos():
-    """
-    Get all uploaded videos with metadata for frame rate analysis.
-
-    Returns Flask Response object with JSON array of videos containing:
-    - id: analysis_id
-    - path: actual file system path to video file
-    - original_name: original filename
-    """
-    videos = []
-
-    # Iterate through all analysis directories
-    if DATA_ROOT.exists():
-        for analysis_dir in DATA_ROOT.iterdir():
-            if not analysis_dir.is_dir():
-                continue
-
-            analysis_id = analysis_dir.name
-
-            # Check if video exists
-            video_files = list(analysis_dir.glob("video.*"))
-            if video_files:
-                videos.append({
-                    "id": analysis_id,
-                    "path": str(video_files[0]),  # actual file path for OpenCV
-                    "original_name": video_files[0].name
-                })
-
-    return jsonify(videos)
 
 
 @video_bp.get("/analyses/<analysis_id>/forensics/<method>/frames/<int:frame_number>/overlay")
