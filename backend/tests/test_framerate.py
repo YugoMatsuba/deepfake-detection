@@ -57,11 +57,11 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         response = self.client.get('/api/framerate')
 
-            self.assertEqual(response.status_code, 200)
-            data = response.get_json()
-            self.assertEqual(data['video_id'], 'test-analysis-id')
-            self.assertEqual(data['original_name'], 'test_video.mp4')
-            self.assertEqual(data['frame_rate'], 29.97)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data['video_id'], 'test-analysis-id')
+        self.assertEqual(data['original_name'], 'test_video.mp4')
+        self.assertEqual(data['frame_rate'], 29.97)
 
     @patch('api.routes.framerate.get_db')
     @patch('api.auth_utils.current_user')
@@ -82,9 +82,9 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         response = self.client.get('/api/framerate')
 
-            self.assertEqual(response.status_code, 404)
-            data = response.get_json()
-            self.assertEqual(data['error'], 'No videos found')
+        self.assertEqual(response.status_code, 404)
+        data = response.get_json()
+        self.assertEqual(data['error'], 'No videos found')
 
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
@@ -114,9 +114,9 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         response = self.client.get('/api/framerate')
 
-            self.assertEqual(response.status_code, 404)
-            data = response.get_json()
-            self.assertEqual(data['error'], 'No valid video files found')
+        self.assertEqual(response.status_code, 404)
+        data = response.get_json()
+        self.assertEqual(data['error'], 'No valid video files found')
 
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
@@ -154,9 +154,9 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         response = self.client.get('/api/framerate')
 
-            self.assertEqual(response.status_code, 404)
-            data = response.get_json()
-            self.assertEqual(data['error'], 'No valid video files found')
+        self.assertEqual(response.status_code, 404)
+        data = response.get_json()
+        self.assertEqual(data['error'], 'No valid video files found')
 
 
 if __name__ == '__main__':
