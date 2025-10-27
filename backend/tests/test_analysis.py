@@ -33,7 +33,7 @@ class TestAnalysisRoutes(unittest.TestCase):
             self.test_user_id = self.test_user.id
 
     @patch('api.routes.analysis.get_db')
-    @patch('api.routes.analysis.check_analysis_ownership')
+    @patch('api.auth_utils.check_analysis_ownership_or_admin')
     @patch('api.routes.analysis.run_ml_analysis')
     @patch('api.routes.analysis.run_traditional_forensics')
     def test_start_analysis_success(self, mock_traditional, mock_ml, mock_ownership, mock_get_db):
@@ -81,7 +81,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         self.assertEqual(data['status'], 'succeeded')
 
     @patch('api.routes.analysis.get_db')
-    @patch('api.routes.analysis.check_analysis_ownership')
+    @patch('api.auth_utils.check_analysis_ownership_or_admin')
     def test_start_analysis_no_modules(self, mock_ownership, mock_get_db):
         mock_db = MagicMock()
         mock_analysis = MagicMock()
@@ -95,7 +95,7 @@ class TestAnalysisRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
     @patch('api.routes.analysis.get_db')
-    @patch('api.routes.analysis.check_analysis_ownership')
+    @patch('api.auth_utils.check_analysis_ownership_or_admin')
     def test_get_analysis(self, mock_ownership, mock_get_db):
         mock_db = MagicMock()
         mock_analysis = MagicMock()
@@ -119,7 +119,7 @@ class TestAnalysisRoutes(unittest.TestCase):
 
     @patch('storage.DATA_ROOT')
     @patch('api.routes.analysis.get_db')
-    @patch('api.routes.analysis.check_analysis_ownership')
+    @patch('api.auth_utils.check_analysis_ownership_or_admin')
     @patch('api.routes.analysis.extract_single_frame')
     @patch('api.routes.analysis.run_ela')
     def test_analyze_frame(self, mock_ela, mock_extract, mock_ownership, mock_get_db, mock_data_root):

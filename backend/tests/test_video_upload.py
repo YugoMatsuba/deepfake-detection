@@ -91,23 +91,32 @@ class TestVideoUploadRoutes(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
 
+    @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.DATA_ROOT')
-    def test_list_videos(self, mock_data_root):
-        mock_analysis_dir = MagicMock()
-        mock_analysis_dir.name = 'test-analysis-id'
-        mock_analysis_dir.is_dir.return_value = True
-        mock_analysis_dir.glob.return_value = ['/test/video.mp4']
+    def test_list_videos(self, mock_data_root, mock_get_db):
+        # Mock database and user
+        mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.id = self.test_user_id
+        mock_user.role = 'user'
+        mock_get_db.return_value.__enter__.return_value = mock_db
+        mock_db.query.return_value.filter.return_value.all.return_value = []
 
-        mock_data_root.exists.return_value = True
-        mock_data_root.iterdir.return_value = [mock_analysis_dir]
+        # Mock g.user for auth
+        with patch('api.auth_utils.g') as mock_g:
+            mock_g.user = mock_user
 
-        response = self.client.get('/api/videos/all')
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertIsInstance(data, list)
+            # Set session for auth
+            with self.client.session_transaction() as sess:
+                sess['user_id'] = self.test_user_id
+
+            response = self.client.get('/api/videos/all')
+            self.assertEqual(response.status_code, 200)
+            data = response.get_json()
+            self.assertIsInstance(data, list)
 
     @patch('api.routes.video_upload.get_db')
-    @patch('api.routes.analysis.check_analysis_ownership')  # Patch from where it's defined
+    @patch('api.auth_utils.check_analysis_ownership_or_admin')
     @patch('api.routes.video_upload.DATA_ROOT')
     @patch('api.routes.video_upload.send_file')
     def test_get_video(self, mock_send_file, mock_data_root, mock_ownership, mock_get_db):
