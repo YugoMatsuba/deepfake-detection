@@ -18,7 +18,7 @@ from flask_cors import cross_origin
 from werkzeug.utils import secure_filename
 
 from api import get_db
-from api.auth_utils import require_user
+from api.auth_utils import require_user, check_analysis_ownership_or_admin
 from models import Analysis
 from storage import save_video_for_analysis, probe_video_metadata, DATA_ROOT
 
@@ -167,9 +167,8 @@ def get_analysis_video(analysis_id: str):
     - 404: Analysis or video not found
     """
     with get_db() as db:
-        # Check ownership
-        from api.routes.analysis import check_analysis_ownership
-        analysis = check_analysis_ownership(db, analysis_id)
+        # Check access (ownership or admin)
+        analysis = check_analysis_ownership_or_admin(db, analysis_id)
 
         # Find video file in analysis directory
         video_dir = DATA_ROOT / analysis_id
@@ -204,9 +203,8 @@ def get_forensics_overlay(analysis_id: str, method: str, frame_number: int):
         - 404: Overlay not found
     """
     with get_db() as db:
-        # Check ownership
-        from api.routes.analysis import check_analysis_ownership
-        analysis = check_analysis_ownership(db, analysis_id)
+        # Check access (ownership or admin)
+        analysis = check_analysis_ownership_or_admin(db, analysis_id)
 
         # Validate method
         if method not in ["noise", "ela", "lbp"]:

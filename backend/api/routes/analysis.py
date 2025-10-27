@@ -22,7 +22,7 @@ from sqlalchemy import update
 from werkzeug.exceptions import HTTPException
 
 from api import get_db
-from api.auth_utils import require_user, check_analysis_ownership
+from api.auth_utils import require_user, check_analysis_ownership_or_admin
 from models import Analysis
 from storage import delete_analysis_files
 from api.ml_integration import run_ml_analysis, run_single_frame_ml_analysis
@@ -135,8 +135,8 @@ def start_analysis(analysis_id: str):
     """
     try:
         with get_db() as db:
-            # Check ownership
-            analysis = check_analysis_ownership(db, analysis_id)
+            # Check access (ownership or admin)
+            analysis = check_analysis_ownership_or_admin(db, analysis_id)
 
             # Parse request
             body = request.get_json() or {}
@@ -329,7 +329,7 @@ def start_analysis(analysis_id: str):
             return jsonify(response), 200
 
     except HTTPException:
-        raise  # Re-raise HTTP exceptions (401/403/404) from check_analysis_ownership
+        raise  # Re-raise HTTP exceptions (401/403/404) from check_analysis_ownership_or_admin
     except Exception as e:
         return jsonify(error=str(e)), 500
 
@@ -413,7 +413,7 @@ def get_analysis(analysis_id: str):
     Response (403/404): error message
     """
     with get_db() as db:
-        analysis = check_analysis_ownership(db, analysis_id)
+        analysis = check_analysis_ownership_or_admin(db, analysis_id)
 
         response = {
             "analysis_id": analysis.id,
@@ -561,8 +561,8 @@ def analyze_frame(analysis_id: str, frame_number: int):
     """
     try:
         with get_db() as db:
-            # Check ownership
-            analysis = check_analysis_ownership(db, analysis_id)
+            # Check access (ownership or admin)
+            analysis = check_analysis_ownership_or_admin(db, analysis_id)
 
             # Parse request
             body = request.get_json() or {}
@@ -744,8 +744,8 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
     """
     try:
         with get_db() as db:
-            # Check ownership
-            analysis = check_analysis_ownership(db, analysis_id)
+            # Check access (ownership or admin)
+            analysis = check_analysis_ownership_or_admin(db, analysis_id)
 
             # Parse request
             body = request.get_json() or {}
@@ -859,7 +859,7 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
 #     try:
 #         with get_db() as db:
 #             # Check ownership
-#             analysis = check_analysis_ownership(db, analysis_id)
+#             analysis = check_analysis_ownership_or_admin(db, analysis_id)
 #
 #             # Delete files from disk
 #             success = delete_analysis_files(analysis_id)
@@ -891,8 +891,8 @@ def delete_analysis(analysis_id: str):
     """
     try:
         with get_db() as db:
-            # Check ownership
-            analysis = check_analysis_ownership(db, analysis_id)
+            # Check access (ownership or admin)
+            analysis = check_analysis_ownership_or_admin(db, analysis_id)
 
             # Delete files from disk (if they still exist)
             delete_analysis_files(analysis_id)
