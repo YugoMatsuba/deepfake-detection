@@ -112,17 +112,14 @@ class TestVideoUploadRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertIsInstance(data, list)
 
-    @patch('api.routes.video_upload.get_db')
     @patch('api.auth_utils.check_analysis_ownership_or_admin')
     @patch('api.routes.video_upload.DATA_ROOT')
     @patch('api.routes.video_upload.send_file')
-    def test_get_video(self, mock_send_file, mock_data_root, mock_ownership, mock_get_db):
-        # Mock database and analysis ownership
-        mock_db = MagicMock()
+    def test_get_video(self, mock_send_file, mock_data_root, mock_ownership):
+        # Mock analysis ownership
         mock_analysis = MagicMock()
         mock_analysis.id = 'test-analysis-id'
         mock_ownership.return_value = mock_analysis
-        mock_get_db.return_value.__enter__.return_value = mock_db
 
         # Mock file system
         mock_video_dir = MagicMock()
