@@ -61,21 +61,33 @@ export default function FrameViewerPage() {
   );
 
   const flaggedFrameIndices = useMemo(() => {
-    if (!Array.isArray(mlFramesRaw)) {
-      return [];
-    }
-    return mlFramesRaw
-      .map((frame) => {
+    const indices = new Set();
+
+    // Add frames from mlFramesRaw (initially filtered frames)
+    if (Array.isArray(mlFramesRaw)) {
+      mlFramesRaw.forEach((frame) => {
         if (typeof frame === "number") {
-          return frame;
+          indices.add(frame);
+        } else if (frame && typeof frame.index === "number") {
+          indices.add(frame.index);
         }
-        if (frame && typeof frame.index === "number") {
-          return frame.index;
-        }
-        return null;
-      })
-      .filter((idx) => typeof idx === "number");
-  }, [mlFramesRaw]);
+      });
+    }
+
+    // ALSO add any frames with requested_adhoc: true from mlModels
+    // This ensures ad-hoc frames show up on initial page load
+    Object.values(mlModels).forEach((model) => {
+      if (model.frames) {
+        model.frames.forEach((f) => {
+          if (f.requested_adhoc === true && typeof f.index === "number") {
+            indices.add(f.index);
+          }
+        });
+      }
+    });
+
+    return Array.from(indices).sort((a, b) => a - b);
+  }, [mlFramesRaw, mlModels]);
 
   useEffect(() => {
     if (!analysisId) {
