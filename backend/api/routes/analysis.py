@@ -8,6 +8,7 @@ Routes:
 - POST /api/analyses/<id>/frames/<frame_number>/forensics - On-demand frame analysis
 """
 from __future__ import annotations
+import copy
 import os
 import subprocess
 import tempfile
@@ -259,11 +260,21 @@ def start_analysis(analysis_id: str):
                     "traditional": {}
                 }
 
-                # ML results: save scores + frames (no overlays to strip)
+                # ML results: Store ALL 32 frames in database
+                # Mark all frames with requested_adhoc=False (initial analysis, not user-requested)
+                # Frontend will filter to show only: (score > 0.5) OR (requested_adhoc == True)
                 for model_name, model_data in ml_results.items():
+                    all_frames = model_data.get("frames", [])
+
+                    # Mark ALL frames as not requested by user (initial auto-analysis)
+                    frames_with_flag = [
+                        {**frame, "requested_adhoc": False}
+                        for frame in all_frames
+                    ]
+
                     result_json["ml"][model_name] = {
                         "score": model_data.get("score"),
-                        "frames": model_data.get("frames", []),
+                        "frames": frames_with_flag,  # Store ALL 32 frames
                         "weights_hash": model_data.get("weights_hash")
                     }
 
@@ -299,15 +310,16 @@ def start_analysis(analysis_id: str):
 
             # Build full response payload
             # Metadata: from upload (persisted in DB)
-            # ML: scores + frames (no overlays)
+            # ML: scores + ALL 32 frames (each marked with requested_adhoc flag)
+            # ml_frames: filtered frame indices (only score > 0.5) for UI markers
             # Traditional: scores + overlay URLs (overlays persisted to disk)
             response = {
                 "analysis_id": analysis.id,
                 "status": "succeeded",
                 "metadata": analysis.result_json.get("metadata", {}),  # From upload
-                "ml": ml_results,
+                "ml": result_json.get("ml", {}),  # ALL frames with requested_adhoc flags
                 "ml_video": ml_video_meta,
-                "ml_frames": ml_frames_meta,
+                "ml_frames": ml_frames_meta,  # Filtered indices (score > 0.5)
                 "ml_timing": ml_timing_meta,
                 "traditional": traditional_results,  # Includes ephemeral overlays
                 "created_at": analysis.created_at.isoformat(),
@@ -571,7 +583,7 @@ def analyze_frame(analysis_id: str, frame_number: int):
             from storage import DATA_ROOT
             frames_dir = DATA_ROOT / analysis.id / "frames"
             frames_dir.mkdir(parents=True, exist_ok=True)
-            frame_path = str(frames_dir / f"frame_{frame_number:04d}.jpg")
+            frame_path = str(frames_dir / f"frame_{frame_number}.jpg")
 
             try:
                 extract_single_frame(
@@ -580,8 +592,8 @@ def analyze_frame(analysis_id: str, frame_number: int):
                     output_path=frame_path
                 )
 
-                # Fetch current result_json from DB
-                current_json = analysis.result_json or {}
+                # Fetch current result_json from DB (deep copy to trigger SQLAlchemy change detection)
+                current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
                 if "traditional" not in current_json:
                     current_json["traditional"] = {}
 
@@ -624,6 +636,10 @@ def analyze_frame(analysis_id: str, frame_number: int):
 
                         # Merge with existing data and recompute z-scores
                         existing_method_data = current_json["traditional"].get(method, {})
+                        print(f"\n[AD-HOC DEBUG] Existing {method} data before merge:")
+                        print(f"  Frames count: {len(existing_method_data.get('frames', []))}")
+                        print(f"  Frame numbers: {[f.get('frame_number') for f in existing_method_data.get('frames', [])]}")
+
                         updated_method_data = _merge_and_recompute_traditional(
                             method_name=method,
                             new_frame_result=raw_result,
@@ -631,6 +647,11 @@ def analyze_frame(analysis_id: str, frame_number: int):
                             frame_number=frame_number,
                             analysis_id=analysis.id
                         )
+
+                        print(f"\n[AD-HOC DEBUG] Updated {method} data after merge:")
+                        print(f"  Frames count: {len(updated_method_data.get('frames', []))}")
+                        print(f"  Frame numbers: {[f.get('frame_number') for f in updated_method_data.get('frames', [])]}")
+                        print(f"  Scores: {[f.get('score') for f in updated_method_data.get('frames', [])]}")
 
                         # Update result_json with merged data
                         current_json["traditional"][method] = updated_method_data
@@ -645,8 +666,24 @@ def analyze_frame(analysis_id: str, frame_number: int):
                         }
 
                 # Save updated result_json back to DB
+                print(f"\n[AD-HOC DEBUG] About to save to DB:")
+                print(f"  Traditional methods in JSON: {list(current_json.get('traditional', {}).keys())}")
+                for method_name, method_data in current_json.get('traditional', {}).items():
+                    print(f"  {method_name} frame count: {len(method_data.get('frames', []))}")
+
                 analysis.result_json = current_json
+                print(f"[AD-HOC DEBUG] Assigned to analysis.result_json")
+
                 db.commit()
+                print(f"[AD-HOC DEBUG] ✓ Committed to DB")
+
+                # Verify what's actually in the DB after commit
+                db.refresh(analysis)
+                verified_json = analysis.result_json
+                print(f"\n[AD-HOC DEBUG] Verified from DB after commit:")
+                for method_name, method_data in verified_json.get('traditional', {}).items():
+                    print(f"  {method_name} frame count: {len(method_data.get('frames', []))}")
+                    print(f"  {method_name} frame numbers: {[f.get('frame_number') for f in method_data.get('frames', [])]}")
 
                 response = {
                     "analysis_id": analysis.id,
@@ -740,6 +777,53 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
 
                 # Remaining keys are model results
                 model_results = results
+
+                # Persist ad-hoc ML results to DB with requested_adhoc flag
+                try:
+                    current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
+                    ml_data = current_json.get("ml", {})
+
+                    # Merge ad-hoc results into each model's frames
+                    for model_name, model_result in model_results.items():
+                        if model_name not in ml_data:
+                            ml_data[model_name] = {"score": None, "frames": [], "weights_hash": None}
+
+                        existing_frames = ml_data[model_name].get("frames", [])
+
+                        # Create new frame entry with requested_adhoc flag
+                        new_frame = {
+                            "index": response_frame_number,
+                            "time": response_time,
+                            "score": model_result.get("score"),
+                            "requested_adhoc": True  # Mark as user-requested
+                        }
+
+                        # Find if frame already exists
+                        frame_idx = next(
+                            (i for i, f in enumerate(existing_frames) if f.get("index") == response_frame_number),
+                            None
+                        )
+
+                        if frame_idx is not None:
+                            # Update existing frame
+                            existing_frames[frame_idx] = new_frame
+                        else:
+                            # Add new frame
+                            existing_frames.append(new_frame)
+
+                        ml_data[model_name]["frames"] = existing_frames
+
+                    # Save updated data
+                    current_json["ml"] = ml_data
+                    analysis.result_json = current_json
+                    analysis.updated_at = datetime.now(timezone.utc)
+                    # Commit happens automatically via context manager
+
+                    print(f"[AD-HOC ML] Saved frame {response_frame_number} for models: {', '.join(model_results.keys())}")
+
+                except Exception as db_error:
+                    # Log but don't fail the request if DB save fails
+                    print(f"[AD-HOC ML] Warning: Failed to persist to DB: {db_error}")
 
                 response = {
                     "analysis_id": analysis.id,

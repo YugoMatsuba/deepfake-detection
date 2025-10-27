@@ -150,7 +150,8 @@ def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
             "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
             "frame_number": frame_number,
-            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None
+            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None,
+            "requested_adhoc": True  # Ad-hoc single-frame analysis
         }
         return {
             "score": frame_entry["score"],
@@ -168,7 +169,8 @@ def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
                 "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # NEW: Preserve raw score
                 "score": frame.get("score", 0.0),
                 "frame_number": frame_number,
-                "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None
+                "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None,
+                "requested_adhoc": False  # Initial analysis frames
             })
         return {
             "score": frame_list[0]["score"],
@@ -186,7 +188,8 @@ def transform_noise_result(raw_result: dict[str, Any], analysis_id: str) -> dict
             "frame": raw_result.get("frame"),
             "confidence": raw_result.get("confidence", 0.0),
             "frame_number": frame_number,
-            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None
+            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None,
+            "requested_adhoc": True  # Ad-hoc single-frame analysis
         }
         return {
             "confidence": frame_entry["confidence"],
@@ -207,7 +210,8 @@ def transform_noise_result(raw_result: dict[str, Any], analysis_id: str) -> dict
                 "confidence": z_score,  # Z-score
                 "score": z_score,  # Also store as "score" for consistency
                 "frame_number": frame_number,
-                "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None
+                "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None,
+                "requested_adhoc": False  # Initial analysis frames
             })
         return {
             "confidence": frame_list[0]["confidence"],
@@ -226,7 +230,8 @@ def transform_lbp_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
             "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
             "frame_number": frame_number,
-            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None
+            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None,
+            "requested_adhoc": True  # Ad-hoc single-frame analysis
         }
         return {
             "score": frame_entry["score"],
@@ -244,7 +249,8 @@ def transform_lbp_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
                 "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # NEW: Preserve raw score
                 "score": frame.get("normalized_score", frame.get("score", 0.0)),
                 "frame_number": frame_number,
-                "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None
+                "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None,
+                "requested_adhoc": False  # Initial analysis frames
             })
         return {
             "score": frame_list[0]["score"],

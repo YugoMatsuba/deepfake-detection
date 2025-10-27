@@ -237,8 +237,8 @@ def get_forensics_overlay(analysis_id: str, method: str, frame_number: int):
         if not overlay_dir.exists():
             return jsonify(error="Forensics data not found"), 404
 
-        # Look for overlay with this frame number
-        overlay_path = overlay_dir / f"frame_{frame_number:04d}.jpg"
+        # Look for overlay with this frame number (no zero-padding to match _save_overlay behavior)
+        overlay_path = overlay_dir / f"frame_{frame_number}.jpg"
         if not overlay_path.exists():
             return jsonify(error=f"Overlay not found for frame {frame_number}"), 404
 

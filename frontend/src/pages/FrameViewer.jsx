@@ -79,18 +79,6 @@ useEffect(() => {
   }
 }, [initialFrameRate]);
 
-useEffect(() => {
-  setTraditionalData(traditionalResults || {});
-}, [traditionalResults]);
-
-useEffect(() => {
-  setMLData(deepfakeMeta || {});
-}, [deepfakeMeta]);
-
-useEffect(() => {
-  setMLFrames(deepfakeFrames || []);
-}, [deepfakeFrames]);
-
   useEffect(() => {
     let abort = false;
     let objectUrl = null;
@@ -489,10 +477,43 @@ useEffect(() => {
         setMLData(updatedMLData);
         onMLResultsUpdate(updatedMLData, frameNumber);
 
-        // Add frame to mlFrames array if not already present
-        if (!mlFrames.includes(frameNumber)) {
-          const updatedFrames = [...mlFrames, frameNumber].sort((a, b) => a - b);
-          setMLFrames(updatedFrames);
+        // Fetch fresh data from DB to ensure consistency and persistence
+        try {
+          const freshResponse = await fetch(`http://localhost:5050/api/analyses/${analysisId}`, {
+            credentials: "include"
+          });
+          if (freshResponse.ok) {
+            const freshData = await freshResponse.json();
+            const freshML = freshData.result?.ml || {};
+            const freshMLFrames = [];
+
+            // Extract frame indices that should be displayed:
+            // (score > 0.5) OR (requested_adhoc === true)
+            Object.values(freshML).forEach(modelData => {
+              if (modelData.frames) {
+                modelData.frames.forEach(f => {
+                  if (typeof f.index === 'number' && !freshMLFrames.includes(f.index)) {
+                    // Show frame if score > 0.5 OR user requested it via ad-hoc analysis
+                    if (f.score > 0.5 || f.requested_adhoc === true) {
+                      freshMLFrames.push(f.index);
+                    }
+                  }
+                });
+              }
+            });
+
+            setMLData(freshML);
+            setMLFrames(freshMLFrames.sort((a, b) => a - b));
+            console.log("Synced ML data from DB:", freshML);
+          }
+        } catch (dbError) {
+          console.error("Failed to fetch fresh ML data from DB:", dbError);
+          // Continue with local state if DB fetch fails
+          // Add frame to mlFrames array if not already present
+          if (!mlFrames.includes(frameNumber)) {
+            const updatedFrames = [...mlFrames, frameNumber].sort((a, b) => a - b);
+            setMLFrames(updatedFrames);
+          }
         }
 
         // Calculate average score from all models for popup
@@ -517,6 +538,8 @@ useEffect(() => {
       }
 
       // Traditional forensics analysis (existing code)
+      console.log("1. Starting traditional forensics request for", analysisType, "frame", targetFrame);
+
       const response = await fetch(
         `http://localhost:5050/api/analyses/${analysisId}/frames/${targetFrame}/forensics`,
         {
@@ -527,29 +550,53 @@ useEffect(() => {
         }
       );
 
+      console.log("2. Got forensics response, status:", response.status);
       const result = await response.json();
+      console.log("3. Forensics result:", result);
 
       if (!response.ok) {
         throw new Error(result.error || "Analysis failed");
       }
 
       const methodResult = result?.results?.[analysisType];
+      console.log("4. Method result:", methodResult);
+
       if (!methodResult) {
         throw new Error("Backend returned no data for the requested analysis.");
       }
 
-      // Backend now returns FULL updated method data (all frames with recalculated z-scores)
-      // No need to merge - just replace the entire method data
-      const updatedTraditional = {
-        ...traditionalData,
-        [analysisType]: methodResult,
-      };
+      // Fetch fresh data from DB to ensure consistency and persistence
+      console.log("5. Fetching fresh data from DB...");
+      const freshResponse = await fetch(`http://localhost:5050/api/analyses/${analysisId}`, {
+        credentials: "include"
+      });
 
-      setTraditionalData(updatedTraditional);
-      onTraditionalResultsUpdate(updatedTraditional);
+      console.log("6. Got DB response, status:", freshResponse.status);
 
-      // Find the frame we just analyzed
-      const analyzedFrame = methodResult.frames?.find(
+      if (!freshResponse.ok) {
+        throw new Error("Failed to fetch updated analysis from DB");
+      }
+
+      const freshData = await freshResponse.json();
+      console.log("7. Fresh DB data:", freshData);
+
+      const freshTraditional = freshData.result?.traditional || {};
+      console.log("8. Fresh traditional data:", freshTraditional);
+
+      const freshMethodResult = freshTraditional[analysisType];
+      console.log("9. Fresh method result:", freshMethodResult);
+
+      if (!freshMethodResult) {
+        throw new Error("Analysis method data missing from DB after update");
+      }
+
+      console.log("10. Setting state with fresh traditional data");
+      setTraditionalData(freshTraditional);
+      onTraditionalResultsUpdate(freshTraditional);
+      console.log("11. ✓ Synced traditional data from DB:", freshTraditional);
+
+      // Find the frame we just analyzed (from fresh DB data)
+      const analyzedFrame = freshMethodResult.frames?.find(
         (frame) => frame.frame_number === result.frame_number
       );
 
