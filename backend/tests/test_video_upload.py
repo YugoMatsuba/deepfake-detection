@@ -24,15 +24,19 @@ class TestVideoUploadRoutes(unittest.TestCase):
         # Create a test user for @require_user decorated routes
         with get_db() as db:
             self.test_user = User(
-                username='testuser',
+                username='testuser_video',
                 password_hash=hash_password('password123'),
                 role='user',
                 active=True,
                 pending_approval=False
             )
             db.add(self.test_user)
-            db.flush()  # Get the ID without committing
-            self.test_user_id = self.test_user.id
+            # Commit is handled automatically by get_db context manager
+
+        # Fetch the user ID after commit
+        with get_db() as db:
+            user = db.query(User).filter(User.username == 'testuser_video').first()
+            self.test_user_id = user.id if user else None
 
     @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.save_video_for_analysis')

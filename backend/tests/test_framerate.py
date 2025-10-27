@@ -6,6 +6,8 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from api.routes.framerate import frame_rate_bp
+from api import get_db, hash_password
+from models import User
 
 
 class TestFrameRateRoutes(unittest.TestCase):
@@ -16,7 +18,22 @@ class TestFrameRateRoutes(unittest.TestCase):
         self.app.config['SECRET_KEY'] = 'test-secret-key'
         self.app.register_blueprint(frame_rate_bp, url_prefix='/api')
         self.client = self.app.test_client()
-        self.test_user_id = 1
+
+        # Create a test user for @require_user decorated routes
+        with get_db() as db:
+            self.test_user = User(
+                username='testuser_framerate',
+                password_hash=hash_password('password123'),
+                role='user',
+                active=True,
+                pending_approval=False
+            )
+            db.add(self.test_user)
+
+        # Fetch the user ID after commit
+        with get_db() as db:
+            user = db.query(User).filter(User.username == 'testuser_framerate').first()
+            self.test_user_id = user.id if user else None
 
     @patch('api.routes.framerate.get_db')
     @patch('api.routes.framerate.DATA_ROOT')
