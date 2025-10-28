@@ -764,14 +764,54 @@ const handleRunFullAnalysis = async (method) => {
 
     if (method === "ml") {
       setMLData(freshData.ml || {});
-      // Extract ML frames
-      const allMLFrames = new Set();
+
+      // Extract ML frames - only show if avgScore > 0.5 OR requested_adhoc === true
+      const freshMLFrames = [];
+
+      // First, collect all unique frame indices
+      const allFrameIndices = new Set();
       Object.values(freshData.ml || {}).forEach(modelData => {
-        modelData.frames?.forEach(f => {
-          if (typeof f.index === 'number') allMLFrames.add(f.index);
-        });
+        if (modelData.frames) {
+          modelData.frames.forEach(f => {
+            if (typeof f.index === 'number') {
+              allFrameIndices.add(f.index);
+            }
+          });
+        }
       });
-      setMLFrames(Array.from(allMLFrames).sort((a, b) => a - b));
+
+      // For each frame, calculate average score across all models
+      allFrameIndices.forEach(frameIndex => {
+        const scores = [];
+        let isRequestedAdhoc = false;
+
+        // Collect scores from all models for this frame
+        Object.values(freshData.ml || {}).forEach(modelData => {
+          if (modelData.frames) {
+            const frameData = modelData.frames.find(f => f.index === frameIndex);
+            if (frameData) {
+              if (typeof frameData.score === 'number') {
+                scores.push(frameData.score);
+              }
+              if (frameData.requested_adhoc === true) {
+                isRequestedAdhoc = true;
+              }
+            }
+          }
+        });
+
+        // Calculate average score
+        const avgScore = scores.length > 0
+          ? scores.reduce((a, b) => a + b, 0) / scores.length
+          : 0;
+
+        // Show frame if average score > 0.5 OR explicitly requested via ad-hoc
+        if (avgScore > 0.5 || isRequestedAdhoc) {
+          freshMLFrames.push(frameIndex);
+        }
+      });
+
+      setMLFrames(freshMLFrames.sort((a, b) => a - b));
     } else {
       setTraditionalData(freshData.traditional || {});
       onTraditionalResultsUpdate(freshData.traditional || {});
