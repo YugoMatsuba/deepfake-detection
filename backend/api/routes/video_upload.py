@@ -25,7 +25,8 @@ from storage import save_video_for_analysis, probe_video_metadata, DATA_ROOT
 video_bp = Blueprint("video", __name__)
 
 ALLOWED_MIME = {
-    "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "video/avi"
+    "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "video/avi",
+    "image/jpeg", "image/png", "image/heic", "image/webp"
 }
 
 
@@ -58,8 +59,11 @@ def upload_video():
     if file.mimetype not in ALLOWED_MIME:
         return jsonify(error=f"Unsupported mimetype: {file.mimetype}"), 400
 
+    # Detect media type from MIME
+    media_type = "image" if file.mimetype.startswith("image/") else "video"
+
     # Get secure extension
-    ext = Path(secure_filename(file.filename)).suffix or ".mp4"
+    ext = Path(secure_filename(file.filename)).suffix or (".jpg" if media_type == "image" else ".mp4")
 
     # Use context manager for DB session
     with get_db() as db:
@@ -70,6 +74,7 @@ def upload_video():
                 video_path="",  # Will be updated after save
                 video_sha256="",  # Will be updated after save
                 original_filename=original_filename,
+                media_type=media_type,
             )
             db.add(analysis)
             db.flush()  # Get analysis.id without committing
@@ -82,8 +87,8 @@ def upload_video():
             # Move to final location and compute SHA-256
             video_path, sha256 = save_video_for_analysis(tmp_path, ext, analysis.id)
 
-            # Probe metadata
-            meta = probe_video_metadata(video_path)
+            # Probe metadata (only for videos)
+            meta = probe_video_metadata(video_path) if media_type == "video" else {}
 
             # Update Analysis record
             analysis.video_path = str(video_path)
@@ -93,6 +98,7 @@ def upload_video():
             # Commit happens automatically in context manager
             return jsonify({
                 "analysis_id": analysis.id,
+                "media_type": media_type,
                 "video_sha256": sha256,
                 "meta": meta
             }), 201
@@ -182,6 +188,51 @@ def get_analysis_video(analysis_id: str):
 
         video_path = video_files[0]
         return send_file(video_path, mimetype="video/mp4")
+
+
+@video_bp.get("/analyses/<analysis_id>/image")
+@require_user
+def get_analysis_image(analysis_id: str):
+    """
+    Serve image file for a given analysis with authentication and ownership check.
+
+    Used by image analysis page to display image content securely.
+    Requires authentication and verifies user owns the analysis.
+
+    Returns:
+    - 200: Image file
+    - 401: Unauthorized (no session)
+    - 403: Forbidden (not owner)
+    - 404: Analysis or image not found
+    """
+    with get_db() as db:
+        # Check access (ownership or admin)
+        analysis = check_analysis_ownership_or_admin(db, analysis_id)
+
+        # Find image file in analysis directory
+        image_dir = DATA_ROOT / analysis_id
+        if not image_dir.exists():
+            return jsonify(error="Analysis not found"), 404
+
+        # Find image file (any extension)
+        image_files = list(image_dir.glob("video.*"))  # Still named "video.*" for consistency with storage
+        if not image_files:
+            return jsonify(error="Image file not found"), 404
+
+        image_path = image_files[0]
+
+        # Determine mimetype from extension
+        ext = image_path.suffix.lower()
+        mimetype_map = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".heic": "image/heic",
+            ".webp": "image/webp"
+        }
+        mimetype = mimetype_map.get(ext, "image/jpeg")
+
+        return send_file(image_path, mimetype=mimetype)
 
 
 @video_bp.get("/analyses/<analysis_id>/forensics/<method>/frames/<int:frame_number>/overlay")
