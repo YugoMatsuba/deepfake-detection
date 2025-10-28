@@ -370,6 +370,132 @@ def _get_video_metadata(video_path: str) -> Dict[str, Any]:
     return metadata
 
 
+@analysis_bp.post("/analyses/<analysis_id>/start-image")
+@require_user
+def start_image_analysis(analysis_id: str):
+    """
+    Start synchronous image analysis (blocking).
+
+    Request body:
+    {
+      "modules": ["xception", "spsl", "ucf"],  // ML modules
+      "traditional": ["ela", "noise", "lbp"]   // Traditional forensics
+    }
+
+    Response (200):
+    {
+      "analysis_id": "uuid",
+      "status": "succeeded",
+      "result": {
+        "ml": {
+          "xception": {"score": 0.87},
+          "spsl": {"score": 0.82},
+          "ucf": {"score": 0.91}
+        },
+        "traditional": {
+          "ela": {
+            "score": 2.34,
+            "raw_score": 2.34,
+            "frame_number": 0,
+            "overlay_url": "/api/analyses/{id}/forensics/ela/frames/0/overlay"
+          },
+          ...
+        },
+        "exif": {
+          "analyzed_at": "2024-01-15T14:30:00Z",
+          "file_hash": "abc123...",
+          "metadata": {...}
+        }
+      },
+      "created_at": "2025-10-28T...",
+      "completed_at": "2025-10-28T..."
+    }
+
+    Response (400/403/404/500): error message
+    """
+    try:
+        with get_db() as db:
+            # Check access (ownership or admin)
+            analysis = check_analysis_ownership_or_admin(db, analysis_id)
+
+            # Verify this is an image analysis
+            if analysis.media_type != "image":
+                return jsonify(error="This endpoint is for images only. Use /start for videos."), 400
+
+            # Parse request
+            body = request.get_json() or {}
+            ml_modules = body.get("modules", [])
+            traditional_modules = body.get("traditional", [])
+
+            if not ml_modules and not traditional_modules:
+                return jsonify(error="No modules specified"), 400
+
+            # Validate modules
+            VALID_ML_MODULES = {"xception", "spsl", "ucf"}
+            VALID_TRADITIONAL = {"ela", "noise", "lbp"}
+
+            invalid_ml = set(ml_modules) - VALID_ML_MODULES
+            invalid_trad = set(traditional_modules) - VALID_TRADITIONAL
+
+            if invalid_ml or invalid_trad:
+                invalid_all = invalid_ml | invalid_trad
+                return jsonify(error=f"Invalid modules: {', '.join(sorted(invalid_all))}"), 400
+
+            # Optimistic UPDATE to prevent race condition
+            stmt = (
+                update(Analysis)
+                .where(Analysis.id == analysis_id, Analysis.status == "created")
+                .values(status="running", updated_at=datetime.now(timezone.utc))
+            )
+            result = db.execute(stmt)
+
+            if result.rowcount == 0:
+                db.refresh(analysis)
+                return jsonify(error=f"Analysis already {analysis.status}"), 409
+
+            # Run image analysis (BLOCKING)
+            try:
+                from api.image_analysis import run_image_analysis
+
+                results = run_image_analysis(
+                    image_path=analysis.video_path,  # Still named video_path for consistency
+                    image_sha256=analysis.video_sha256,
+                    ml_modules=ml_modules,
+                    traditional_modules=traditional_modules,
+                    analysis_id=analysis.id
+                )
+
+                # Mark as succeeded and store results
+                analysis.status = "succeeded"
+                analysis.result_json = results
+                analysis.updated_at = datetime.now(timezone.utc)
+
+                print(f"✓ Image analysis completed for {analysis.id}")
+
+                return jsonify({
+                    "analysis_id": analysis.id,
+                    "status": "succeeded",
+                    "result": results,
+                    "created_at": analysis.created_at.isoformat(),
+                    "completed_at": analysis.updated_at.isoformat()
+                }), 200
+
+            except Exception as e:
+                # Mark as failed
+                analysis.status = "failed"
+                analysis.error = str(e)
+                analysis.updated_at = datetime.now(timezone.utc)
+
+                print(f"✗ Image analysis failed for {analysis.id}: {e}")
+
+                return jsonify(error=f"Image analysis failed: {str(e)}"), 500
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
 @analysis_bp.get("/analyses/<analysis_id>")
 @require_user
 def get_analysis(analysis_id: str):
