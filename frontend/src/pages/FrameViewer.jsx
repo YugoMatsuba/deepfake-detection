@@ -1367,7 +1367,7 @@ const handleRunFullAnalysis = async (method) => {
             {/* ML Results */}
             {overallStats.syntheticMediaChance !== null ? (
               <div className="mb-6">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-blue-700">
                     Synthetic Media Chance = {overallStats.syntheticMediaChance}%
                   </h3>
@@ -1375,7 +1375,7 @@ const handleRunFullAnalysis = async (method) => {
                     <button
                       onClick={() => handleRunFullAnalysis('ml')}
                       disabled={isAnalysing}
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap"
                     >
                       {overallStats.mlFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
                     </button>
@@ -1388,14 +1388,14 @@ const handleRunFullAnalysis = async (method) => {
             ) : (
               overallStats.showMLButton && (
                 <div className="mb-6">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between">
                     <h3 className="text-xl font-semibold text-gray-700">
                       Synthetic Media Chance = N/A
                     </h3>
                     <button
                       onClick={() => handleRunFullAnalysis('ml')}
                       disabled={isAnalysing}
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap"
                     >
                       Run Full Analysis
                     </button>
@@ -1408,7 +1408,7 @@ const handleRunFullAnalysis = async (method) => {
             <div className="space-y-3 mb-6">
               {(overallStats.elaScore !== null || overallStats.showElaButton) && (
                 <div className="text-lg text-gray-700">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between">
                     <span>
                       <span className="font-medium">ELA Top Z-score:</span> {overallStats.elaScore !== null ? overallStats.elaScore : 'N/A'}
                       {overallStats.elaFrameCount > 0 && overallStats.elaFrameCount < 10 && (
@@ -1419,7 +1419,7 @@ const handleRunFullAnalysis = async (method) => {
                       <button
                         onClick={() => handleRunFullAnalysis('ela')}
                         disabled={isAnalysing}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap ml-4"
                       >
                         {overallStats.elaFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
                       </button>
@@ -1429,7 +1429,7 @@ const handleRunFullAnalysis = async (method) => {
               )}
               {(overallStats.noiseScore !== null || overallStats.showNoiseButton) && (
                 <div className="text-lg text-gray-700">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between">
                     <span>
                       <span className="font-medium">Noise Top Z-score:</span> {overallStats.noiseScore !== null ? overallStats.noiseScore : 'N/A'}
                       {overallStats.noiseFrameCount > 0 && overallStats.noiseFrameCount < 10 && (
@@ -1440,7 +1440,7 @@ const handleRunFullAnalysis = async (method) => {
                       <button
                         onClick={() => handleRunFullAnalysis('noise')}
                         disabled={isAnalysing}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap ml-4"
                       >
                         {overallStats.noiseFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
                       </button>
@@ -1450,7 +1450,7 @@ const handleRunFullAnalysis = async (method) => {
               )}
               {(overallStats.lbpScore !== null || overallStats.showLBPButton) && (
                 <div className="text-lg text-gray-700">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between">
                     <span>
                       <span className="font-medium">LBP Top Z-score:</span> {overallStats.lbpScore !== null ? overallStats.lbpScore : 'N/A'}
                       {overallStats.lbpFrameCount > 0 && overallStats.lbpFrameCount < 10 && (
@@ -1461,7 +1461,7 @@ const handleRunFullAnalysis = async (method) => {
                       <button
                         onClick={() => handleRunFullAnalysis('lbp')}
                         disabled={isAnalysing}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap ml-4"
                       >
                         {overallStats.lbpFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
                       </button>
