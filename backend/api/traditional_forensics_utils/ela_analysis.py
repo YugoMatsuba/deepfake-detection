@@ -191,25 +191,32 @@ def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
         for fname, fpath, score, ela_img in results
     ]
 
-    # Step 3: Sort and pick top frames
+    # Step 3: Sort ALL frames by z-score (descending)
     normalized_results.sort(key=lambda x: x[3], reverse=True)  # Sort by z-score (index 3)
-    top_count = min(max(1, int(len(normalized_results) * top_percent / 100)), 32)
-    top_frames_data = normalized_results[:top_count]
 
-    # Step 4: Save overlays for top frames and build response
-    top_frames = []
-    for fname, fpath, raw_score, z_score, ela_img in top_frames_data:
-        # Save overlay to disk
-        _save_overlay(ela_img, fname, output_dir)
-        top_frames.append({
+    # Determine which frames are in top N% (flagged frames)
+    top_count = min(max(1, int(len(normalized_results) * top_percent / 100)), 32)
+    flagged_indices = set(range(top_count))  # Top N frames are flagged
+
+    # Step 4: Save overlays ONLY for flagged frames, return ALL frames
+    all_frames = []
+    for idx, (fname, fpath, raw_score, z_score, ela_img) in enumerate(normalized_results):
+        is_flagged = idx in flagged_indices
+
+        # Save overlay to disk ONLY for flagged frames (reduce storage)
+        if is_flagged:
+            _save_overlay(ela_img, fname, output_dir)
+
+        all_frames.append({
             "frame": fname,
-            "raw_score": float(raw_score),  # NEW: Store raw score for z-score recalculation
-            "score": float(z_score)
+            "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
+            "score": float(z_score),
+            "flagged": is_flagged  # Mark top N% as flagged
         })
 
-    # Return JSON-ready dict
+    # Return JSON-ready dict with ALL frames
     return {
         "mode": "multi_frame",
         "top_percent": top_percent,
-        "top_frames": top_frames
+        "top_frames": all_frames  # Now contains ALL frames, not just top
     }

@@ -95,6 +95,10 @@ def extract_frames(video_path: str, output_base: str = "frames") -> list[str]:
         ret, frame = cap.read()
         if not ret:
             break
+        # Skip frame 0 (often has compression artifacts, title cards, or fade-in effects)
+        if count == 0:
+            count += 1
+            continue
         if count % frame_interval == 0:
             frame_filename = f"{video_name}_frame{count}.png"
             path = os.path.join(output_folder, frame_filename)

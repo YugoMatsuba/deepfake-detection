@@ -170,37 +170,44 @@ def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=No
             "score": score
         }
 
-    # Multi-frame case
+    # Multi-frame case: Compute z-scores for ALL frames
     scores = [s for _, s, _ in results]
     mean_score = float(np.mean(scores))
     std_score = float(np.std(scores)) + 1e-6
 
-    # Normalize scores (zero-clip for LBP)
+    # Normalize scores (NO zero-clipping - negatives are meaningful)
     normalized_results = []
     for fname, score, lbp_img in results:
-        norm_score = max((score - mean_score) / std_score, 0)
-        normalized_results.append((fname, score, norm_score, lbp_img))
+        z_score = (score - mean_score) / std_score  # Removed max(..., 0) zero-clipping
+        normalized_results.append((fname, score, z_score, lbp_img))
 
+    # Sort ALL frames by z-score (descending)
     results_sorted = sorted(normalized_results, key=lambda x: x[2], reverse=True)
 
-    # Top frames (cap at 32 to limit JSON payload size)
+    # Determine which frames are in top N% (flagged frames)
     top_count = min(max(1, int(len(results_sorted) * top_percent / 100)), 32)
-    top_frames_data = results_sorted[:top_count]
+    flagged_indices = set(range(top_count))  # Top N frames are flagged
 
-    # Save overlays and build response
-    top_frames = []
-    for fname, raw_score, norm_score, lbp_img in top_frames_data:
-        # Save overlay to disk
-        _save_overlay(lbp_img, fname, output_dir)
-        top_frames.append({
+    # Save overlays ONLY for flagged frames, return ALL frames
+    all_frames = []
+    for idx, (fname, raw_score, z_score, lbp_img) in enumerate(results_sorted):
+        is_flagged = idx in flagged_indices
+
+        # Save overlay to disk ONLY for flagged frames (reduce storage)
+        if is_flagged:
+            _save_overlay(lbp_img, fname, output_dir)
+
+        all_frames.append({
             "frame": fname,
-            "raw_score": float(raw_score),  # Store raw score for z-score recalculation
-            "score": float(norm_score),     # Z-score (zero-clipped for LBP)
-            "normalized_score": float(norm_score)  # Keep for backward compatibility
+            "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
+            "score": float(z_score),
+            "normalized_score": float(z_score),  # Keep for backward compatibility
+            "flagged": is_flagged  # Mark top N% as flagged
         })
 
+    # Return ALL frames JSON
     return {
         "mode": "multi_frame",
         "top_percent": top_percent,
-        "top_frames": top_frames
+        "top_frames": all_frames  # Now contains ALL frames, not just top
     }

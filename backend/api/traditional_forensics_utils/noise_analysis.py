@@ -258,7 +258,7 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
             "confidence": float(score)
         }
 
-    # Multi-frame case
+    # Multi-frame case: Compute z-scores for ALL frames
     scores_only = [s for _, s, _ in results]
     mean_score = np.mean(scores_only)
     std_score = np.std(scores_only) + 1e-6
@@ -272,8 +272,8 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
     # Cap at 32 frames to limit JSON payload size
     top_count = min(max(1, int(len(sorted_results) * top_percent / 100)), 32)
 
-    # Temporal NMS: select frames with temporal diversity
-    selected_frames = []
+    # Temporal NMS: select frames with temporal diversity (these become flagged)
+    selected_frame_names = set()
     selected_indices = []
 
     for fname, raw_score, z_score, img, idx in sorted_results:
@@ -281,27 +281,30 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
         too_close = any(abs(idx - sel_idx) <= NOISE_TEMP_NMS_WINDOW for sel_idx in selected_indices)
 
         if not too_close:
-            selected_frames.append((fname, raw_score, z_score, img))
+            selected_frame_names.add(fname)  # Track flagged frame names
             selected_indices.append(idx)
 
-        if len(selected_frames) >= top_count:
+        if len(selected_frame_names) >= top_count:
             break
 
-    top_frames = selected_frames
+    # Build response for ALL frames (not just selected)
+    all_frames = []
+    for fname, raw_score, z_score, img, idx in sorted_results:
+        is_flagged = fname in selected_frame_names
 
-    # Save overlays and build response
-    frame_list = []
-    for f, raw_s, z_s, img in top_frames:
-        # Save overlay to disk
-        _save_overlay(img, f, output_dir)
-        frame_list.append({
-            "frame": f,
-            "raw_score": float(raw_s),  # NEW: Store raw score for z-score recalculation
-            "score": float(z_s)
+        # Save overlay to disk ONLY for flagged frames (reduce storage)
+        if is_flagged:
+            _save_overlay(img, fname, output_dir)
+
+        all_frames.append({
+            "frame": fname,
+            "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
+            "score": float(z_score),
+            "flagged": is_flagged  # Mark NMS-selected frames as flagged
         })
 
-    # Return top frames JSON
+    # Return ALL frames JSON
     return {
         "mode": "multi_frame",
-        "top_frames": frame_list
+        "top_frames": all_frames  # Now contains ALL frames, not just top
     }
