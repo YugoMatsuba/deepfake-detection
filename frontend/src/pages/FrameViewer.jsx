@@ -726,8 +726,7 @@ const handleDownloadPDF = async () => {
 };
 
 const handleFinishAnalysis = () => {
-  // Just navigate back to upload page, no cleanup
-  navigate("/upload");
+  setShowFinishPopup(true);
 };
 
   // Calculate overall statistics
@@ -1216,6 +1215,50 @@ const handleFinishAnalysis = () => {
             >
               More Details
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Finish Analysis Popup */}
+      {showFinishPopup && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
+          onClick={() => setShowFinishPopup(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Finish Analysis</h2>
+            <p className="text-gray-700 mb-6">
+              This analysis has been saved and will be available in Past Analyses.
+            </p>
+            <p className="text-gray-700 mb-6">
+              Would you like to download a PDF report?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  await handleDownloadPDF();
+                  setShowFinishPopup(false);
+                  navigate("/upload");
+                }}
+                disabled={downloadingPDF}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
+              >
+                {downloadingPDF ? "Downloading..." : "Yes, Download PDF"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowFinishPopup(false);
+                  navigate("/upload");
+                }}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
+              >
+                No, Just Finish
+              </button>
+            </div>
           </div>
         </div>
       )}
