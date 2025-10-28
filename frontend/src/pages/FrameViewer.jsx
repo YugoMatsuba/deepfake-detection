@@ -1375,7 +1375,7 @@ const handleRunFullAnalysis = async (method) => {
                     <button
                       onClick={() => handleRunFullAnalysis('ml')}
                       disabled={isAnalysing}
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap"
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap ml-4"
                     >
                       {overallStats.mlFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
                     </button>
@@ -1395,7 +1395,7 @@ const handleRunFullAnalysis = async (method) => {
                     <button
                       onClick={() => handleRunFullAnalysis('ml')}
                       disabled={isAnalysing}
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap"
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap ml-4"
                     >
                       Run Full Analysis
                     </button>
