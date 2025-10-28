@@ -12,6 +12,7 @@ import RoleSelect from '../pages/RoleSelect.jsx';
 import AdminDashboard from '../pages/AdminDashboard.jsx';
 import Landing from '../pages/Landing.jsx';
 import PastReports from '../pages/PastReports.jsx';
+import ImageAnalysis from '../pages/ImageAnalysis.jsx';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
             />
             <Route path="/upload" element={<Upload />} />
             <Route path="/analysis" element={<Analysis />}/>
+            <Route path="/image-analysis/:id" element={<ImageAnalysis />} />
             <Route path="/frame-viewer" element={<FrameViewerPage />} />
             <Route
               path="/reports"
