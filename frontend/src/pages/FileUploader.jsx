@@ -92,7 +92,13 @@ export default function FileUploader() {
 
       // Save selected modules to context
       setSelectedModules({ ml: mlModules, traditional: traditionalModules });
-      navigate("/analysis");
+
+      // Route based on media type
+      if (response.media_type === "image") {
+        navigate(`/image-analysis/${response.analysis_id}`);
+      } else {
+        navigate("/analysis");
+      }
     } catch (error) {
       setUploadStatus('error');
       alert('Upload failed. Please try again.');
