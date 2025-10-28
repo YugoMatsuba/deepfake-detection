@@ -1408,7 +1408,7 @@ const handleRunFullAnalysis = async (method) => {
             {overallStats.syntheticMediaChance !== null ? (
               <div className="mb-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-blue-700">
+                  <h3 className="text-lg font-semibold text-blue-700">
                     Synthetic Media Chance = {overallStats.syntheticMediaChance}%
                   </h3>
                   {overallStats.showMLButton && (
@@ -1429,7 +1429,7 @@ const handleRunFullAnalysis = async (method) => {
               overallStats.showMLButton && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-700">
                       Synthetic Media Chance = N/A
                     </h3>
                     <button
