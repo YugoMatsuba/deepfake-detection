@@ -252,9 +252,10 @@ useEffect(() => {
     // Add ML frames
     frames = [...mlFrames];
 
-    // Add traditional forensics frames
+    // Add traditional forensics frames (only flagged)
     ["ela", "noise", "lbp"].forEach(t => {
       const tFrames = (traditionalData?.[t]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -265,6 +266,7 @@ useEffect(() => {
       frames = mlFrames;
     } else {
       frames = (traditionalData?.[type]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -292,9 +294,10 @@ const jumpToPreviousMarker = (type) => {
     // Add ML frames
     frames = [...mlFrames];
 
-    // Add traditional forensics frames
+    // Add traditional forensics frames (only flagged)
     ["ela", "noise", "lbp"].forEach(t => {
       const tFrames = (traditionalData?.[t]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -305,6 +308,7 @@ const jumpToPreviousMarker = (type) => {
       frames = mlFrames;
     } else {
       frames = (traditionalData?.[type]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -371,8 +375,8 @@ useEffect(() => {
     return mlFrames[hoveredIndex] ?? null;
   }
 
-  // For other types
-  const frames = traditionalData?.[typeToCheck]?.frames;
+  // For other types (filter to flagged frames to match timeline markers)
+  const frames = traditionalData?.[typeToCheck]?.frames?.filter(f => f.flagged) || [];
   if (!frames || hoveredIndex < 0 || hoveredIndex >= frames.length) return null;
 
   return frames[hoveredIndex].frame_number ?? frames[hoveredIndex].frame;
@@ -897,12 +901,9 @@ const handleFinishAnalysis = () => {
       />
     ));
   } else {
-    return traditionalData?.[type]?.frames?.map((frame, idx) => {
+    return traditionalData?.[type]?.frames?.filter(f => f.flagged).map((frame, idx) => {
       const frameNum = frame.frame_number ?? frame.frame;
       if (frameNum == null) return null;
-
-      const showFrame = frame.flagged || typeof frame.score === "number" || typeof frame.confidence === "number";
-      if (!showFrame) return null;
 
       return (
         <div
