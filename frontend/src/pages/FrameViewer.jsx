@@ -733,6 +733,61 @@ const handleFinishAnalysis = () => {
   setShowFinishPopup(true);
 };
 
+const handleRunFullAnalysis = async (method) => {
+  if (!analysisId) return;
+
+  // Set loading state
+  setIsAnalysing(true);
+  setCurrentAnalysisType(method);
+
+  try {
+    console.log(`Starting full ${method} analysis...`);
+
+    const response = await fetch(
+      `http://localhost:5050/api/analyses/${analysisId}/run-full/${method}`,
+      {
+        method: "POST",
+        credentials: "include"
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Full analysis failed");
+    }
+
+    const result = await response.json();
+    console.log(`Full ${method} analysis completed:`, result);
+
+    // Update state with fresh data
+    const freshData = result.result;
+
+    if (method === "ml") {
+      setMLData(freshData.ml || {});
+      // Extract ML frames
+      const allMLFrames = new Set();
+      Object.values(freshData.ml || {}).forEach(modelData => {
+        modelData.frames?.forEach(f => {
+          if (typeof f.index === 'number') allMLFrames.add(f.index);
+        });
+      });
+      setMLFrames(Array.from(allMLFrames).sort((a, b) => a - b));
+    } else {
+      setTraditionalData(freshData.traditional || {});
+      onTraditionalResultsUpdate(freshData.traditional || {});
+    }
+
+    alert(`Full ${method.toUpperCase()} analysis completed successfully!`);
+
+  } catch (error) {
+    console.error(`Full ${method} analysis failed:`, error);
+    alert(`Failed to run full ${method} analysis: ${error.message}`);
+  } finally {
+    setIsAnalysing(false);
+    setCurrentAnalysisType(null);
+  }
+};
+
   // Calculate overall statistics
   const overallStats = useMemo(() => {
     // ML: Calculate average score across all models (use state, not prop)
@@ -741,16 +796,38 @@ const handleFinishAnalysis = () => {
       ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
       : null;
 
+    // ML frame counts (min across all models)
+    const mlFrameCounts = Object.values(mlData || {})
+      .map(m => m.frames?.length ?? 0)
+      .filter(c => c > 0);
+    const mlFrameCount = mlFrameCounts.length > 0 ? Math.min(...mlFrameCounts) : 0;
+
     // Traditional: Get scores (use state, not prop)
     const elaScore = traditionalData?.ela?.score ?? null;
     const noiseConfidence = traditionalData?.noise?.confidence ?? null;
     const lbpScore = traditionalData?.lbp?.score ?? null;
 
+    // Traditional frame counts
+    const elaFrameCount = traditionalData?.ela?.frames?.length ?? 0;
+    const noiseFrameCount = traditionalData?.noise?.frames?.length ?? 0;
+    const lbpFrameCount = traditionalData?.lbp?.frames?.length ?? 0;
+
     return {
       syntheticMediaChance: mlAverage,
+      mlFrameCount,
+      showMLButton: mlFrameCount === 0 || mlFrameCount < 10,
+
       elaScore: elaScore !== null ? elaScore.toFixed(2) : null,
+      elaFrameCount,
+      showElaButton: elaFrameCount === 0 || elaFrameCount < 10,
+
       noiseScore: noiseConfidence !== null ? noiseConfidence.toFixed(2) : null,
-      lbpScore: lbpScore !== null ? lbpScore.toFixed(2) : null
+      noiseFrameCount,
+      showNoiseButton: noiseFrameCount === 0 || noiseFrameCount < 10,
+
+      lbpScore: lbpScore !== null ? lbpScore.toFixed(2) : null,
+      lbpFrameCount,
+      showLBPButton: lbpFrameCount === 0 || lbpFrameCount < 10
     };
   }, [mlData, traditionalData]);
 
@@ -1288,29 +1365,108 @@ const handleFinishAnalysis = () => {
             </div>
 
             {/* ML Results */}
-            {overallStats.syntheticMediaChance !== null && (
+            {overallStats.syntheticMediaChance !== null ? (
               <div className="mb-6">
-                <h3 className="text-xl font-semibold text-blue-700 mb-2">
-                  Synthetic Media Chance = {overallStats.syntheticMediaChance}%
-                </h3>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-xl font-semibold text-blue-700">
+                    Synthetic Media Chance = {overallStats.syntheticMediaChance}%
+                  </h3>
+                  {overallStats.showMLButton && (
+                    <button
+                      onClick={() => handleRunFullAnalysis('ml')}
+                      disabled={isAnalysing}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                    >
+                      {overallStats.mlFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
+                    </button>
+                  )}
+                </div>
+                {overallStats.mlFrameCount > 0 && overallStats.mlFrameCount < 10 && (
+                  <p className="text-sm text-gray-500 mt-1">({overallStats.mlFrameCount} frames analyzed)</p>
+                )}
               </div>
+            ) : (
+              overallStats.showMLButton && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-semibold text-gray-700">
+                      Synthetic Media Chance = N/A
+                    </h3>
+                    <button
+                      onClick={() => handleRunFullAnalysis('ml')}
+                      disabled={isAnalysing}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                    >
+                      Run Full Analysis
+                    </button>
+                  </div>
+                </div>
+              )
             )}
 
             {/* Traditional Forensics */}
             <div className="space-y-3 mb-6">
-              {overallStats.elaScore !== null && (
+              {(overallStats.elaScore !== null || overallStats.showElaButton) && (
                 <div className="text-lg text-gray-700">
-                  <span className="font-medium">ELA Top Z-score:</span> {overallStats.elaScore}
+                  <div className="flex items-center gap-3">
+                    <span>
+                      <span className="font-medium">ELA Top Z-score:</span> {overallStats.elaScore !== null ? overallStats.elaScore : 'N/A'}
+                      {overallStats.elaFrameCount > 0 && overallStats.elaFrameCount < 10 && (
+                        <span className="text-sm text-gray-500 ml-2">({overallStats.elaFrameCount} frames)</span>
+                      )}
+                    </span>
+                    {overallStats.showElaButton && (
+                      <button
+                        onClick={() => handleRunFullAnalysis('ela')}
+                        disabled={isAnalysing}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                      >
+                        {overallStats.elaFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
-              {overallStats.noiseScore !== null && (
+              {(overallStats.noiseScore !== null || overallStats.showNoiseButton) && (
                 <div className="text-lg text-gray-700">
-                  <span className="font-medium">Noise Top Z-score:</span> {overallStats.noiseScore}
+                  <div className="flex items-center gap-3">
+                    <span>
+                      <span className="font-medium">Noise Top Z-score:</span> {overallStats.noiseScore !== null ? overallStats.noiseScore : 'N/A'}
+                      {overallStats.noiseFrameCount > 0 && overallStats.noiseFrameCount < 10 && (
+                        <span className="text-sm text-gray-500 ml-2">({overallStats.noiseFrameCount} frames)</span>
+                      )}
+                    </span>
+                    {overallStats.showNoiseButton && (
+                      <button
+                        onClick={() => handleRunFullAnalysis('noise')}
+                        disabled={isAnalysing}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                      >
+                        {overallStats.noiseFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
-              {overallStats.lbpScore !== null && (
+              {(overallStats.lbpScore !== null || overallStats.showLBPButton) && (
                 <div className="text-lg text-gray-700">
-                  <span className="font-medium">LBP Top Z-score:</span> {overallStats.lbpScore}
+                  <div className="flex items-center gap-3">
+                    <span>
+                      <span className="font-medium">LBP Top Z-score:</span> {overallStats.lbpScore !== null ? overallStats.lbpScore : 'N/A'}
+                      {overallStats.lbpFrameCount > 0 && overallStats.lbpFrameCount < 10 && (
+                        <span className="text-sm text-gray-500 ml-2">({overallStats.lbpFrameCount} frames)</span>
+                      )}
+                    </span>
+                    {overallStats.showLBPButton && (
+                      <button
+                        onClick={() => handleRunFullAnalysis('lbp')}
+                        disabled={isAnalysing}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                      >
+                        {overallStats.lbpFrameCount === 0 ? 'Run Full Analysis' : 'Complete Analysis'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
