@@ -480,7 +480,8 @@ def _merge_and_recompute_traditional(
     new_frame_entry = {
         "frame_number": frame_number,
         "raw_score": float(raw_score),
-        "overlay_url": f"/api/analyses/{analysis_id}/forensics/{method_name}/frames/{frame_number}/overlay"
+        "overlay_url": f"/api/analyses/{analysis_id}/forensics/{method_name}/frames/{frame_number}/overlay",
+        "flagged": True  # Ad-hoc frames are explicitly requested by user, so flagged
     }
 
     if frame_index is not None:
@@ -506,11 +507,9 @@ def _merge_and_recompute_traditional(
         if method_name == "noise":
             frame["confidence"] = float(z_score)
 
-    # 5. Compute overall score (mean of top N frames, or all if < 10)
+    # 5. Compute overall score (MAX z-score = most suspicious frame)
     z_scores = [f["score"] for f in existing_frames]
-    z_scores_sorted = sorted(z_scores, reverse=True)
-    top_n = min(10, len(z_scores_sorted))
-    overall_score = float(np.mean(z_scores_sorted[:top_n]))
+    overall_score = float(max(z_scores))
 
     # 6. Return updated structure
     result = {
@@ -585,16 +584,49 @@ def analyze_frame(analysis_id: str, frame_number: int):
             frame_path = str(frames_dir / f"frame_{frame_number}.jpg")
 
             try:
-                extract_single_frame(
-                    video_path=analysis.video_path,
-                    frame_number=frame_number,
-                    output_path=frame_path
-                )
+                # Only extract if frame doesn't already exist (avoid JPEG re-encoding variance)
+                if not os.path.exists(frame_path):
+                    extract_single_frame(
+                        video_path=analysis.video_path,
+                        frame_number=frame_number,
+                        output_path=frame_path
+                    )
 
                 # Fetch current result_json from DB (deep copy to trigger SQLAlchemy change detection)
                 current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
                 if "traditional" not in current_json:
                     current_json["traditional"] = {}
+
+                # Check if frame already analyzed for ALL requested methods (short-circuit if so)
+                all_methods_exist = True
+                for method in methods:
+                    method_data = current_json["traditional"].get(method, {})
+                    existing_frames = method_data.get("frames", [])
+                    frame_exists = any(f.get("frame_number") == frame_number for f in existing_frames)
+                    if not frame_exists:
+                        all_methods_exist = False
+                        break
+
+                if all_methods_exist:
+                    # Frame already analyzed for all requested methods - return cached results
+                    results = {}
+                    for method in methods:
+                        method_data = current_json["traditional"].get(method, {})
+                        existing_frames = method_data.get("frames", [])
+                        frame_data = next((f for f in existing_frames if f.get("frame_number") == frame_number), None)
+                        if frame_data:
+                            results[method] = {
+                                "score": frame_data.get("score"),
+                                "frame_number": frame_number,
+                                "cached": True
+                            }
+
+                    response = {
+                        "analysis_id": analysis.id,
+                        "frame_number": frame_number,
+                        "results": results
+                    }
+                    return jsonify(response), 200
 
                 # Run each requested forensics method on the single frame
                 results = {}
@@ -761,6 +793,39 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                     error=f"Invalid models: {', '.join(sorted(invalid_models))}"
                 ), 400
 
+            # Check if frame already analyzed for ALL requested models (short-circuit if so)
+            current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
+            ml_data = current_json.get("ml", {})
+
+            all_models_exist = True
+            for model_name in models:
+                if model_name not in ml_data:
+                    all_models_exist = False
+                    break
+                existing_frames = ml_data[model_name].get("frames", [])
+                frame_exists = any(f.get("index") == frame_number for f in existing_frames)
+                if not frame_exists:
+                    all_models_exist = False
+                    break
+
+            if all_models_exist:
+                # Frame already analyzed for all requested models - return cached results
+                model_results = {}
+                for model_name in models:
+                    existing_frames = ml_data[model_name].get("frames", [])
+                    frame_data = next((f for f in existing_frames if f.get("index") == frame_number), None)
+                    if frame_data:
+                        model_results[model_name] = {"score": frame_data.get("score")}
+
+                response = {
+                    "analysis_id": analysis.id,
+                    "frame_number": frame_number,
+                    "time": 0.0,  # Cached result, no compute time
+                    "results": model_results,
+                    "cached": True
+                }
+                return jsonify(response), 200
+
             # Run ML analysis on single frame
             try:
                 results = run_single_frame_ml_analysis(
@@ -779,8 +844,6 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
 
                 # Persist ad-hoc ML results to DB with requested_adhoc flag
                 try:
-                    current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
-                    ml_data = current_json.get("ml", {})
 
                     # Merge ad-hoc results into each model's frames
                     for model_name, model_result in model_results.items():
@@ -811,6 +874,11 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                             existing_frames.append(new_frame)
 
                         ml_data[model_name]["frames"] = existing_frames
+
+                        # Recalculate per-model score as average of ALL frames
+                        frame_scores = [f["score"] for f in existing_frames if f.get("score") is not None]
+                        if frame_scores:
+                            ml_data[model_name]["score"] = sum(frame_scores) / len(frame_scores)
 
                     # Save updated data
                     current_json["ml"] = ml_data

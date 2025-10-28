@@ -252,9 +252,10 @@ useEffect(() => {
     // Add ML frames
     frames = [...mlFrames];
 
-    // Add traditional forensics frames
+    // Add traditional forensics frames (only flagged)
     ["ela", "noise", "lbp"].forEach(t => {
       const tFrames = (traditionalData?.[t]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -265,6 +266,7 @@ useEffect(() => {
       frames = mlFrames;
     } else {
       frames = (traditionalData?.[type]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -292,9 +294,10 @@ const jumpToPreviousMarker = (type) => {
     // Add ML frames
     frames = [...mlFrames];
 
-    // Add traditional forensics frames
+    // Add traditional forensics frames (only flagged)
     ["ela", "noise", "lbp"].forEach(t => {
       const tFrames = (traditionalData?.[t]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
       frames.push(...tFrames);
@@ -305,6 +308,7 @@ const jumpToPreviousMarker = (type) => {
       frames = mlFrames;
     } else {
       frames = (traditionalData?.[type]?.frames || [])
+        .filter(f => f.flagged)  // Only show flagged frames
         .map(f => f.frame_number ?? f.frame)
         .filter(n => typeof n === "number");
     }
@@ -371,8 +375,8 @@ useEffect(() => {
     return mlFrames[hoveredIndex] ?? null;
   }
 
-  // For other types
-  const frames = traditionalData?.[typeToCheck]?.frames;
+  // For other types (filter to flagged frames to match timeline markers)
+  const frames = traditionalData?.[typeToCheck]?.frames?.filter(f => f.flagged) || [];
   if (!frames || hoveredIndex < 0 || hoveredIndex >= frames.length) return null;
 
   return frames[hoveredIndex].frame_number ?? frames[hoveredIndex].frame;
@@ -726,22 +730,21 @@ const handleDownloadPDF = async () => {
 };
 
 const handleFinishAnalysis = () => {
-  // Just navigate back to upload page, no cleanup
-  navigate("/upload");
+  setShowFinishPopup(true);
 };
 
   // Calculate overall statistics
   const overallStats = useMemo(() => {
-    // ML: Calculate average score across all models
-    const mlScores = Object.values(deepfakeMeta || {}).map(r => r.score).filter(s => s != null);
+    // ML: Calculate average score across all models (use state, not prop)
+    const mlScores = Object.values(mlData || {}).map(r => r.score).filter(s => s != null);
     const mlAverage = mlScores.length > 0
       ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
       : null;
 
-    // Traditional: Get scores
-    const elaScore = traditionalResults?.ela?.score ?? null;
-    const noiseConfidence = traditionalResults?.noise?.confidence ?? null;
-    const lbpScore = traditionalResults?.lbp?.score ?? null;
+    // Traditional: Get scores (use state, not prop)
+    const elaScore = traditionalData?.ela?.score ?? null;
+    const noiseConfidence = traditionalData?.noise?.confidence ?? null;
+    const lbpScore = traditionalData?.lbp?.score ?? null;
 
     return {
       syntheticMediaChance: mlAverage,
@@ -749,17 +752,17 @@ const handleFinishAnalysis = () => {
       noiseScore: noiseConfidence ? noiseConfidence.toFixed(2) : null,
       lbpScore: lbpScore ? lbpScore.toFixed(2) : null
     };
-  }, [deepfakeMeta, traditionalResults]);
+  }, [mlData, traditionalData]);
 
 
   return (
     <>
     <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
 
-      {/* Info Button - Top Left */}
+      {/* Info Button - Bottom Left */}
       <button
         onClick={() => setShowStatsPopup(true)}
-        className="fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg flex items-center justify-center"
+        className="fixed bottom-8 left-8 z-50 w-10 h-10 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg flex items-center justify-center"
         title="View Overall Statistics"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -898,12 +901,9 @@ const handleFinishAnalysis = () => {
       />
     ));
   } else {
-    return traditionalData?.[type]?.frames?.map((frame, idx) => {
+    return traditionalData?.[type]?.frames?.filter(f => f.flagged).map((frame, idx) => {
       const frameNum = frame.frame_number ?? frame.frame;
       if (frameNum == null) return null;
-
-      const showFrame = frame.flagged || typeof frame.score === "number" || typeof frame.confidence === "number";
-      if (!showFrame) return null;
 
       return (
         <div
@@ -1216,6 +1216,50 @@ const handleFinishAnalysis = () => {
             >
               More Details
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Finish Analysis Popup */}
+      {showFinishPopup && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
+          onClick={() => setShowFinishPopup(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Finish Analysis</h2>
+            <p className="text-gray-700 mb-6">
+              This analysis has been saved and will be available in Past Analyses.
+            </p>
+            <p className="text-gray-700 mb-6">
+              Would you like to download a PDF report?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  await handleDownloadPDF();
+                  setShowFinishPopup(false);
+                  navigate("/upload");
+                }}
+                disabled={downloadingPDF}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
+              >
+                {downloadingPDF ? "Downloading..." : "Yes, Download PDF"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowFinishPopup(false);
+                  navigate("/upload");
+                }}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
+              >
+                No, Just Finish
+              </button>
+            </div>
           </div>
         </div>
       )}
