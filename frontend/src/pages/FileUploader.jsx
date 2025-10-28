@@ -8,7 +8,7 @@ import { uploadVideo } from "../api/videos";
 import { useAnalysis } from "../app/AnalysisProvider";
 
 export default function FileUploader() {
-  const [files, setFiles] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'success' | 'error'
   const { setAnalysisId, setSelectedModules } = useAnalysis();
 
@@ -20,19 +20,12 @@ export default function FileUploader() {
     lbp: false,
   });
 
-  const onDrop = useCallback(async (droppedFiles) => {
-    setFiles(droppedFiles);
+  const onDrop = useCallback((droppedFiles) => {
     if (droppedFiles && droppedFiles.length > 0) {
-      setUploadStatus('uploading');
-      try {
-        const response = await uploadVideo(droppedFiles[0]);
-        setAnalysisId(response.analysis_id); // Save analysis_id to context
-        setUploadStatus('success');
-      } catch {
-        setUploadStatus('error');
-      }
+      setSelectedFile(droppedFiles[0]);
+      setUploadStatus(null); // Reset status when new file selected
     }
-  }, [setAnalysisId]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -49,7 +42,16 @@ export default function FileUploader() {
   let dropzoneClass = "border-2 border-dashed rounded-xl p-10 cursor-pointer text-center transition";
   dropzoneClass += isDragActive ? " border-blue-500 bg-blue-50" : " border-gray-300 bg-white";
 
-  const dropzoneContent = (
+  const dropzoneContent = selectedFile ? (
+    <div>
+      <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
+        Drag image or video here, or click to select
+      </p>
+      <p className="text-sm text-orange-600 mt-2">
+        ⚠️ This will replace your current file
+      </p>
+    </div>
+  ) : (
     <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
       Drag image or video here, or click to select
     </p>
@@ -58,9 +60,9 @@ export default function FileUploader() {
   const navigate = useNavigate();
   const { analysisId } = useAnalysis();
 
-  const handleGoToAnalysis = () => {
-    if (!analysisId) {
-      alert('Please upload a video first');
+  const handleGoToAnalysis = async () => {
+    if (!selectedFile) {
+      alert('Please select a file first');
       return;
     }
 
@@ -76,9 +78,20 @@ export default function FileUploader() {
       return;
     }
 
-    // Save selected modules to context
-    setSelectedModules({ ml: mlModules, traditional: traditionalModules });
-    navigate("/analysis");
+    // Upload file when Start is clicked
+    setUploadStatus('uploading');
+    try {
+      const response = await uploadVideo(selectedFile);
+      setAnalysisId(response.analysis_id);
+      setUploadStatus('success');
+
+      // Save selected modules to context
+      setSelectedModules({ ml: mlModules, traditional: traditionalModules });
+      navigate("/analysis");
+    } catch (error) {
+      setUploadStatus('error');
+      alert('Upload failed. Please try again.');
+    }
   };
 
   return (
@@ -92,18 +105,17 @@ export default function FileUploader() {
               {dropzoneContent}
             </div>
 
-            {files.length > 0 && (
+            {selectedFile && (
               <div className="mt-4 space-y-2">
-                <h2 className="font-semibold">
-                  {uploadStatus === 'uploading' && 'Uploading...'}
-                  {uploadStatus === 'success' && 'Upload successful!'}
-                  {uploadStatus === 'error' && 'Upload failed'}
+                <h2 className="font-semibold text-gray-700">
+                  Selected: {selectedFile.name}
                 </h2>
-                <ul className="list-disc pl-5 text-gray-700">
-                  {files.map((file) => (
-                    <li key={file.name}>{file.name}</li>
-                  ))}
-                </ul>
+                {uploadStatus === 'uploading' && (
+                  <p className="text-blue-600 text-sm">Uploading...</p>
+                )}
+                {uploadStatus === 'error' && (
+                  <p className="text-red-600 text-sm">Upload failed</p>
+                )}
               </div>
             )}
           </CardContent>
@@ -156,9 +168,10 @@ export default function FileUploader() {
 
         <button
           onClick={handleGoToAnalysis}
-          className="absolute bottom-20 right-48 bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors"
+          disabled={uploadStatus === 'uploading'}
+          className="absolute bottom-20 right-48 bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          Start
+          {uploadStatus === 'uploading' ? 'Uploading...' : 'Start'}
         </button>
       </div>
     </div>
