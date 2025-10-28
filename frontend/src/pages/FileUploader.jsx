@@ -58,8 +58,7 @@ export default function FileUploader() {
 
   const dropzoneContent = (
     <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
-      Drag image or video here, or click to select
-      {selectedFile && <span className="text-sm font-normal text-gray-500"> (drag new file to replace)</span>}
+      Drag image or video here, or click to {selectedFile ? 'replace' : 'select'}
     </p>
   );
 
