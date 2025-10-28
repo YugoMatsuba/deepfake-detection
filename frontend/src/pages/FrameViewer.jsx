@@ -732,16 +732,16 @@ const handleFinishAnalysis = () => {
 
   // Calculate overall statistics
   const overallStats = useMemo(() => {
-    // ML: Calculate average score across all models
-    const mlScores = Object.values(deepfakeMeta || {}).map(r => r.score).filter(s => s != null);
+    // ML: Calculate average score across all models (use state, not prop)
+    const mlScores = Object.values(mlData || {}).map(r => r.score).filter(s => s != null);
     const mlAverage = mlScores.length > 0
       ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
       : null;
 
-    // Traditional: Get scores
-    const elaScore = traditionalResults?.ela?.score ?? null;
-    const noiseConfidence = traditionalResults?.noise?.confidence ?? null;
-    const lbpScore = traditionalResults?.lbp?.score ?? null;
+    // Traditional: Get scores (use state, not prop)
+    const elaScore = traditionalData?.ela?.score ?? null;
+    const noiseConfidence = traditionalData?.noise?.confidence ?? null;
+    const lbpScore = traditionalData?.lbp?.score ?? null;
 
     return {
       syntheticMediaChance: mlAverage,
@@ -749,17 +749,17 @@ const handleFinishAnalysis = () => {
       noiseScore: noiseConfidence ? noiseConfidence.toFixed(2) : null,
       lbpScore: lbpScore ? lbpScore.toFixed(2) : null
     };
-  }, [deepfakeMeta, traditionalResults]);
+  }, [mlData, traditionalData]);
 
 
   return (
     <>
     <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
 
-      {/* Info Button - Top Left */}
+      {/* Info Button - Bottom Left */}
       <button
         onClick={() => setShowStatsPopup(true)}
-        className="fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg flex items-center justify-center"
+        className="fixed bottom-8 left-8 z-50 w-10 h-10 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg flex items-center justify-center"
         title="View Overall Statistics"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
