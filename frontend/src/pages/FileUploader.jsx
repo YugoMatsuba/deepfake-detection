@@ -10,6 +10,7 @@ import { useAnalysis } from "../app/AnalysisProvider";
 export default function FileUploader() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'success' | 'error'
+  const [fileRejectionError, setFileRejectionError] = useState(null);
   const { setAnalysisId, setSelectedModules } = useAnalysis();
 
   // checkbox states - map to backend module names
@@ -24,11 +25,24 @@ export default function FileUploader() {
     if (droppedFiles && droppedFiles.length > 0) {
       setSelectedFile(droppedFiles[0]);
       setUploadStatus(null); // Reset status when new file selected
+      setFileRejectionError(null); // Clear any previous rejection errors
+    }
+  }, []);
+
+  const onDropRejected = useCallback((fileRejections) => {
+    if (fileRejections && fileRejections.length > 0) {
+      const rejection = fileRejections[0];
+      if (rejection.errors.some(e => e.code === 'file-invalid-type')) {
+        setFileRejectionError('Invalid file type. Please select an image or video file.');
+      } else {
+        setFileRejectionError('File rejected. Please try again.');
+      }
     }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: { "image/*": [], "video/*": [] },
     multiple: false,
     maxFiles: 1,
@@ -42,18 +56,10 @@ export default function FileUploader() {
   let dropzoneClass = "border-2 border-dashed rounded-xl p-10 cursor-pointer text-center transition";
   dropzoneClass += isDragActive ? " border-blue-500 bg-blue-50" : " border-gray-300 bg-white";
 
-  const dropzoneContent = selectedFile ? (
-    <div>
-      <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
-        Drag image or video here, or click to select
-      </p>
-      <p className="text-sm text-orange-600 mt-2">
-        ⚠️ This will replace your current file
-      </p>
-    </div>
-  ) : (
+  const dropzoneContent = (
     <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
       Drag image or video here, or click to select
+      {selectedFile && <span className="text-sm font-normal text-gray-500"> (drag new file to replace)</span>}
     </p>
   );
 
@@ -116,6 +122,12 @@ export default function FileUploader() {
                 {uploadStatus === 'error' && (
                   <p className="text-red-600 text-sm">Upload failed</p>
                 )}
+              </div>
+            )}
+
+            {fileRejectionError && (
+              <div className="mt-4">
+                <p className="text-red-600 text-sm font-semibold">{fileRejectionError}</p>
               </div>
             )}
           </CardContent>
