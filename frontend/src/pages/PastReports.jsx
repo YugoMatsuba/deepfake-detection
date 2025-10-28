@@ -10,6 +10,7 @@ export default function PastReports() {
   const [downloading, setDownloading] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [mediaFilter, setMediaFilter] = useState("all"); // "all", "video", "image"
 
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -80,13 +81,18 @@ export default function PastReports() {
     }
   };
 
-  const handleRerunAnalysis = (analysisId) => {
-    // Just navigate with analysisId - FrameViewer will fetch all data from backend
-    navigate("/frame-viewer", {
-      state: {
-        analysisId: analysisId,
-      },
-    });
+  const handleRerunAnalysis = (analysisId, mediaType) => {
+    // Route based on media type
+    if (mediaType === "image") {
+      navigate(`/image-analysis/${analysisId}`);
+    } else {
+      // Video: navigate to frame-viewer
+      navigate("/frame-viewer", {
+        state: {
+          analysisId: analysisId,
+        },
+      });
+    }
   };
 
   const formatDate = (isoString) => {
@@ -100,6 +106,13 @@ export default function PastReports() {
       minute: "2-digit",
     });
   };
+
+  // Filter reports based on media type
+  const filteredReports = reports.filter((report) => {
+    if (mediaFilter === "all") return true;
+    const mediaType = report.media_type || "video"; // Default to video for backward compatibility
+    return mediaType === mediaFilter;
+  });
 
   if (loading) {
     return (
@@ -125,12 +138,25 @@ export default function PastReports() {
             </p>
           </div>
 
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition"
-          >
-            Back
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Media Type Filter */}
+            <select
+              value={mediaFilter}
+              onChange={(e) => setMediaFilter(e.target.value)}
+              className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 transition focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All</option>
+              <option value="video">Videos</option>
+              <option value="image">Images</option>
+            </select>
+
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition"
+            >
+              Back
+            </button>
+          </div>
         </div>
 
         {/* Error Message */}
@@ -141,15 +167,21 @@ export default function PastReports() {
         )}
 
         {/* Analyses Table */}
-        {reports.length === 0 ? (
+        {filteredReports.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <p className="text-gray-600">No analyses available yet.</p>
-            <button
-              onClick={() => navigate("/upload")}
-              className="mt-4 px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white font-semibold hover:opacity-95 active:opacity-90 transition"
-            >
-              Upload a Video
-            </button>
+            <p className="text-gray-600">
+              {reports.length === 0
+                ? "No analyses available yet."
+                : `No ${mediaFilter === "all" ? "" : mediaFilter} analyses found.`}
+            </p>
+            {reports.length === 0 && (
+              <button
+                onClick={() => navigate("/upload")}
+                className="mt-4 px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white font-semibold hover:opacity-95 active:opacity-90 transition"
+              >
+                Upload Media
+              </button>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
@@ -157,7 +189,7 @@ export default function PastReports() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
-                    Video Filename
+                    Filename
                   </th>
                   {(user?.role === "admin" || user?.role === "owner") && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
@@ -179,14 +211,30 @@ export default function PastReports() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {reports.map((report) => (
+                {filteredReports.map((report) => {
+                  const mediaType = report.media_type || "video"; // Default to video for backward compatibility
+                  return (
                   <tr key={report.analysis_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {report.original_filename}
-                      </div>
-                      <div className="text-xs text-gray-500 font-mono">
-                        {report.analysis_id.substring(0, 8)}...
+                      <div className="flex items-center gap-2">
+                        {/* Media type icon */}
+                        {mediaType === "image" ? (
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {report.original_filename}
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono">
+                            {report.analysis_id.substring(0, 8)}...
+                          </div>
+                        </div>
                       </div>
                     </td>
                     {(user?.role === "admin" || user?.role === "owner") && (
@@ -216,26 +264,28 @@ export default function PastReports() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
                       <button
-                        onClick={() => handleRerunAnalysis(report.analysis_id)}
+                        onClick={() => handleRerunAnalysis(report.analysis_id, mediaType)}
                         className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition text-xs mr-2"
                       >
                         Rerun Analysis
                       </button>
-                      <button
-                        onClick={() =>
-                          downloadPDF(
-                            report.analysis_id,
-                            report.original_filename.replace(/\.[^/.]+$/, "") +
-                              "_report.pdf"
-                          )
-                        }
-                        disabled={downloading === report.analysis_id}
-                        className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs mr-2"
-                      >
-                        {downloading === report.analysis_id
-                          ? "Downloading..."
-                          : "Download PDF"}
-                      </button>
+                      {mediaType === "video" && (
+                        <button
+                          onClick={() =>
+                            downloadPDF(
+                              report.analysis_id,
+                              report.original_filename.replace(/\.[^/.]+$/, "") +
+                                "_report.pdf"
+                            )
+                          }
+                          disabled={downloading === report.analysis_id}
+                          className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs mr-2"
+                        >
+                          {downloading === report.analysis_id
+                            ? "Downloading..."
+                            : "Download PDF"}
+                        </button>
+                      )}
                       <button
                         onClick={() => setDeleteConfirm(report.analysis_id)}
                         disabled={deleting === report.analysis_id}
@@ -245,7 +295,8 @@ export default function PastReports() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
