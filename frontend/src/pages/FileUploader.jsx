@@ -47,9 +47,11 @@ export default function FileUploader() {
   let dropzoneClass = "border-2 border-dashed rounded-xl p-10 cursor-pointer text-center transition";
   dropzoneClass += isDragActive ? " border-blue-500 bg-blue-50" : " border-gray-300 bg-white";
 
-  const dropzoneContent = isDragActive
-    ? <p className="text-blue-500 font-semibold">Drop files here...</p>
-    : <p className="text-gray-600 font-semibold">Drag images or videos here, or click to select</p>;
+  const dropzoneContent = (
+    <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
+      Drag images or videos here, or click to select
+    </p>
+  );
 
   const navigate = useNavigate();
   const { analysisId } = useAnalysis();

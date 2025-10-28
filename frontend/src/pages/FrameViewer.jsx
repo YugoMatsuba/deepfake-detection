@@ -748,9 +748,9 @@ const handleFinishAnalysis = () => {
 
     return {
       syntheticMediaChance: mlAverage,
-      elaScore: elaScore ? elaScore.toFixed(2) : null,
-      noiseScore: noiseConfidence ? noiseConfidence.toFixed(2) : null,
-      lbpScore: lbpScore ? lbpScore.toFixed(2) : null
+      elaScore: elaScore !== null ? elaScore.toFixed(2) : null,
+      noiseScore: noiseConfidence !== null ? noiseConfidence.toFixed(2) : null,
+      lbpScore: lbpScore !== null ? lbpScore.toFixed(2) : null
     };
   }, [mlData, traditionalData]);
 
