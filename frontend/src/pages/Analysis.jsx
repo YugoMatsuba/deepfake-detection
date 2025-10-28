@@ -51,8 +51,10 @@ export default function Analysis() {
         selectedModules.traditional
       );
 
-      // Calculates traditional forensics scores
-      const tradResults = response?.traditional || {};
+      // Extract result from nested structure
+      const result = response?.result || {};
+      const tradResults = result?.traditional || {};
+      const mlResults = result?.ml || {};
 
       const elaScore = tradResults?.ela?.score ?? null;
       const lbpScore = tradResults?.lbp?.score ?? null;
@@ -78,14 +80,13 @@ export default function Analysis() {
       }
 
       // Calculate ML score from response
-      const mlResults = response?.ml || {};
       const mlScores = Object.values(mlResults).map(r => r.score).filter(s => s != null);
       const avgScore = mlScores.length > 0
         ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
         : null;
 
       setFakeVideoPercentage(avgScore);
-      setAnalysisResult(response);
+      setAnalysisResult(result);
       setStatus('success');
     } catch (err) {
       setError(err.message || 'Analysis failed');
@@ -131,19 +132,19 @@ export default function Analysis() {
       </h1>
       {ela !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          ELA Z-score = {ela}
+          ELA Top Z-score = {ela}
         </h2>
       )}
 
       {noise !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          Noise Z-score = {noise}
+          Noise Top Z-score = {noise}
         </h2>
       )}
 
       {lbp !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          LBP Z-score = {lbp}
+          LBP Top Z-score = {lbp}
         </h2>
       )}
 
@@ -173,11 +174,7 @@ export default function Analysis() {
         <button
           onClick={() => navigate('/frame-viewer', {
             state: {
-              analysisId,
-              fps: analysisResult?.ml_video?.fps ?? null,
-              mlFrames: analysisResult?.ml_frames ?? [],
-              mlModels: analysisResult?.ml ?? {},
-              traditional: analysisResult?.traditional ?? {}
+              analysisId
             }
           })}
           className={`${baseButton} bg-[#1E88E5] text-white hover:bg-[#114f85] hover:text-[#cccccc] transition-colors`}

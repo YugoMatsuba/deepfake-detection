@@ -1,7 +1,12 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./Button";
 import { Card, CardContent } from "./Card";
+import {
+  MetadataAnomaliesSummary,
+  IntegrityStatus,
+  FrameHashesSummary
+} from "./MetadataResults";
 
 const FrameViewer = ({
   videoSrc,
@@ -9,20 +14,11 @@ const FrameViewer = ({
   deepfakeFrames = [],
   deepfakeMeta = {},
   traditionalResults = {},
+  metadata = null,
   analysisId,
   onTraditionalResultsUpdate = () => {},
   onMLResultsUpdate = () => {},
 }) => {
-
-   useEffect(() => {
-    console.log("FrameViewer props:");
-    console.log("videoSrc:", videoSrc);
-    console.log("initialFrameRate:", initialFrameRate);
-    console.log("deepfakeFrames:", deepfakeFrames);
-    console.log("deepfakeMeta:", deepfakeMeta);
-    console.log("traditionalResults:", traditionalResults);
-    console.log("analysisId:", analysisId);
-  }, [videoSrc, initialFrameRate, deepfakeFrames, deepfakeMeta, traditionalResults, analysisId]);
 
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,6 +48,10 @@ const FrameViewer = ({
   const [showFinishPopup, setShowFinishPopup] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+
+  // Stats info popup state
+  const [showStatsPopup, setShowStatsPopup] = useState(false);
+
   const navigate = useNavigate();
 
 
@@ -78,6 +78,19 @@ useEffect(() => {
     setFrameRate(initialFrameRate);
   }
 }, [initialFrameRate]);
+
+  // Sync props to state when they change (important for page reloads)
+  useEffect(() => {
+    setTraditionalData(traditionalResults || {});
+  }, [traditionalResults]);
+
+  useEffect(() => {
+    setMLData(deepfakeMeta || {});
+  }, [deepfakeMeta]);
+
+  useEffect(() => {
+    setMLFrames(deepfakeFrames || []);
+  }, [deepfakeFrames]);
 
   useEffect(() => {
     let abort = false;
@@ -488,17 +501,49 @@ useEffect(() => {
             const freshMLFrames = [];
 
             // Extract frame indices that should be displayed:
-            // (score > 0.5) OR (requested_adhoc === true)
+            // Calculate average score across all models for each frame (like backend does)
+            // Show if: (average score > 0.5) OR (requested_adhoc === true)
+
+            // First, collect all unique frame indices
+            const allFrameIndices = new Set();
             Object.values(freshML).forEach(modelData => {
               if (modelData.frames) {
                 modelData.frames.forEach(f => {
-                  if (typeof f.index === 'number' && !freshMLFrames.includes(f.index)) {
-                    // Show frame if score > 0.5 OR user requested it via ad-hoc analysis
-                    if (f.score > 0.5 || f.requested_adhoc === true) {
-                      freshMLFrames.push(f.index);
-                    }
+                  if (typeof f.index === 'number') {
+                    allFrameIndices.add(f.index);
                   }
                 });
+              }
+            });
+
+            // For each frame, calculate average score across all models
+            allFrameIndices.forEach(frameIndex => {
+              const scores = [];
+              let isRequestedAdhoc = false;
+
+              // Collect scores from all models for this frame
+              Object.values(freshML).forEach(modelData => {
+                if (modelData.frames) {
+                  const frameData = modelData.frames.find(f => f.index === frameIndex);
+                  if (frameData) {
+                    if (typeof frameData.score === 'number') {
+                      scores.push(frameData.score);
+                    }
+                    if (frameData.requested_adhoc === true) {
+                      isRequestedAdhoc = true;
+                    }
+                  }
+                }
+              });
+
+              // Calculate average score
+              const avgScore = scores.length > 0
+                ? scores.reduce((a, b) => a + b, 0) / scores.length
+                : 0;
+
+              // Show frame if average score > 0.5 OR explicitly requested via ad-hoc
+              if (avgScore > 0.5 || isRequestedAdhoc) {
+                freshMLFrames.push(frameIndex);
               }
             });
 
@@ -685,12 +730,42 @@ const handleFinishAnalysis = () => {
   navigate("/upload");
 };
 
+  // Calculate overall statistics
+  const overallStats = useMemo(() => {
+    // ML: Calculate average score across all models
+    const mlScores = Object.values(deepfakeMeta || {}).map(r => r.score).filter(s => s != null);
+    const mlAverage = mlScores.length > 0
+      ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
+      : null;
 
+    // Traditional: Get scores
+    const elaScore = traditionalResults?.ela?.score ?? null;
+    const noiseConfidence = traditionalResults?.noise?.confidence ?? null;
+    const lbpScore = traditionalResults?.lbp?.score ?? null;
 
+    return {
+      syntheticMediaChance: mlAverage,
+      elaScore: elaScore ? elaScore.toFixed(2) : null,
+      noiseScore: noiseConfidence ? noiseConfidence.toFixed(2) : null,
+      lbpScore: lbpScore ? lbpScore.toFixed(2) : null
+    };
+  }, [deepfakeMeta, traditionalResults]);
 
 
   return (
+    <>
     <div className="flex justify-center items-center min-h-screen bg-gray-50 space-x-10">
+
+      {/* Info Button - Top Left */}
+      <button
+        onClick={() => setShowStatsPopup(true)}
+        className="fixed top-4 left-4 z-50 w-10 h-10 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition shadow-lg flex items-center justify-center"
+        title="View Overall Statistics"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
 
       {/* Finish Analysis Button - Top Right */}
       <button
@@ -787,87 +862,6 @@ const handleFinishAnalysis = () => {
 
             
   <div className="flex flex-col items-center mt-4 space-y-2">
-  
-  {/* Display results */}
-  {analysisResult && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div className="relative w-[400px] max-w-[90%] bg-white rounded-2xl shadow-lg p-5">
-
-      {/* Close button */}
-      <button
-        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-lg font-bold"
-        onClick={() => setAnalysisResult(null)}
-      >
-        ✕
-      </button>
-
-      {/* Analysis content */}
-      <h4 className="font-semibold mb-2 text-gray-800">
-        {analysisResult.analysis_type?.toUpperCase() || "Analysis"} Result
-      </h4>
-
-      <p className="text-sm text-gray-600 mb-1">
-        Frame {analysisResult.frame_number ?? "N/A"}
-      </p>
-
-      <p
-  className={`text-2xl font-bold mb-4 ${
-    getColor(analysisResult.analysis_type, analysisResult.score)
-  }`}
->
-  {analysisResult.score !== undefined ? (
-  analysisResult.analysis_type === "noise"
-    ? `Noise (z): ${analysisResult.score.toFixed(2)}` // z-score for Noise
-    : analysisResult.analysis_type === "ela"
-    ? `ELA (z): ${analysisResult.score.toFixed(2)}` // z-score for ELA
-    : analysisResult.analysis_type === "lbp"
-    ? `LBP (z): ${analysisResult.score.toFixed(2)}` // z-score for LBP
-    : analysisResult.analysis_type === "ml"
-    ? `ML Score: ${(analysisResult.score * 100).toFixed(1)}%` // ML uses 0-1 range, not z-score
-    : `Score: ${analysisResult.score.toFixed(2)}` // Generic fallback
-) : (
-  "No score available"
-)}
-
-</p>
-
-      {(() => {
-        let overlaySrc = analysisResult.overlay;
-
-        // If overlay starts with /, it's a URL path - prepend API base
-        if (overlaySrc && overlaySrc.startsWith('/')) {
-          overlaySrc = `http://localhost:5050${overlaySrc}`;
-        }
-
-        if (!overlaySrc) {
-          return null;
-        }
-
-        return (
-          <img
-            src={overlaySrc}
-            alt={`${analysisResult.analysis_type?.toUpperCase() || "Analysis"} overlay`}
-            className="w-full rounded-lg mb-4"
-          />
-        );
-      })()}
-
-
-
-
-      <Button
-        className="w-full bg-[#1E88E5] text-white hover:bg-[#114f85]"
-        onClick={() => {
-          setDetailsFrame(currentFrame);
-          setIsDetailsOpen(true);
-          setAnalysisResult(null); // close popup
-        }}
-      >
-        More Details
-      </Button>
-    </div>
-  </div>
-)}
 
 
 
@@ -1149,11 +1143,147 @@ const handleFinishAnalysis = () => {
   </Card>
 )}
 
-
-
-        
-
       </div>
+
+      {/* Ad-hoc Analysis Result Popup - rendered outside main container */}
+      {analysisResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative w-[400px] max-w-[90%] bg-white rounded-2xl shadow-lg p-5">
+            {/* Close button */}
+            <button
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-lg font-bold"
+              onClick={() => setAnalysisResult(null)}
+            >
+              ✕
+            </button>
+
+            {/* Analysis content */}
+            <h4 className="font-semibold mb-2 text-gray-800">
+              {analysisResult.analysis_type?.toUpperCase() || "Analysis"} Result
+            </h4>
+
+            <p className="text-sm text-gray-600 mb-1">
+              Frame {analysisResult.frame_number ?? "N/A"}
+            </p>
+
+            <p
+              className={`text-2xl font-bold mb-4 ${
+                getColor(analysisResult.analysis_type, analysisResult.score)
+              }`}
+            >
+              {analysisResult.score !== undefined ? (
+                analysisResult.analysis_type === "noise"
+                  ? `Noise (z): ${analysisResult.score.toFixed(2)}`
+                  : analysisResult.analysis_type === "ela"
+                  ? `ELA (z): ${analysisResult.score.toFixed(2)}`
+                  : analysisResult.analysis_type === "lbp"
+                  ? `LBP (z): ${analysisResult.score.toFixed(2)}`
+                  : analysisResult.analysis_type === "ml"
+                  ? `ML Score: ${(analysisResult.score * 100).toFixed(1)}%`
+                  : `Score: ${analysisResult.score.toFixed(2)}`
+              ) : (
+                "No score available"
+              )}
+            </p>
+
+            {(() => {
+              let overlaySrc = analysisResult.overlay;
+
+              if (overlaySrc && overlaySrc.startsWith('/')) {
+                overlaySrc = `http://localhost:5050${overlaySrc}`;
+              }
+
+              if (!overlaySrc) {
+                return null;
+              }
+
+              return (
+                <img
+                  src={overlaySrc}
+                  alt={`${analysisResult.analysis_type?.toUpperCase() || "Analysis"} overlay`}
+                  className="w-full rounded-lg mb-4"
+                />
+              );
+            })()}
+
+            <Button
+              className="w-full bg-[#1E88E5] text-white hover:bg-[#114f85]"
+              onClick={() => {
+                setDetailsFrame(currentFrame);
+                setIsDetailsOpen(true);
+                setAnalysisResult(null);
+              }}
+            >
+              More Details
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Overall Statistics Popup - rendered outside main container */}
+      {showStatsPopup && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
+          onClick={() => setShowStatsPopup(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Overall Analysis Statistics</h2>
+              <button
+                onClick={() => setShowStatsPopup(false)}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* ML Results */}
+            {overallStats.syntheticMediaChance !== null && (
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-blue-700 mb-2">
+                  Synthetic Media Chance = {overallStats.syntheticMediaChance}%
+                </h3>
+              </div>
+            )}
+
+            {/* Traditional Forensics */}
+            <div className="space-y-3 mb-6">
+              {overallStats.elaScore !== null && (
+                <div className="text-lg text-gray-700">
+                  <span className="font-medium">ELA Top Z-score:</span> {overallStats.elaScore}
+                </div>
+              )}
+              {overallStats.noiseScore !== null && (
+                <div className="text-lg text-gray-700">
+                  <span className="font-medium">Noise Top Z-score:</span> {overallStats.noiseScore}
+                </div>
+              )}
+              {overallStats.lbpScore !== null && (
+                <div className="text-lg text-gray-700">
+                  <span className="font-medium">LBP Top Z-score:</span> {overallStats.lbpScore}
+                </div>
+              )}
+            </div>
+
+            {/* Metadata Forensics */}
+            {metadata && (
+              <div className="border-t pt-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Metadata Forensics</h3>
+                <MetadataAnomaliesSummary metadata={metadata} />
+                <IntegrityStatus metadata={metadata} />
+                <FrameHashesSummary metadata={metadata} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

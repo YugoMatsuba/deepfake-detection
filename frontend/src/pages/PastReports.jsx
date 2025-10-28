@@ -80,6 +80,15 @@ export default function PastReports() {
     }
   };
 
+  const handleRerunAnalysis = (analysisId) => {
+    // Just navigate with analysisId - FrameViewer will fetch all data from backend
+    navigate("/frame-viewer", {
+      state: {
+        analysisId: analysisId,
+      },
+    });
+  };
+
   const formatDate = (isoString) => {
     if (!isoString) return "N/A";
     const date = new Date(isoString);
@@ -104,11 +113,11 @@ export default function PastReports() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full px-4 mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Past Reports</h1>
+            <h1 className="text-3xl font-semibold text-gray-900">Past Analyses</h1>
             <p className="text-gray-600 text-sm mt-1">
               {user?.role === "admin" || user?.role === "owner"
                 ? "All completed analyses"
@@ -131,10 +140,10 @@ export default function PastReports() {
           </div>
         )}
 
-        {/* Reports Table */}
+        {/* Analyses Table */}
         {reports.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <p className="text-gray-600">No reports available yet.</p>
+            <p className="text-gray-600">No analyses available yet.</p>
             <button
               onClick={() => navigate("/upload")}
               className="mt-4 px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white font-semibold hover:opacity-95 active:opacity-90 transition"
@@ -150,6 +159,11 @@ export default function PastReports() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                     Video Filename
                   </th>
+                  {(user?.role === "admin" || user?.role === "owner") && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                      User
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                     Analysis Date
                   </th>
@@ -175,6 +189,11 @@ export default function PastReports() {
                         {report.analysis_id.substring(0, 8)}...
                       </div>
                     </td>
+                    {(user?.role === "admin" || user?.role === "owner") && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {report.username || "Unknown"}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {formatDate(report.created_at)}
                     </td>
@@ -196,6 +215,12 @@ export default function PastReports() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
+                      <button
+                        onClick={() => handleRerunAnalysis(report.analysis_id)}
+                        className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition text-xs mr-2"
+                      >
+                        Rerun Analysis
+                      </button>
                       <button
                         onClick={() =>
                           downloadPDF(

@@ -84,11 +84,12 @@ def compute_lbp(frame_path, P=8, R=1):
 def _save_overlay(image, frame_filename, output_dir):
     """Save overlay image to disk and return saved path."""
     if output_dir:
-        # Parse frame number from filename (e.g., "frame_0001.jpg" -> "0001")
+        # Parse frame number from filename
         stem = Path(frame_filename).stem
         digits = "".join(ch for ch in stem if ch.isdigit())
         if digits:
-            out_path = Path(output_dir) / f"frame_{digits}.jpg"
+            frame_num = int(digits)  # Convert to int to strip leading zeros
+            out_path = Path(output_dir) / f"frame_{frame_num}.jpg"
             image.save(out_path, "JPEG", quality=90)
             return str(out_path)
     return None

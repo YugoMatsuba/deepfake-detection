@@ -105,31 +105,31 @@ def start_analysis(analysis_id: str):
       "traditional": ["ela", "noise"]           // Traditional forensics
     }
 
-    Response (200):
+    Response (200): Same structure as GET /analyses/<id>
     {
       "analysis_id": "uuid",
       "status": "succeeded",
-      "ml": {
-        "xception": {
-          "score": 0.87,
-          "frames": [{"index": 0, "time": 0.00, "score": 0.903}, ...],
-          "weights_hash": "sha256..."
+      "result": {
+        "video": {"fps": 29.97, "frame_count": 300, ...},
+        "ml": {
+          "xception": {
+            "score": 0.87,
+            "frames": [{"index": 0, "time": 0.00, "score": 0.903}, ...],
+            "weights_hash": "sha256..."
+          },
+          ...
         },
-        ...
-      },
-      "traditional": {
-        "ela": {
-          "score": 0.65,
-          "frames": [{"frame_number": 1, "score": 0.65, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/1/overlay"}]
-        },
-        ...
+        "traditional": {
+          "ela": {
+            "score": 0.65,
+            "frames": [{"frame_number": 1, "score": 0.65, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/1/overlay"}]
+          },
+          ...
+        }
       },
       "created_at": "2025-10-14T...",
       "completed_at": "2025-10-14T..."
     }
-
-    Note: ML results include per-frame scores but NO overlays.
-          Traditional results include overlay URLs (overlays persisted to disk).
 
     Response (400/403/404/500): error message
     """
@@ -171,8 +171,8 @@ def start_analysis(analysis_id: str):
                 db.refresh(analysis)
                 return jsonify(error=f"Analysis already {analysis.status}"), 409
 
-            # Collect baseline metadata (used even if ML modules are skipped)
-            video_metadata = _get_video_metadata(analysis.video_path)
+            # Collect baseline video metadata (used even if ML modules are skipped)
+            video_meta = _get_video_metadata(analysis.video_path)
 
             # Run analyses (BLOCKING)
             ml_results = {}
@@ -181,7 +181,6 @@ def start_analysis(analysis_id: str):
 
             try:
                 # Run ML analysis
-                ml_video_meta = video_metadata
                 ml_frames_meta = []
                 ml_timing_meta = None
 
@@ -195,7 +194,8 @@ def start_analysis(analysis_id: str):
                         device=None  # Will use env var DEVICE or auto-detect
                     )
                     ml_results = ml_output.get("models", {})
-                    ml_video_meta = ml_output.get("video") or video_metadata
+                    # Prefer ML runner's video metadata (same source as baseline, but validated through pipeline)
+                    video_meta = ml_output.get("video") or video_meta
                     ml_frames_meta = ml_output.get("frames", [])
                     ml_timing_meta = ml_output.get("timing_ms")
 
@@ -253,9 +253,10 @@ def start_analysis(analysis_id: str):
                         "file_hash": analysis.video_sha256
                     }
 
-                # Extract scores-only for DB storage
+                # Build result_json for DB storage
                 result_json = {
-                    "metadata": metadata_result,  # From metadata analysis above
+                    "metadata": metadata_result,  # Forensic metadata (EXIF, integrity, frame hashes)
+                    "video": video_meta,  # Video playback metadata (fps, frame_count, duration, resolution)
                     "ml": {},
                     "traditional": {}
                 }
@@ -308,20 +309,11 @@ def start_analysis(analysis_id: str):
                 # Commit happens automatically in context manager
                 return jsonify(error=f"Analysis failed: {error_msg}"), 500
 
-            # Build full response payload
-            # Metadata: from upload (persisted in DB)
-            # ML: scores + ALL 32 frames (each marked with requested_adhoc flag)
-            # ml_frames: filtered frame indices (only score > 0.5) for UI markers
-            # Traditional: scores + overlay URLs (overlays persisted to disk)
+            # Build response payload matching GET endpoint structure
             response = {
                 "analysis_id": analysis.id,
                 "status": "succeeded",
-                "metadata": analysis.result_json.get("metadata", {}),  # From upload
-                "ml": result_json.get("ml", {}),  # ALL frames with requested_adhoc flags
-                "ml_video": ml_video_meta,
-                "ml_frames": ml_frames_meta,  # Filtered indices (score > 0.5)
-                "ml_timing": ml_timing_meta,
-                "traditional": traditional_results,  # Includes ephemeral overlays
+                "result": analysis.result_json,  # Same as GET endpoint
                 "created_at": analysis.created_at.isoformat(),
                 "completed_at": analysis.updated_at.isoformat()
             }
@@ -389,6 +381,13 @@ def get_analysis(analysis_id: str):
       "analysis_id": "uuid",
       "status": "created|running|succeeded|failed",
       "result": {
+        "video": {
+          "fps": 29.97,
+          "frame_count": 300,
+          "duration_sec": 10.0,
+          "width": 1920,
+          "height": 1080
+        },
         "ml": {
           "xception": {
             "score": 0.87,
