@@ -37,6 +37,8 @@ export default function FileUploader() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { "image/*": [], "video/*": [] },
+    multiple: false,
+    maxFiles: 1,
   });
 
   const handleCheckboxChange = (e) => {
@@ -49,7 +51,7 @@ export default function FileUploader() {
 
   const dropzoneContent = (
     <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
-      Drag images or videos here, or click to select
+      Drag image or video here, or click to select
     </p>
   );
 
