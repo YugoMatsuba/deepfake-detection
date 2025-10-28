@@ -315,6 +315,51 @@ def detect_metadata_anomalies(metadata: dict) -> dict:
     return anomalies
 
 
+def run_image_exif_analysis(image_path: str, image_sha256: str) -> dict:
+    """
+    Analyze image EXIF metadata using ExifTool.
+
+    Reuses existing extract_metadata() and detect_metadata_anomalies() functions.
+    Images don't need integrity checks or frame hashes (video-only features).
+
+    Args:
+        image_path: Absolute path to image file
+        image_sha256: Pre-computed SHA-256 hash from upload (for chain-of-custody)
+
+    Returns:
+        dict containing:
+        - file_hash: SHA-256 for integrity verification
+        - metadata: Raw EXIF data + forensic anomalies
+        - analyzed_at: ISO timestamp
+    """
+    if not os.path.exists(image_path):
+        logger.error(f"File not found: {image_path}")
+        return {"error": f"File not found: {image_path}"}
+
+    logger.info(f"Running EXIF analysis on image: {image_path}")
+
+    # Extract metadata using ExifTool (works for images too!)
+    metadata = extract_metadata(image_path)
+
+    # Detect anomalies using existing function
+    anomalies = detect_metadata_anomalies(metadata) if metadata else {
+        "missing_fields": [],
+        "timestamp_issues": [],
+        "software_anomalies": [],
+        "gps_inconsistencies": []
+    }
+
+    # Build simplified report (no integrity checks or frame hashes for images)
+    return {
+        "analyzed_at": datetime.now().isoformat(),
+        "file_hash": image_sha256,
+        "metadata": {
+            "raw": metadata,
+            "anomalies": anomalies
+        }
+    }
+
+
 def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
     """
     Analyze video metadata using industry-standard forensic techniques.
