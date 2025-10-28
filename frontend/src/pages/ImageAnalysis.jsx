@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "./Card";
 import { Button } from "./Button";
@@ -17,23 +17,47 @@ const ImageAnalysis = () => {
   const [imageUrl, setImageUrl] = useState(null);
   const [showExifDetails, setShowExifDetails] = useState(false);
 
-  useEffect(() => {
-    const runAnalysis = async () => {
-      if (!selectedModules || (!selectedModules.ml.length && !selectedModules.traditional.length)) {
-        setError("No analysis methods selected");
-        setIsLoading(false);
-        return;
-      }
+  const hasRun = useRef(false);
 
+  useEffect(() => {
+    // Prevent double execution in React StrictMode
+    if (hasRun.current) return;
+    hasRun.current = true;
+
+    const loadOrRunAnalysis = async () => {
       try {
         setIsLoading(true);
+        setImageUrl(`http://localhost:5050/api/analyses/${id}/image`);
+
+        // First, try to fetch existing results
+        const existingResponse = await fetch(`http://localhost:5050/api/analyses/${id}`, {
+          credentials: 'include'
+        });
+
+        if (existingResponse.ok) {
+          const analysisData = await existingResponse.json();
+
+          // If analysis is complete and has results, use them
+          if (analysisData.status === 'succeeded' && analysisData.result_json) {
+            setResults(analysisData.result_json);
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // If no existing results, run new analysis
+        if (!selectedModules || (!selectedModules.ml.length && !selectedModules.traditional.length)) {
+          setError("No analysis methods selected");
+          setIsLoading(false);
+          return;
+        }
+
         const response = await startImageAnalysis(
           id,
           selectedModules.ml,
           selectedModules.traditional
         );
         setResults(response);
-        setImageUrl(`http://localhost:5050/analyses/${id}/image`);
       } catch (err) {
         console.error("Image analysis failed:", err);
         setError(err.message || "Analysis failed");
@@ -42,7 +66,7 @@ const ImageAnalysis = () => {
       }
     };
 
-    runAnalysis();
+    loadOrRunAnalysis();
   }, [id, selectedModules]);
 
   const handleFinish = () => {
@@ -134,7 +158,7 @@ const ImageAnalysis = () => {
                       />
                       {activeOverlay && (
                         <img
-                          src={`http://localhost:5050/analyses/${id}/forensics/${activeOverlay}/frames/0/overlay`}
+                          src={`http://localhost:5050/api/analyses/${id}/forensics/${activeOverlay}/frames/0/overlay`}
                           alt={`${activeOverlay.toUpperCase()} overlay`}
                           className="absolute top-0 left-0 w-full h-full object-cover opacity-100 rounded-lg pointer-events-none"
                         />
