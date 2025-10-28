@@ -172,8 +172,10 @@ def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
                 "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None,
                 "requested_adhoc": False  # Initial analysis frames
             })
+        # Overall score = MAX z-score (most suspicious frame)
+        max_score = max(f["score"] for f in frame_list)
         return {
-            "score": frame_list[0]["score"],
+            "score": max_score,
             "frames": frame_list
         }
 
@@ -213,9 +215,11 @@ def transform_noise_result(raw_result: dict[str, Any], analysis_id: str) -> dict
                 "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None,
                 "requested_adhoc": False  # Initial analysis frames
             })
+        # Overall score = MAX z-score (most suspicious frame)
+        max_score = max(f["score"] for f in frame_list)
         return {
-            "confidence": frame_list[0]["confidence"],
-            "score": frame_list[0]["score"],
+            "confidence": max_score,
+            "score": max_score,
             "frames": frame_list
         }
 
@@ -252,8 +256,10 @@ def transform_lbp_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
                 "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None,
                 "requested_adhoc": False  # Initial analysis frames
             })
+        # Overall score = MAX z-score (most suspicious frame)
+        max_score = max(f["score"] for f in frame_list)
         return {
-            "score": frame_list[0]["score"],
+            "score": max_score,
             "frames": frame_list
         }
 

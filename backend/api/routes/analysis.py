@@ -506,11 +506,9 @@ def _merge_and_recompute_traditional(
         if method_name == "noise":
             frame["confidence"] = float(z_score)
 
-    # 5. Compute overall score (mean of top N frames, or all if < 10)
+    # 5. Compute overall score (MAX z-score = most suspicious frame)
     z_scores = [f["score"] for f in existing_frames]
-    z_scores_sorted = sorted(z_scores, reverse=True)
-    top_n = min(10, len(z_scores_sorted))
-    overall_score = float(np.mean(z_scores_sorted[:top_n]))
+    overall_score = float(max(z_scores))
 
     # 6. Return updated structure
     result = {
