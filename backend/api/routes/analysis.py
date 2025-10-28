@@ -812,6 +812,11 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
 
                         ml_data[model_name]["frames"] = existing_frames
 
+                        # Recalculate per-model score as average of ALL frames
+                        frame_scores = [f["score"] for f in existing_frames if f.get("score") is not None]
+                        if frame_scores:
+                            ml_data[model_name]["score"] = sum(frame_scores) / len(frame_scores)
+
                     # Save updated data
                     current_json["ml"] = ml_data
                     analysis.result_json = current_json
