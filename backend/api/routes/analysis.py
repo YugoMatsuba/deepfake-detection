@@ -1083,7 +1083,13 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                 import traceback
                 error_trace = traceback.format_exc()
                 logger.error(f"ML analysis failed for frame {frame_number}: {error_trace}")
-                return jsonify(error=str(e)), 500
+
+                # Make "no face" errors more helpful
+                error_msg = str(e)
+                if "no face detected" in error_msg.lower():
+                    error_msg = f"{error_msg}. Try finding a frame with a clearly visible face."
+
+                return jsonify(error=error_msg), 500
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)
