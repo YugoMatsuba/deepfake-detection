@@ -869,9 +869,6 @@ def analyze_frame(analysis_id: str, frame_number: int):
 
                         # Merge with existing data and recompute z-scores
                         existing_method_data = current_json["traditional"].get(method, {})
-                        print(f"\n[AD-HOC DEBUG] Existing {method} data before merge:")
-                        print(f"  Frames count: {len(existing_method_data.get('frames', []))}")
-                        print(f"  Frame numbers: {[f.get('frame_number') for f in existing_method_data.get('frames', [])]}")
 
                         updated_method_data = _merge_and_recompute_traditional(
                             method_name=method,
@@ -880,11 +877,6 @@ def analyze_frame(analysis_id: str, frame_number: int):
                             frame_number=frame_number,
                             analysis_id=analysis.id
                         )
-
-                        print(f"\n[AD-HOC DEBUG] Updated {method} data after merge:")
-                        print(f"  Frames count: {len(updated_method_data.get('frames', []))}")
-                        print(f"  Frame numbers: {[f.get('frame_number') for f in updated_method_data.get('frames', [])]}")
-                        print(f"  Scores: {[f.get('score') for f in updated_method_data.get('frames', [])]}")
 
                         # Update result_json with merged data
                         current_json["traditional"][method] = updated_method_data
@@ -899,24 +891,8 @@ def analyze_frame(analysis_id: str, frame_number: int):
                         }
 
                 # Save updated result_json back to DB
-                print(f"\n[AD-HOC DEBUG] About to save to DB:")
-                print(f"  Traditional methods in JSON: {list(current_json.get('traditional', {}).keys())}")
-                for method_name, method_data in current_json.get('traditional', {}).items():
-                    print(f"  {method_name} frame count: {len(method_data.get('frames', []))}")
-
                 analysis.result_json = current_json
-                print(f"[AD-HOC DEBUG] Assigned to analysis.result_json")
-
                 db.commit()
-                print(f"[AD-HOC DEBUG] ✓ Committed to DB")
-
-                # Verify what's actually in the DB after commit
-                db.refresh(analysis)
-                verified_json = analysis.result_json
-                print(f"\n[AD-HOC DEBUG] Verified from DB after commit:")
-                for method_name, method_data in verified_json.get('traditional', {}).items():
-                    print(f"  {method_name} frame count: {len(method_data.get('frames', []))}")
-                    print(f"  {method_name} frame numbers: {[f.get('frame_number') for f in method_data.get('frames', [])]}")
 
                 response = {
                     "analysis_id": analysis.id,
