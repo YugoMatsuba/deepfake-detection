@@ -121,8 +121,11 @@ def _run_ml_on_image(image_path: str, ml_modules: list[str], analysis_id: str) -
 
         # Check for errors
         if result.get("error"):
-            logger.warning(f"ML analysis failed: {result['error']}")
-            return {"error": result["error"].get("message", "ML analysis failed")}
+            error_msg = result["error"].get("message", "ML analysis failed")
+            # Clean up "frame 0" references for images
+            error_msg = error_msg.replace("in frame 0", "in image")
+            logger.warning(f"ML analysis failed: {error_msg}")
+            return {"error": error_msg}
 
         # Transform result format from per-frame to per-model scores
         models_result = result.get("models", {})
