@@ -39,6 +39,7 @@ const ImageAnalysis = () => {
 
           // If analysis is complete and has results, use them
           if (analysisData.status === 'succeeded' && analysisData.result_json) {
+            // result_json contains {ml, traditional, exif} directly
             setResults(analysisData.result_json);
             setIsLoading(false);
             return;
@@ -57,7 +58,8 @@ const ImageAnalysis = () => {
           selectedModules.ml,
           selectedModules.traditional
         );
-        setResults(response);
+        // Backend returns {result: {ml, traditional, exif}}
+        setResults(response.result || response);
       } catch (err) {
         console.error("Image analysis failed:", err);
         setError(err.message || "Analysis failed");
