@@ -29,7 +29,7 @@ const ImageAnalysis = () => {
         setIsLoading(true);
         setImageUrl(`http://localhost:5050/api/analyses/${id}/image`);
 
-        // First, try to fetch existing results
+        // Always fetch existing analysis first (like FrameViewer)
         const existingResponse = await fetch(`http://localhost:5050/api/analyses/${id}`, {
           credentials: 'include'
         });
@@ -37,39 +37,40 @@ const ImageAnalysis = () => {
         if (existingResponse.ok) {
           const analysisData = await existingResponse.json();
 
-          // If analysis is complete and has results, use them
+          // If analysis is complete and has results, display them
           if (analysisData.status === 'succeeded' && analysisData.result_json) {
-            // result_json contains {ml, traditional, exif} directly
             setResults(analysisData.result_json);
+            setIsLoading(false);
+            return;
+          }
+
+          // If analysis exists but not complete, show error (shouldn't run from here)
+          if (analysisData.status === 'created' || analysisData.status === 'running') {
+            setError("This analysis is not yet complete. Please start it from the upload page.");
+            setIsLoading(false);
+            return;
+          }
+
+          // If failed
+          if (analysisData.status === 'failed') {
+            setError(`Analysis failed: ${analysisData.error || 'Unknown error'}`);
             setIsLoading(false);
             return;
           }
         }
 
-        // If no existing results, run new analysis
-        if (!selectedModules || (!selectedModules.ml.length && !selectedModules.traditional.length)) {
-          setError("No analysis methods selected");
-          setIsLoading(false);
-          return;
-        }
-
-        const response = await startImageAnalysis(
-          id,
-          selectedModules.ml,
-          selectedModules.traditional
-        );
-        // Backend returns {result: {ml, traditional, exif}}
-        setResults(response.result || response);
+        // If we get here, analysis doesn't exist or fetch failed
+        setError("Analysis not found");
+        setIsLoading(false);
       } catch (err) {
-        console.error("Image analysis failed:", err);
-        setError(err.message || "Analysis failed");
-      } finally {
+        console.error("Failed to load analysis:", err);
+        setError(err.message || "Failed to load analysis");
         setIsLoading(false);
       }
     };
 
     loadOrRunAnalysis();
-  }, [id, selectedModules]);
+  }, [id]); // Remove selectedModules dependency
 
   const handleFinish = () => {
     navigate("/upload");
