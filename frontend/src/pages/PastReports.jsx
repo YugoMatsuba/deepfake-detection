@@ -29,13 +29,14 @@ export default function PastReports() {
       const data = await fetchJson(`/reports?limit=${limit}&offset=${offset}`);
       // Append to existing reports for "load more" behavior
       if (offset === 0) {
-        setReports(data.reports);
+        setReports(data?.reports || []);
       } else {
-        setReports(prev => [...prev, ...data.reports]);
+        setReports(prev => [...prev, ...(data?.reports || [])]);
       }
-      setTotal(data.total);
+      setTotal(data?.total || 0);
     } catch (err) {
       setError(err.message || "Failed to load reports");
+      setReports([]); // Reset to empty array on error
     } finally {
       setLoading(false);
     }
@@ -85,7 +86,7 @@ export default function PastReports() {
       if (!response.ok) throw new Error("Failed to delete analysis");
 
       // Remove from local state
-      setReports(reports.filter((r) => r.analysis_id !== analysisId));
+      setReports((reports || []).filter((r) => r.analysis_id !== analysisId));
       setDeleteConfirm(null);
     } catch (err) {
       setError(err.message || "Failed to delete analysis");
@@ -121,7 +122,7 @@ export default function PastReports() {
   };
 
   // Filter reports based on media type
-  const filteredReports = reports.filter((report) => {
+  const filteredReports = (reports || []).filter((report) => {
     if (mediaFilter === "all") return true;
     const mediaType = report.media_type || "video"; // Default to video for backward compatibility
     return mediaType === mediaFilter;
