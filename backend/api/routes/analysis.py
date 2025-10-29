@@ -1080,11 +1080,17 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                 return jsonify(response), 200
 
             except Exception as e:
+                import traceback
+                error_trace = traceback.format_exc()
+                logger.error(f"ML analysis failed for frame {frame_number}: {error_trace}")
                 return jsonify(error=f"ML analysis failed: {str(e)}"), 500
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"Unexpected error in ad-hoc ML endpoint: {error_trace}")
         return jsonify(error=str(e)), 500
 
 
