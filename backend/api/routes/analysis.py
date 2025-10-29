@@ -370,6 +370,132 @@ def _get_video_metadata(video_path: str) -> Dict[str, Any]:
     return metadata
 
 
+@analysis_bp.post("/analyses/<analysis_id>/start-image")
+@require_user
+def start_image_analysis(analysis_id: str):
+    """
+    Start synchronous image analysis (blocking).
+
+    Request body:
+    {
+      "modules": ["xception", "spsl", "ucf"],  // ML modules
+      "traditional": ["ela", "noise", "lbp"]   // Traditional forensics
+    }
+
+    Response (200):
+    {
+      "analysis_id": "uuid",
+      "status": "succeeded",
+      "result": {
+        "ml": {
+          "xception": {"score": 0.87},
+          "spsl": {"score": 0.82},
+          "ucf": {"score": 0.91}
+        },
+        "traditional": {
+          "ela": {
+            "score": 2.34,
+            "raw_score": 2.34,
+            "frame_number": 0,
+            "overlay_url": "/api/analyses/{id}/forensics/ela/frames/0/overlay"
+          },
+          ...
+        },
+        "exif": {
+          "analyzed_at": "2024-01-15T14:30:00Z",
+          "file_hash": "abc123...",
+          "metadata": {...}
+        }
+      },
+      "created_at": "2025-10-28T...",
+      "completed_at": "2025-10-28T..."
+    }
+
+    Response (400/403/404/500): error message
+    """
+    try:
+        with get_db() as db:
+            # Check access (ownership or admin)
+            analysis = check_analysis_ownership_or_admin(db, analysis_id)
+
+            # Verify this is an image analysis
+            if analysis.media_type != "image":
+                return jsonify(error="This endpoint is for images only. Use /start for videos."), 400
+
+            # Parse request
+            body = request.get_json() or {}
+            ml_modules = body.get("modules", [])
+            traditional_modules = body.get("traditional", [])
+
+            if not ml_modules and not traditional_modules:
+                return jsonify(error="No modules specified"), 400
+
+            # Validate modules
+            VALID_ML_MODULES = {"xception", "spsl", "ucf"}
+            VALID_TRADITIONAL = {"ela", "noise", "lbp"}
+
+            invalid_ml = set(ml_modules) - VALID_ML_MODULES
+            invalid_trad = set(traditional_modules) - VALID_TRADITIONAL
+
+            if invalid_ml or invalid_trad:
+                invalid_all = invalid_ml | invalid_trad
+                return jsonify(error=f"Invalid modules: {', '.join(sorted(invalid_all))}"), 400
+
+            # Optimistic UPDATE to prevent race condition
+            stmt = (
+                update(Analysis)
+                .where(Analysis.id == analysis_id, Analysis.status == "created")
+                .values(status="running", updated_at=datetime.now(timezone.utc))
+            )
+            result = db.execute(stmt)
+
+            if result.rowcount == 0:
+                db.refresh(analysis)
+                return jsonify(error=f"Analysis already {analysis.status}"), 409
+
+            # Run image analysis (BLOCKING)
+            try:
+                from api.image_analysis import run_image_analysis
+
+                results = run_image_analysis(
+                    image_path=analysis.video_path,  # Still named video_path for consistency
+                    image_sha256=analysis.video_sha256,
+                    ml_modules=ml_modules,
+                    traditional_modules=traditional_modules,
+                    analysis_id=analysis.id
+                )
+
+                # Mark as succeeded and store results
+                analysis.status = "succeeded"
+                analysis.result_json = results
+                analysis.updated_at = datetime.now(timezone.utc)
+
+                print(f"✓ Image analysis completed for {analysis.id}")
+
+                return jsonify({
+                    "analysis_id": analysis.id,
+                    "status": "succeeded",
+                    "result": results,
+                    "created_at": analysis.created_at.isoformat(),
+                    "completed_at": analysis.updated_at.isoformat()
+                }), 200
+
+            except Exception as e:
+                # Mark as failed
+                analysis.status = "failed"
+                analysis.error = str(e)
+                analysis.updated_at = datetime.now(timezone.utc)
+
+                print(f"✗ Image analysis failed for {analysis.id}: {e}")
+
+                return jsonify(error=f"Image analysis failed: {str(e)}"), 500
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
 @analysis_bp.get("/analyses/<analysis_id>")
 @require_user
 def get_analysis(analysis_id: str):
@@ -524,6 +650,82 @@ def _merge_and_recompute_traditional(
     return result
 
 
+def _merge_analysis_results_with_dedup(
+    existing_data: dict,
+    new_results: dict,
+    method_name: str
+) -> dict:
+    """
+    Merge new full-sampling analysis results with existing data, deduplicating frames.
+
+    Used for retroactive full analysis feature where user runs full sampling analysis
+    on a method that may already have some ad-hoc frames.
+
+    Args:
+        existing_data: Existing method data from DB (may be empty or have ad-hoc frames)
+        new_results: New results from full sampling analysis
+        method_name: "ela", "noise", or "lbp"
+
+    Returns:
+        Merged data with recalculated z-scores across ALL frames (existing + new unique)
+    """
+    # Step 1: Extract frames
+    existing_frames = list(existing_data.get("frames", []))
+    new_frames = list(new_results.get("frames", []))
+
+    # Step 2: Build deduplication set
+    existing_frame_numbers = {f.get("frame_number") for f in existing_frames}
+
+    # Step 3: Filter out duplicates from new frames
+    unique_new_frames = [
+        f for f in new_frames
+        if f.get("frame_number") not in existing_frame_numbers
+    ]
+
+    print(f"[MERGE DEBUG] {method_name}: {len(existing_frames)} existing, {len(new_frames)} new, {len(unique_new_frames)} unique new")
+
+    # Step 4: Merge frames
+    all_frames = existing_frames + unique_new_frames
+
+    if not all_frames:
+        # No frames at all - return empty result
+        return {
+            "score": 0.0,
+            "confidence": 0.0 if method_name == "noise" else None,
+            "frames": []
+        }
+
+    # Step 5: Recalculate z-scores across ALL frames
+    raw_scores = [f["raw_score"] for f in all_frames]
+    mean_score = float(np.mean(raw_scores))
+    std_score = float(np.std(raw_scores)) + 1e-6  # Avoid division by zero
+
+    for frame in all_frames:
+        raw = frame["raw_score"]
+        z_score = (raw - mean_score) / std_score
+        frame["score"] = float(z_score)
+
+        # Noise also uses "confidence" field
+        if method_name == "noise":
+            frame["confidence"] = float(z_score)
+
+    # Step 6: Recalculate overall score (MAX z-score)
+    z_scores = [f["score"] for f in all_frames]
+    overall_score = float(max(z_scores))
+
+    # Step 7: Return merged structure
+    result = {
+        "score": overall_score,
+        "frames": all_frames
+    }
+
+    # Noise also has "confidence" at top level
+    if method_name == "noise":
+        result["confidence"] = overall_score
+
+    return result
+
+
 @analysis_bp.post("/analyses/<analysis_id>/frames/<int:frame_number>/forensics")
 @require_user
 def analyze_frame(analysis_id: str, frame_number: int):
@@ -667,9 +869,6 @@ def analyze_frame(analysis_id: str, frame_number: int):
 
                         # Merge with existing data and recompute z-scores
                         existing_method_data = current_json["traditional"].get(method, {})
-                        print(f"\n[AD-HOC DEBUG] Existing {method} data before merge:")
-                        print(f"  Frames count: {len(existing_method_data.get('frames', []))}")
-                        print(f"  Frame numbers: {[f.get('frame_number') for f in existing_method_data.get('frames', [])]}")
 
                         updated_method_data = _merge_and_recompute_traditional(
                             method_name=method,
@@ -678,11 +877,6 @@ def analyze_frame(analysis_id: str, frame_number: int):
                             frame_number=frame_number,
                             analysis_id=analysis.id
                         )
-
-                        print(f"\n[AD-HOC DEBUG] Updated {method} data after merge:")
-                        print(f"  Frames count: {len(updated_method_data.get('frames', []))}")
-                        print(f"  Frame numbers: {[f.get('frame_number') for f in updated_method_data.get('frames', [])]}")
-                        print(f"  Scores: {[f.get('score') for f in updated_method_data.get('frames', [])]}")
 
                         # Update result_json with merged data
                         current_json["traditional"][method] = updated_method_data
@@ -697,24 +891,8 @@ def analyze_frame(analysis_id: str, frame_number: int):
                         }
 
                 # Save updated result_json back to DB
-                print(f"\n[AD-HOC DEBUG] About to save to DB:")
-                print(f"  Traditional methods in JSON: {list(current_json.get('traditional', {}).keys())}")
-                for method_name, method_data in current_json.get('traditional', {}).items():
-                    print(f"  {method_name} frame count: {len(method_data.get('frames', []))}")
-
                 analysis.result_json = current_json
-                print(f"[AD-HOC DEBUG] Assigned to analysis.result_json")
-
                 db.commit()
-                print(f"[AD-HOC DEBUG] ✓ Committed to DB")
-
-                # Verify what's actually in the DB after commit
-                db.refresh(analysis)
-                verified_json = analysis.result_json
-                print(f"\n[AD-HOC DEBUG] Verified from DB after commit:")
-                for method_name, method_data in verified_json.get('traditional', {}).items():
-                    print(f"  {method_name} frame count: {len(method_data.get('frames', []))}")
-                    print(f"  {method_name} frame numbers: {[f.get('frame_number') for f in method_data.get('frames', [])]}")
 
                 response = {
                     "analysis_id": analysis.id,
@@ -902,7 +1080,150 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                 return jsonify(response), 200
 
             except Exception as e:
-                return jsonify(error=f"ML analysis failed: {str(e)}"), 500
+                import traceback
+                error_trace = traceback.format_exc()
+                logger.error(f"ML analysis failed for frame {frame_number}: {error_trace}")
+
+                # Make "no face" errors more helpful
+                error_msg = str(e)
+                if "no face detected" in error_msg.lower():
+                    error_msg = f"{error_msg}. Try finding a frame with a clearly visible face."
+
+                return jsonify(error=error_msg), 500
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (401/403/404)
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"Unexpected error in ad-hoc ML endpoint: {error_trace}")
+        return jsonify(error=str(e)), 500
+
+
+@analysis_bp.post("/analyses/<analysis_id>/run-full/<method>")
+@require_user
+def run_full_analysis_retroactive(analysis_id: str, method: str):
+    """
+    Run full sampling analysis on a method that wasn't included in initial analysis.
+
+    Allows users to retroactively add full sampling analysis (e.g., run ELA on all
+    sampled frames after initial analysis only included LBP). Deduplicates with
+    any existing ad-hoc frames and recalculates aggregate statistics.
+
+    Args:
+        analysis_id: Analysis UUID
+        method: One of ["ela", "noise", "lbp", "ml"]
+
+    Response (200): Full analysis result (same structure as GET /analyses/<id>)
+    Response (400): Invalid method
+    Response (403/404): Access denied or analysis not found
+    Response (500): Analysis failed
+    """
+    try:
+        with get_db() as db:
+            # Check access (ownership or admin)
+            analysis = check_analysis_ownership_or_admin(db, analysis_id)
+
+            # Validate method
+            VALID_METHODS = {"ela", "noise", "lbp", "ml"}
+            if method not in VALID_METHODS:
+                return jsonify(error=f"Invalid method: {method}. Must be one of: {', '.join(sorted(VALID_METHODS))}"), 400
+
+            print(f"\n[FULL ANALYSIS] Starting retroactive full {method} analysis for {analysis_id}")
+
+            # Fetch current result_json
+            current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
+            if "traditional" not in current_json:
+                current_json["traditional"] = {}
+            if "ml" not in current_json:
+                current_json["ml"] = {}
+
+            try:
+                if method == "ml":
+                    # Run full ML analysis on all 3 models
+                    print(f"[FULL ANALYSIS] Running ML inference...")
+                    ml_output = run_ml_analysis(
+                        video_path=analysis.video_path,
+                        modules=["xception", "spsl", "ucf"],
+                        device=None  # Will use env var DEVICE or auto-detect
+                    )
+                    ml_results = ml_output.get("models", {})
+
+                    # For each model, merge with existing data
+                    for model_name, new_model_data in ml_results.items():
+                        existing_model_data = current_json["ml"].get(model_name, {})
+                        existing_frames = existing_model_data.get("frames", [])
+                        new_frames = new_model_data.get("frames", [])
+
+                        # Deduplicate by frame index
+                        existing_indices = {f.get("index") for f in existing_frames}
+                        unique_new = [f for f in new_frames if f.get("index") not in existing_indices]
+
+                        print(f"[FULL ANALYSIS] {model_name}: {len(existing_frames)} existing, {len(new_frames)} new, {len(unique_new)} unique new")
+
+                        # Merge and mark new frames as requested_adhoc=False (auto-analysis)
+                        all_frames = existing_frames + [
+                            {**f, "requested_adhoc": False} for f in unique_new
+                        ]
+
+                        # Recalculate per-model score (average)
+                        frame_scores = [f["score"] for f in all_frames if f.get("score") is not None]
+                        avg_score = sum(frame_scores) / len(frame_scores) if frame_scores else None
+
+                        # Update model data
+                        current_json["ml"][model_name] = {
+                            "score": avg_score,
+                            "frames": all_frames,
+                            "weights_hash": new_model_data.get("weights_hash")
+                        }
+
+                    print(f"[FULL ANALYSIS] ✓ ML analysis completed")
+
+                else:
+                    # Traditional forensics
+                    print(f"[FULL ANALYSIS] Running {method} forensics...")
+                    traditional_results = run_traditional_forensics(
+                        video_path=analysis.video_path,
+                        modules=[method],
+                        analysis_id=analysis.id
+                    )
+
+                    new_method_data = traditional_results.get(method, {})
+                    existing_method_data = current_json["traditional"].get(method, {})
+
+                    # Merge with deduplication
+                    merged_data = _merge_analysis_results_with_dedup(
+                        existing_data=existing_method_data,
+                        new_results=new_method_data,
+                        method_name=method
+                    )
+
+                    # Update traditional data
+                    current_json["traditional"][method] = merged_data
+
+                    print(f"[FULL ANALYSIS] ✓ {method} forensics completed")
+
+                # Save to database
+                analysis.result_json = current_json
+                analysis.updated_at = datetime.now(timezone.utc)
+                # Commit happens automatically via context manager
+
+                print(f"[FULL ANALYSIS] ✓ Saved to database")
+
+                # Return full analysis result
+                response = {
+                    "analysis_id": analysis.id,
+                    "status": analysis.status,
+                    "result": current_json,
+                    "updated_at": analysis.updated_at.isoformat()
+                }
+
+                return jsonify(response), 200
+
+            except Exception as e:
+                error_msg = str(e)
+                print(f"[FULL ANALYSIS] ✗ Failed: {error_msg}")
+                return jsonify(error=f"Full {method} analysis failed: {error_msg}"), 500
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions (401/403/404)

@@ -15,6 +15,7 @@ Endpoints:
 - POST /api/admin/users/<id>/promote - Promote to admin (owner only)
 - POST /api/admin/users/<id>/demote - Demote to user (owner only)
 - POST /api/admin/users/<id>/deactivate - Deactivate user (owner only)
+- POST /api/admin/users/<id>/change-password - Change user password (admin/owner)
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from api import get_db
+from api import get_db, hash_password
 from api.auth_utils import (
     require_admin,
     require_owner,
@@ -433,3 +434,39 @@ def deactivate_user(user_id: int):
         db.commit()
 
         return jsonify(message="User deactivated", user_id=user_id), 200
+
+
+@admin_bp.post("/users/<int:user_id>/change-password")
+@require_admin
+def change_user_password(user_id: int):
+    """
+    Change user password (admin/owner).
+
+    Body:
+    - new_password: string (min 8 chars)
+
+    Returns:
+    - 200: {message, user_id}
+    - 404: User not found
+    - 400: Invalid password
+    """
+    data = request.get_json() or {}
+    new_password = data.get("new_password", "").strip()
+
+    if not new_password or len(new_password) < 8:
+        return jsonify(error="password_too_short", message="Password must be at least 8 characters"), 400
+
+    with get_db() as db:
+        user = db.query(User).get(user_id)
+        if not user:
+            return jsonify(error="not_found"), 404
+
+        if user.role == "owner":
+            return jsonify(error="cannot_modify_owner"), 403
+
+        user.password_hash = hash_password(new_password)
+
+        _audit_log(db, "password_changed_by_admin", details={"target_user_id": user_id, "username": user.username})
+        db.commit()
+
+        return jsonify(message="Password changed successfully", user_id=user_id), 200

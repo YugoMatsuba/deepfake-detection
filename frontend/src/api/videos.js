@@ -16,3 +16,13 @@ export async function startAnalysis(analysisId, mlModules, traditionalModules) {
     }
   });
 }
+
+export async function startImageAnalysis(analysisId, mlModules, traditionalModules) {
+  return fetchJson(`/analyses/${analysisId}/start-image`, {
+    method: "POST",
+    json: {
+      modules: mlModules,
+      traditional: traditionalModules
+    }
+  });
+}

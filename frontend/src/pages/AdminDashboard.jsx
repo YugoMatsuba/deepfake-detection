@@ -544,6 +544,7 @@ function RoleManagementTab() {
   const [query, setQuery] = useState("");
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [passwordModal, setPasswordModal] = useState(null);
 
   // Load all users on mount
   useEffect(() => {
@@ -667,6 +668,12 @@ function RoleManagementTab() {
                           Promote to Admin
                         </button>
                         <button
+                          onClick={() => setPasswordModal(user)}
+                          className="px-3 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition"
+                        >
+                          Change Password
+                        </button>
+                        <button
                           onClick={() => handleDeactivate(user.id, user.username)}
                           className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700 transition"
                         >
@@ -683,6 +690,12 @@ function RoleManagementTab() {
                           Demote to User
                         </button>
                         <button
+                          onClick={() => setPasswordModal(user)}
+                          className="px-3 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition"
+                        >
+                          Change Password
+                        </button>
+                        <button
                           onClick={() => handleDeactivate(user.id, user.username)}
                           className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700 transition"
                         >
@@ -691,7 +704,15 @@ function RoleManagementTab() {
                       </>
                     )}
                     {user.role === 'owner' && (
-                      <span className="text-sm text-gray-500">Cannot modify owner</span>
+                      <>
+                        <button
+                          onClick={() => setPasswordModal(user)}
+                          className="px-3 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition"
+                        >
+                          Change Password
+                        </button>
+                        <span className="text-sm text-gray-500 ml-2">Cannot modify owner role</span>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -700,6 +721,112 @@ function RoleManagementTab() {
           </table>
         </div>
       )}
+
+      {/* Password Change Modal */}
+      {passwordModal && (
+        <PasswordChangeModal
+          user={passwordModal}
+          onClose={() => setPasswordModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Password Change Modal
+// ============================================================================
+
+function PasswordChangeModal({ user, onClose }) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await adminApi.changeUserPassword(user.id, newPassword);
+      alert(`Password changed successfully for ${user.username}`);
+      onClose();
+    } catch (err) {
+      setError(err.message || "Failed to change password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 grid place-items-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-lg p-6 w-[min(92vw,450px)]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-semibold mb-4">Change Password</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Changing password for: <strong>{user.username}</strong>
+        </p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">New Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Minimum 8 characters"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Confirm Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter password"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
+          <div className="flex gap-3 justify-end pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              {loading ? 'Changing...' : 'Change Password'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

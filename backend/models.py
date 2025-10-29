@@ -166,6 +166,7 @@ class Analysis(Base):
     video_path: Mapped[str] = mapped_column(Text, nullable=False)
     video_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    media_type: Mapped[str] = mapped_column(String(50), nullable=False, default="video", server_default="video")  # "video" | "image"
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

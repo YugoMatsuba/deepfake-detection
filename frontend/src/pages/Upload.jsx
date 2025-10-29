@@ -3,13 +3,15 @@ import FileUploader from "./FileUploader";
 import { useAuth } from "../app/useAuth.js";
 
 export default function Page() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
+
+  const isAdminOrOwner = user?.role === "admin" || user?.role === "owner";
 
   return (
     <main className="flex min-h-screen items-center justify-center relative">
@@ -20,6 +22,16 @@ export default function Page() {
       >
         Past Analyses
       </button>
+
+      {/* Admin Dashboard button (only for admins/owners) */}
+      {isAdminOrOwner && (
+        <button
+          onClick={() => navigate("/admin")}
+          className="absolute top-4 left-48 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition text-sm"
+        >
+          Admin Dashboard
+        </button>
+      )}
 
       {/* Logout button in top-right corner */}
       <button

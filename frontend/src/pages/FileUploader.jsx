@@ -8,8 +8,9 @@ import { uploadVideo } from "../api/videos";
 import { useAnalysis } from "../app/AnalysisProvider";
 
 export default function FileUploader() {
-  const [files, setFiles] = useState([]);
-  const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'success' | 'error'
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'analyzing' | 'success' | 'error'
+  const [fileRejectionError, setFileRejectionError] = useState(null);
   const { setAnalysisId, setSelectedModules } = useAnalysis();
 
   // checkbox states - map to backend module names
@@ -20,23 +21,45 @@ export default function FileUploader() {
     lbp: false,
   });
 
-  const onDrop = useCallback(async (droppedFiles) => {
-    setFiles(droppedFiles);
+  const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB in bytes
+
+  const onDrop = useCallback((droppedFiles) => {
     if (droppedFiles && droppedFiles.length > 0) {
-      setUploadStatus('uploading');
-      try {
-        const response = await uploadVideo(droppedFiles[0]);
-        setAnalysisId(response.analysis_id); // Save analysis_id to context
-        setUploadStatus('success');
-      } catch {
-        setUploadStatus('error');
+      const file = droppedFiles[0];
+
+      // Check file size
+      if (file.size > MAX_FILE_SIZE) {
+        setFileRejectionError(`File too large. Maximum size is 500MB (your file: ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+        setSelectedFile(null);
+        return;
+      }
+
+      setSelectedFile(file);
+      setUploadStatus(null); // Reset status when new file selected
+      setFileRejectionError(null); // Clear any previous rejection errors
+    }
+  }, []);
+
+  const onDropRejected = useCallback((fileRejections) => {
+    if (fileRejections && fileRejections.length > 0) {
+      const rejection = fileRejections[0];
+      if (rejection.errors.some(e => e.code === 'file-invalid-type')) {
+        setFileRejectionError('Invalid file type. Please select an image or video file.');
+      } else if (rejection.errors.some(e => e.code === 'file-too-large')) {
+        setFileRejectionError('File too large. Maximum size is 500MB.');
+      } else {
+        setFileRejectionError('File rejected. Please try again.');
       }
     }
-  }, [setAnalysisId]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: { "image/*": [], "video/*": [] },
+    multiple: false,
+    maxFiles: 1,
+    maxSize: MAX_FILE_SIZE,
   });
 
   const handleCheckboxChange = (e) => {
@@ -47,16 +70,21 @@ export default function FileUploader() {
   let dropzoneClass = "border-2 border-dashed rounded-xl p-10 cursor-pointer text-center transition";
   dropzoneClass += isDragActive ? " border-blue-500 bg-blue-50" : " border-gray-300 bg-white";
 
-  const dropzoneContent = isDragActive
-    ? <p className="text-blue-500 font-semibold">Drop files here...</p>
-    : <p className="text-gray-600 font-semibold">Drag images or videos here, or click to select</p>;
+  const dropzoneContent = (
+    <div>
+      <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
+        Click or drag image or video to {selectedFile ? 'replace' : 'select'}
+      </p>
+      <p className="text-xs text-gray-500 mt-2">Max file size: 500MB</p>
+    </div>
+  );
 
   const navigate = useNavigate();
   const { analysisId } = useAnalysis();
 
-  const handleGoToAnalysis = () => {
-    if (!analysisId) {
-      alert('Please upload a video first');
+  const handleGoToAnalysis = async () => {
+    if (!selectedFile) {
+      alert('Please select a file first');
       return;
     }
 
@@ -72,9 +100,42 @@ export default function FileUploader() {
       return;
     }
 
-    // Save selected modules to context
-    setSelectedModules({ ml: mlModules, traditional: traditionalModules });
-    navigate("/analysis");
+    // Upload file when Start is clicked
+    setUploadStatus('uploading');
+    try {
+      const response = await uploadVideo(selectedFile);
+      setAnalysisId(response.analysis_id);
+      setUploadStatus('success');
+
+      // Save selected modules to context
+      setSelectedModules({ ml: mlModules, traditional: traditionalModules });
+
+      // Route based on media type
+      if (response.media_type === "image") {
+        // For images, run analysis immediately then navigate
+        setUploadStatus('analyzing');
+        try {
+          const { startImageAnalysis } = await import('../api/videos');
+          await startImageAnalysis(response.analysis_id, mlModules, traditionalModules);
+          navigate(`/image-analysis/${response.analysis_id}`);
+        } catch (analysisError) {
+          console.error('Image analysis failed:', analysisError);
+          alert('Image analysis failed. Please try again.');
+          setUploadStatus('error');
+        }
+      } else {
+        // For videos, go to intermediate Analysis page
+        navigate("/analysis");
+      }
+    } catch (error) {
+      setUploadStatus('error');
+      // Check for 413 error (file too large)
+      if (error.status === 413) {
+        alert('File too large. Maximum upload size is 500MB.');
+      } else {
+        alert('Upload failed. Please try again.');
+      }
+    }
   };
 
   return (
@@ -88,18 +149,26 @@ export default function FileUploader() {
               {dropzoneContent}
             </div>
 
-            {files.length > 0 && (
+            {selectedFile && (
               <div className="mt-4 space-y-2">
-                <h2 className="font-semibold">
-                  {uploadStatus === 'uploading' && 'Uploading...'}
-                  {uploadStatus === 'success' && 'Upload successful!'}
-                  {uploadStatus === 'error' && 'Upload failed'}
+                <h2 className="font-semibold text-gray-700">
+                  Selected: {selectedFile.name}
                 </h2>
-                <ul className="list-disc pl-5 text-gray-700">
-                  {files.map((file) => (
-                    <li key={file.name}>{file.name}</li>
-                  ))}
-                </ul>
+                {uploadStatus === 'uploading' && (
+                  <p className="text-blue-600 text-sm">Uploading...</p>
+                )}
+                {uploadStatus === 'analyzing' && (
+                  <p className="text-blue-600 text-sm">Analyzing...</p>
+                )}
+                {uploadStatus === 'error' && (
+                  <p className="text-red-600 text-sm">Upload failed</p>
+                )}
+              </div>
+            )}
+
+            {fileRejectionError && (
+              <div className="mt-4">
+                <p className="text-red-600 text-sm font-semibold">{fileRejectionError}</p>
               </div>
             )}
           </CardContent>
@@ -152,9 +221,10 @@ export default function FileUploader() {
 
         <button
           onClick={handleGoToAnalysis}
-          className="absolute bottom-20 right-48 bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors"
+          disabled={uploadStatus === 'uploading' || uploadStatus === 'analyzing'}
+          className="absolute bottom-20 right-48 bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          Start
+          {uploadStatus === 'uploading' ? 'Uploading...' : uploadStatus === 'analyzing' ? 'Analyzing...' : 'Start'}
         </button>
       </div>
     </div>

@@ -196,9 +196,100 @@ def detect_duplicate_frames(frame_hashes_raw: list) -> list:
     return duplicates
 
 
+def detect_image_metadata_anomalies(metadata: dict) -> dict:
+    """
+    Detect metadata inconsistencies in images using established forensic techniques.
+
+    Based on industry-standard forensic analysis methods adapted for images:
+    - Missing critical fields (indicates stripping/tampering) [Fotoforensics]
+    - Timestamp logical inconsistencies [Eclipse Forensics]
+    - Software field anomalies (editing software detected) [Belkasoft 2024]
+    - GPS/timezone mismatches [Amped Authenticate]
+
+    Returns:
+        dict with categorized anomalies: {
+            "missing_fields": [...],
+            "timestamp_issues": [...],
+            "software_anomalies": [...],
+            "gps_inconsistencies": [...]
+        }
+    """
+    anomalies = {
+        "missing_fields": [],
+        "timestamp_issues": [],
+        "software_anomalies": [],
+        "gps_inconsistencies": []
+    }
+
+    if not metadata:
+        return anomalies
+
+    # 1. MISSING METADATA CHECK (Fotoforensics standard)
+    # Critical fields that should be present in authentic camera/phone images
+    expected_fields = {
+        'FileType', 'MIMEType', 'CreateDate',
+        'ImageWidth', 'ImageHeight'
+    }
+    device_fields = {'Make', 'Model'}
+
+    missing_critical = [f for f in expected_fields if not metadata.get(f)]
+    missing_device = [f for f in device_fields if not metadata.get(f)]
+
+    if missing_critical:
+        anomalies["missing_fields"].append({
+            "type": "critical",
+            "fields": missing_critical,
+            "note": "Missing basic image metadata"
+        })
+
+    if len(missing_device) == len(device_fields):
+        anomalies["missing_fields"].append({
+            "type": "device_info",
+            "fields": list(device_fields),
+            "note": "No device information - metadata may be stripped"
+        })
+
+    # 2. TIMESTAMP CONSISTENCY (Eclipse Forensics standard)
+    create_date = metadata.get('CreateDate') or metadata.get('DateTimeOriginal')
+    modify_date = metadata.get('ModifyDate')
+
+    if create_date and modify_date:
+        if create_date > modify_date:
+            anomalies["timestamp_issues"].append({
+                "type": "create_after_modify",
+                "create": create_date,
+                "modify": modify_date,
+                "note": "Create date is after modify date (logically impossible)"
+            })
+
+    # 3. SOFTWARE ANOMALIES (Belkasoft 2024 standard)
+    # Flag common image editing software
+    software = metadata.get('Software', '').lower()
+    editing_software = ['photoshop', 'gimp', 'affinity', 'pixelmator', 'paint.net', 'canva']
+
+    if any(edit_sw in software for edit_sw in editing_software):
+        anomalies["software_anomalies"].append({
+            "type": "editing_software",
+            "software": metadata.get('Software'),
+            "note": "Editing software detected in metadata - image may be processed/modified"
+        })
+
+    # 4. GPS CONSISTENCY
+    gps_lat = metadata.get('GPSLatitude')
+    gps_long = metadata.get('GPSLongitude')
+
+    if (gps_lat and not gps_long) or (gps_long and not gps_lat):
+        anomalies["gps_inconsistencies"].append({
+            "type": "incomplete_gps",
+            "note": "GPS coordinates incomplete (only latitude or longitude present)"
+        })
+
+    return anomalies
+
+
 def detect_metadata_anomalies(metadata: dict) -> dict:
     """
-    Detect metadata inconsistencies using established forensic techniques.
+    Detect metadata inconsistencies in videos using established forensic techniques.
 
     Based on industry-standard forensic analysis methods:
     - Missing critical fields (indicates stripping/tampering) [Fotoforensics]
@@ -313,6 +404,51 @@ def detect_metadata_anomalies(metadata: dict) -> dict:
             pass
 
     return anomalies
+
+
+def run_image_exif_analysis(image_path: str, image_sha256: str) -> dict:
+    """
+    Analyze image EXIF metadata using ExifTool.
+
+    Reuses existing extract_metadata() and detect_metadata_anomalies() functions.
+    Images don't need integrity checks or frame hashes (video-only features).
+
+    Args:
+        image_path: Absolute path to image file
+        image_sha256: Pre-computed SHA-256 hash from upload (for chain-of-custody)
+
+    Returns:
+        dict containing:
+        - file_hash: SHA-256 for integrity verification
+        - metadata: Raw EXIF data + forensic anomalies
+        - analyzed_at: ISO timestamp
+    """
+    if not os.path.exists(image_path):
+        logger.error(f"File not found: {image_path}")
+        return {"error": f"File not found: {image_path}"}
+
+    logger.info(f"Running EXIF analysis on image: {image_path}")
+
+    # Extract metadata using ExifTool (works for images too!)
+    metadata = extract_metadata(image_path)
+
+    # Detect anomalies using IMAGE-SPECIFIC function
+    anomalies = detect_image_metadata_anomalies(metadata) if metadata else {
+        "missing_fields": [],
+        "timestamp_issues": [],
+        "software_anomalies": [],
+        "gps_inconsistencies": []
+    }
+
+    # Build simplified report (no integrity checks or frame hashes for images)
+    return {
+        "analyzed_at": datetime.now().isoformat(),
+        "file_hash": image_sha256,
+        "metadata": {
+            "raw": metadata,
+            "anomalies": anomalies
+        }
+    }
 
 
 def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
