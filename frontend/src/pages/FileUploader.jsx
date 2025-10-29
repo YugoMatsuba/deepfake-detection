@@ -9,7 +9,7 @@ import { useAnalysis } from "../app/AnalysisProvider";
 
 export default function FileUploader() {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'success' | 'error'
+  const [uploadStatus, setUploadStatus] = useState(null); // 'uploading' | 'analyzing' | 'success' | 'error'
   const [fileRejectionError, setFileRejectionError] = useState(null);
   const { setAnalysisId, setSelectedModules } = useAnalysis();
 
@@ -95,8 +95,19 @@ export default function FileUploader() {
 
       // Route based on media type
       if (response.media_type === "image") {
-        navigate(`/image-analysis/${response.analysis_id}`);
+        // For images, run analysis immediately then navigate
+        setUploadStatus('analyzing');
+        try {
+          const { startImageAnalysis } = await import('../api/videos');
+          await startImageAnalysis(response.analysis_id, mlModules, traditionalModules);
+          navigate(`/image-analysis/${response.analysis_id}`);
+        } catch (analysisError) {
+          console.error('Image analysis failed:', analysisError);
+          alert('Image analysis failed. Please try again.');
+          setUploadStatus('error');
+        }
       } else {
+        // For videos, go to intermediate Analysis page
         navigate("/analysis");
       }
     } catch (error) {
@@ -123,6 +134,9 @@ export default function FileUploader() {
                 </h2>
                 {uploadStatus === 'uploading' && (
                   <p className="text-blue-600 text-sm">Uploading...</p>
+                )}
+                {uploadStatus === 'analyzing' && (
+                  <p className="text-blue-600 text-sm">Analyzing...</p>
                 )}
                 {uploadStatus === 'error' && (
                   <p className="text-red-600 text-sm">Upload failed</p>
@@ -185,10 +199,10 @@ export default function FileUploader() {
 
         <button
           onClick={handleGoToAnalysis}
-          disabled={uploadStatus === 'uploading'}
+          disabled={uploadStatus === 'uploading' || uploadStatus === 'analyzing'}
           className="absolute bottom-20 right-48 bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {uploadStatus === 'uploading' ? 'Uploading...' : 'Start'}
+          {uploadStatus === 'uploading' ? 'Uploading...' : uploadStatus === 'analyzing' ? 'Analyzing...' : 'Start'}
         </button>
       </div>
     </div>
