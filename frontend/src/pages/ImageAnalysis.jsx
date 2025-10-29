@@ -156,9 +156,9 @@ const ImageAnalysis = () => {
                         alt="Analyzed image"
                         className="w-full rounded-lg"
                       />
-                      {activeOverlay && (
+                      {activeOverlay && traditionalResults[activeOverlay]?.overlay_url && (
                         <img
-                          src={`http://localhost:5050/api/analyses/${id}/forensics/${activeOverlay}/frames/0/overlay`}
+                          src={`http://localhost:5050${traditionalResults[activeOverlay].overlay_url}`}
                           alt={`${activeOverlay.toUpperCase()} overlay`}
                           className="absolute top-0 left-0 w-full h-full object-cover opacity-100 rounded-lg pointer-events-none"
                         />
@@ -247,10 +247,10 @@ const ImageAnalysis = () => {
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Traditional Forensics</h3>
                     <div className="space-y-3">
                       {Object.entries(traditionalResults).map(([method, methodData]) => {
-                        const frameData = methodData.frames?.find(f => f.frame_number === 0);
-                        if (!frameData || typeof frameData.score !== 'number') return null;
+                        // Image analysis returns flat structure with score directly on methodData
+                        if (!methodData || typeof methodData.score !== 'number') return null;
 
-                        const score = frameData.score;
+                        const score = methodData.score;
                         const barWidth = Math.min(100, Math.max(0, ((score + 3) / 6) * 100));
 
                         return (
