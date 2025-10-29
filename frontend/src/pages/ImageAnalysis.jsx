@@ -92,6 +92,7 @@ const ImageAnalysis = () => {
   // Extract ML results
   const mlResults = results?.ml || {};
   const hasMlResults = Object.keys(mlResults).length > 0;
+  const mlError = mlResults.error;
 
   // Extract traditional forensics results
   const traditionalResults = results?.traditional || {};
@@ -239,26 +240,34 @@ const ImageAnalysis = () => {
                 {hasMlResults && (
                   <section>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">ML Detection</h3>
-                    {overallMLScore !== null && (
-                      <div className="mb-3 p-3 bg-blue-50 rounded">
-                        <div className="text-sm text-gray-600">Overall Score</div>
-                        <div className="text-2xl font-bold text-blue-700">{overallMLScore}%</div>
+                    {mlError ? (
+                      <div className="p-3 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                        <p className="text-sm text-yellow-800">{mlError}</p>
                       </div>
-                    )}
-                    <div className="space-y-2">
-                      {Object.entries(mlResults).map(([modelName, modelData]) => {
-                        // Image analysis returns flat structure: {score: 0.87}
-                        if (!modelData || typeof modelData.score !== 'number') return null;
-                        return (
-                          <div key={modelName} className="flex items-center justify-between text-sm border-b pb-2">
-                            <span className="font-medium">{modelName.toUpperCase()}</span>
-                            <span className="font-bold text-blue-600">
-                              {Math.round(modelData.score * 100)}%
-                            </span>
+                    ) : (
+                      <>
+                        {overallMLScore !== null && (
+                          <div className="mb-3 p-3 bg-blue-50 rounded">
+                            <div className="text-sm text-gray-600">Overall Score</div>
+                            <div className="text-2xl font-bold text-blue-700">{overallMLScore}%</div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        )}
+                        <div className="space-y-2">
+                          {Object.entries(mlResults).map(([modelName, modelData]) => {
+                            // Image analysis returns flat structure: {score: 0.87}
+                            if (!modelData || typeof modelData.score !== 'number') return null;
+                            return (
+                              <div key={modelName} className="flex items-center justify-between text-sm border-b pb-2">
+                                <span className="font-medium">{modelName.toUpperCase()}</span>
+                                <span className="font-bold text-blue-600">
+                                  {Math.round(modelData.score * 100)}%
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </section>
                 )}
 
