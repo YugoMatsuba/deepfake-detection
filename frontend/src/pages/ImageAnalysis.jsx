@@ -38,8 +38,8 @@ const ImageAnalysis = () => {
           const analysisData = await existingResponse.json();
 
           // If analysis is complete and has results, display them
-          if (analysisData.status === 'succeeded' && analysisData.result_json) {
-            setResults(analysisData.result_json);
+          if (analysisData.status === 'succeeded' && analysisData.result) {
+            setResults(analysisData.result);
             setIsLoading(false);
             return;
           }
@@ -57,10 +57,15 @@ const ImageAnalysis = () => {
             setIsLoading(false);
             return;
           }
+        } else {
+          // Log the actual error for debugging
+          console.error(`GET /api/analyses/${id} returned ${existingResponse.status}`);
+          const errorText = await existingResponse.text();
+          console.error('Error response:', errorText);
         }
 
         // If we get here, analysis doesn't exist or fetch failed
-        setError("Analysis not found");
+        setError(`Analysis not found (status: ${existingResponse.status})`);
         setIsLoading(false);
       } catch (err) {
         console.error("Failed to load analysis:", err);
