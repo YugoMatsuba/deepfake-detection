@@ -267,7 +267,7 @@ export default function PastReports() {
                         onClick={() => handleRerunAnalysis(report.analysis_id, mediaType)}
                         className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition text-xs mr-2"
                       >
-                        Rerun Analysis
+                        Reopen Analysis
                       </button>
                       {mediaType === "video" && (
                         <button
