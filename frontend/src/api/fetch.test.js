@@ -53,7 +53,13 @@ describe('apiFetch', () => {
       json: jest.fn(),
     });
 
-    await expect(apiFetch('/api/protected')).rejects.toThrow('Session expired. Please login again.');
+    // apiFetch returns a never-resolving promise on 401 (page redirects before it matters)
+    // Just verify the redirect happens, don't wait for promise
+    const promise = apiFetch('/api/protected');
+
+    // Give it a tick to process the response
+    await new Promise(resolve => setImmediate(resolve));
+
     expect(mockLocation.href).toBe('/login');
   });
 
