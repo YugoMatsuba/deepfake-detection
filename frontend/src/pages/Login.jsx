@@ -8,6 +8,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState(null);
+  const [showForgotPopup, setShowForgotPopup] = useState(false);
   
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -101,15 +102,15 @@ export default function Login() {
             />
           </div>
 
-          {/* Remember + Forgot */}
-          <div className="flex items-center justify-between text-[13px]">
-            <label className="inline-flex items-center gap-1.5">
-              <input type="checkbox" className="size-4 accent-blue-600" />
-              Remember me
-            </label>
-            <a href="#" className="text-gray-900 underline">
+          {/* Forgot password */}
+          <div className="flex items-center justify-end text-[13px]">
+            <button
+              type="button"
+              onClick={() => setShowForgotPopup(true)}
+              className="text-gray-900 underline"
+            >
               Forgot password?
-            </a>
+            </button>
           </div>
 
           {/* Submit */}
@@ -123,7 +124,7 @@ export default function Login() {
         </form>
 
         <footer className="mt-2 text-center text-xs opacity-80">
-          Don’t have an account?{" "}
+          Don't have an account?{" "}
       <button
         type="button"
         onClick={() => navigate("/signup")}
@@ -133,6 +134,41 @@ export default function Login() {
       </button>
     </footer>
   </div>
+
+      {/* Forgot Password Popup */}
+      {showForgotPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowForgotPopup(false)}>
+          <div
+            className="relative w-[400px] max-w-[90%] bg-white rounded-lg shadow-xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition"
+              onClick={() => setShowForgotPopup(false)}
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Content */}
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              Forgot Password?
+            </h3>
+            <p className="text-sm text-gray-700 mb-4">
+              Please contact an administrator to reset your password.
+            </p>
+            <button
+              onClick={() => setShowForgotPopup(false)}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 </div>
 );
 }

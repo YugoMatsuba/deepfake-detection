@@ -40,6 +40,13 @@ export async function fetchJson(path, options = {}) {
 
     // Handle non-2xx responses
     if (!response.ok) {
+      // Handle session expired
+      if (response.status === 401) {
+        window.location.href = '/login';
+        // Return a promise that never resolves - page will redirect before it matters
+        return new Promise(() => {});
+      }
+
       const error = new Error(data?.error || `HTTP ${response.status}`);
       error.name = 'ApiError';
       error.status = response.status;
@@ -50,11 +57,16 @@ export async function fetchJson(path, options = {}) {
 
     return data;
   } catch (err) {
+    // Don't catch 401 redirects - let them proceed
+    if (err === undefined) {
+      return new Promise(() => {}); // Should never happen, but just in case
+    }
+
     // Network/fetch errors (backend down)
     if (err.name === 'ApiError') {
       throw err; // Re-throw API errors
     }
-    
+
     // Network failure
     const error = new Error('Backend unavailable');
     error.name = 'ApiError';

@@ -150,3 +150,17 @@ export async function deactivateUser(userId) {
     method: 'POST'
   });
 }
+
+/**
+ * Change user password.
+ * Requires admin or owner role.
+ * @param {number} userId - User ID
+ * @param {string} newPassword - New password (min 8 chars)
+ * @returns {Promise<{message: string, user_id: number}>}
+ */
+export async function changeUserPassword(userId, newPassword) {
+  return apiFetch(`${BASE_URL}/users/${userId}/change-password`, {
+    method: 'POST',
+    body: JSON.stringify({ new_password: newPassword })
+  });
+}

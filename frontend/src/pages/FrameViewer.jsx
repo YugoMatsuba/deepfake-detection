@@ -8,6 +8,8 @@ import {
   FrameHashesSummary
 } from "./MetadataResults";
 import Toast from "../components/Toast";
+import InfoButton from "../components/InfoButton";
+import { forensicsInfo } from "../utils/ForensicsInfo";
 
 const FrameViewer = ({
   videoSrc,
@@ -1247,7 +1249,13 @@ const handleRunFullAnalysis = async (method) => {
 
   return (
     <section key={type} className="mt-4">
-      <h4 className="text-sm font-medium text-gray-700 mb-2">{type.toUpperCase()} Analysis</h4>
+      <div className="flex items-center mb-2">
+        <h4 className="text-sm font-medium text-gray-700">{type.toUpperCase()} Analysis</h4>
+        <InfoButton
+          title={forensicsInfo.video[type]?.title}
+          content={forensicsInfo.video[type]?.content}
+        />
+      </div>
       <div className="flex items-center justify-between text-sm mb-1">
         <span>Z-score</span>
         <span className="text-gray-600 font-semibold">{displayValue}</span>

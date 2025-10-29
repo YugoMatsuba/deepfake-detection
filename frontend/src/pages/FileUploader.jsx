@@ -21,9 +21,20 @@ export default function FileUploader() {
     lbp: false,
   });
 
+  const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB in bytes
+
   const onDrop = useCallback((droppedFiles) => {
     if (droppedFiles && droppedFiles.length > 0) {
-      setSelectedFile(droppedFiles[0]);
+      const file = droppedFiles[0];
+
+      // Check file size
+      if (file.size > MAX_FILE_SIZE) {
+        setFileRejectionError(`File too large. Maximum size is 500MB (your file: ${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+        setSelectedFile(null);
+        return;
+      }
+
+      setSelectedFile(file);
       setUploadStatus(null); // Reset status when new file selected
       setFileRejectionError(null); // Clear any previous rejection errors
     }
@@ -34,6 +45,8 @@ export default function FileUploader() {
       const rejection = fileRejections[0];
       if (rejection.errors.some(e => e.code === 'file-invalid-type')) {
         setFileRejectionError('Invalid file type. Please select an image or video file.');
+      } else if (rejection.errors.some(e => e.code === 'file-too-large')) {
+        setFileRejectionError('File too large. Maximum size is 500MB.');
       } else {
         setFileRejectionError('File rejected. Please try again.');
       }
@@ -46,6 +59,7 @@ export default function FileUploader() {
     accept: { "image/*": [], "video/*": [] },
     multiple: false,
     maxFiles: 1,
+    maxSize: MAX_FILE_SIZE,
   });
 
   const handleCheckboxChange = (e) => {
@@ -57,9 +71,12 @@ export default function FileUploader() {
   dropzoneClass += isDragActive ? " border-blue-500 bg-blue-50" : " border-gray-300 bg-white";
 
   const dropzoneContent = (
-    <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
-      Click or drag image or video to {selectedFile ? 'replace' : 'select'}
-    </p>
+    <div>
+      <p className={`font-semibold ${isDragActive ? "text-blue-500" : "text-gray-600"}`}>
+        Click or drag image or video to {selectedFile ? 'replace' : 'select'}
+      </p>
+      <p className="text-xs text-gray-500 mt-2">Max file size: 500MB</p>
+    </div>
   );
 
   const navigate = useNavigate();
@@ -112,7 +129,12 @@ export default function FileUploader() {
       }
     } catch (error) {
       setUploadStatus('error');
-      alert('Upload failed. Please try again.');
+      // Check for 413 error (file too large)
+      if (error.status === 413) {
+        alert('File too large. Maximum upload size is 500MB.');
+      } else {
+        alert('Upload failed. Please try again.');
+      }
     }
   };
 

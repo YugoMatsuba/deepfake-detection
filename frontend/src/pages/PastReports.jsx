@@ -11,25 +11,38 @@ export default function PastReports() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [mediaFilter, setMediaFilter] = useState("all"); // "all", "video", "image"
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const limit = 50;
 
   const navigate = useNavigate();
   const { user } = useAuth();
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [offset]);
 
   const fetchReports = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchJson("/reports");
-      setReports(data);
+      const data = await fetchJson(`/reports?limit=${limit}&offset=${offset}`);
+      // Append to existing reports for "load more" behavior
+      if (offset === 0) {
+        setReports(data.reports);
+      } else {
+        setReports(prev => [...prev, ...data.reports]);
+      }
+      setTotal(data.total);
     } catch (err) {
       setError(err.message || "Failed to load reports");
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMore = () => {
+    setOffset(offset + limit);
   };
 
   const downloadPDF = async (analysisId, filename) => {
@@ -299,6 +312,19 @@ export default function PastReports() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Load More Button */}
+        {filteredReports.length < total && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={loadMore}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              {loading ? 'Loading...' : `Load More (${filteredReports.length} of ${total})`}
+            </button>
           </div>
         )}
 

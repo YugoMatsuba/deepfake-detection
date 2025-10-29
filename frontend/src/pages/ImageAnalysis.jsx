@@ -4,6 +4,8 @@ import { Card, CardContent } from "./Card";
 import { Button } from "./Button";
 import { startImageAnalysis } from "../api/videos";
 import { useAnalysis } from "../app/AnalysisProvider";
+import InfoButton from "../components/InfoButton";
+import { forensicsInfo } from "../utils/ForensicsInfo";
 
 const ImageAnalysis = () => {
   const { id } = useParams();
@@ -281,7 +283,6 @@ const ImageAnalysis = () => {
                         if (!methodData || typeof methodData.score !== 'number') return null;
 
                         const score = methodData.score;
-                        const barWidth = Math.min(100, Math.max(0, ((score + 3) / 6) * 100));
 
                         return (
                           <div
@@ -291,12 +292,15 @@ const ImageAnalysis = () => {
                             }`}
                             onClick={() => toggleOverlay(method)}
                           >
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-semibold text-gray-900">{method.toUpperCase()}</h4>
-                              <span className="text-sm text-gray-600">z: {score.toFixed(2)}</span>
-                            </div>
-                            <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                              <div className="h-full bg-gray-700" style={{ width: `${barWidth}%` }} />
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <h4 className="font-semibold text-gray-900">{method.toUpperCase()}</h4>
+                                <InfoButton
+                                  title={forensicsInfo.singleImage[method]?.title}
+                                  content={forensicsInfo.singleImage[method]?.content}
+                                />
+                              </div>
+                              <span className="text-lg font-semibold text-gray-800">{score.toFixed(2)}</span>
                             </div>
                           </div>
                         );

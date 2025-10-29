@@ -11,8 +11,8 @@ import io
 from datetime import datetime
 from typing import List, Dict, Any
 
-from flask import Blueprint, jsonify, send_file, g
-from sqlalchemy import select
+from flask import Blueprint, jsonify, send_file, g, request
+from sqlalchemy import select, func
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -31,28 +31,41 @@ reports_bp = Blueprint("reports", __name__)
 @require_user
 def list_reports():
     """
-    List available analysis reports for current user.
+    List available analysis reports for current user with pagination.
+
+    Query params:
+    - limit: max results (default 50, max 500)
+    - offset: pagination offset (default 0)
 
     Regular users see only their own reports (no username field).
     Admin/owner users see all reports with username field.
 
     Response (200):
-    [
-      {
-        "analysis_id": "uuid",
-        "original_filename": "suspicious_video.mp4",
-        "status": "succeeded",
-        "created_at": "2025-10-19T...",
-        "completed_at": "2025-10-19T...",
-        "has_ml_results": true,
-        "has_traditional_results": true,
-        "username": "john_doe"  // Only present for admin/owner users
-      },
-      ...
-    ]
+    {
+      "reports": [
+        {
+          "analysis_id": "uuid",
+          "original_filename": "suspicious_video.mp4",
+          "status": "succeeded",
+          "created_at": "2025-10-19T...",
+          "completed_at": "2025-10-19T...",
+          "has_ml_results": true,
+          "has_traditional_results": true,
+          "username": "john_doe"  // Only present for admin/owner users
+        },
+        ...
+      ],
+      "total": 123,
+      "limit": 50,
+      "offset": 0
+    }
 
     Response (401/403): error message
     """
+    # Pagination params
+    limit = min(int(request.args.get('limit', 50)), 500)
+    offset = int(request.args.get('offset', 0))
+
     with get_db() as db:
         user = g.user  # Set by @require_user decorator
         is_admin = user.role in ("admin", "owner")
@@ -66,7 +79,16 @@ def list_reports():
                 .where(Analysis.status == "succeeded")
                 .order_by(Analysis.created_at.desc())
             )
-            results = db.execute(query).all()
+            # Get total count
+            count_query = (
+                select(func.count())
+                .select_from(Analysis)
+                .where(Analysis.status == "succeeded")
+            )
+            total = db.execute(count_query).scalar()
+
+            # Apply pagination
+            results = db.execute(query.limit(limit).offset(offset)).all()
         else:
             # Regular users: only their own analyses, no need for username
             query = (
@@ -74,7 +96,16 @@ def list_reports():
                 .where(Analysis.status == "succeeded", Analysis.user_id == user.id)
                 .order_by(Analysis.created_at.desc())
             )
-            results = [(analysis, None) for analysis in db.execute(query).scalars().all()]
+            # Get total count
+            count_query = (
+                select(func.count())
+                .select_from(Analysis)
+                .where(Analysis.status == "succeeded", Analysis.user_id == user.id)
+            )
+            total = db.execute(count_query).scalar()
+
+            # Apply pagination
+            results = [(analysis, None) for analysis in db.execute(query.limit(limit).offset(offset)).scalars().all()]
 
         # Build response
         reports = []
@@ -98,7 +129,12 @@ def list_reports():
 
             reports.append(report)
 
-        return jsonify(reports), 200
+        return jsonify({
+            "reports": reports,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }), 200
 
 
 @reports_bp.get("/reports/<analysis_id>/pdf")
