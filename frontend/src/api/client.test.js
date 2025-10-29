@@ -79,4 +79,41 @@ describe('fetchJson', () => {
       message: 'Backend unavailable',
     });
   });
+
+  it('throws ApiError on 401 for /auth/me (prevents infinite loop)', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValue({ error: 'unauthorized' }),
+    });
+
+    await expect(fetchJson('/auth/me')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 401,
+      message: 'Unauthorized',
+    });
+  });
+
+  it('redirects to /login on 401 for non-auth endpoints', async () => {
+    const originalLocation = window.location;
+    delete window.location;
+    window.location = { href: '' };
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValue({ error: 'unauthorized' }),
+    });
+
+    // Start the promise but don't await (it never resolves)
+    const promise = fetchJson('/protected');
+
+    // Give it a tick to process
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(window.location.href).toBe('/login');
+
+    // Cleanup
+    window.location = originalLocation;
+  });
 });

@@ -40,22 +40,24 @@ export async function fetchJson(path, options = {}) {
 
     // Handle non-2xx responses
     if (!response.ok) {
-      // Handle session expired - redirect immediately (unless already on login page)
+      // Handle session expired
       if (response.status === 401) {
-        // Only redirect if not already on login page (prevents infinite loop)
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-          // Never-resolving promise prevents components from catching error and updating state
-          // No memory leak: page navigates away immediately, entire context is destroyed
-          return new Promise(() => {});
+        // Don't redirect if checking auth status (prevents infinite loop on login page)
+        // AuthProvider calls /auth/me on mount - let it handle 401 gracefully
+        if (path === '/auth/me') {
+          const error = new Error('Unauthorized');
+          error.name = 'ApiError';
+          error.status = 401;
+          error.message = 'Unauthorized';
+          error.body = data;
+          throw error;
         }
-        // If already on login page, throw error so AuthProvider can handle it gracefully
-        const error = new Error('Unauthorized');
-        error.name = 'ApiError';
-        error.status = 401;
-        error.message = 'Unauthorized';
-        error.body = data;
-        throw error;
+
+        // For all other 401s, redirect to login
+        window.location.href = '/login';
+        // Never-resolving promise prevents components from catching error and updating state
+        // No memory leak: page navigates away immediately, entire context is destroyed
+        return new Promise(() => {});
       }
 
       const error = new Error(data?.error || `HTTP ${response.status}`);

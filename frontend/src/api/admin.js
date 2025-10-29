@@ -2,12 +2,12 @@
  * Admin API client for dashboard operations.
  *
  * All endpoints require admin or owner role.
- * Uses global apiFetch for auth handling and credentials.
+ * Uses fetchJson for auth handling and credentials.
  */
 
-import { apiFetch } from './fetch.js';
+import { fetchJson } from './client.js';
 
-const BASE_URL = '/api/admin';
+const BASE_URL = '/admin';
 
 // ============================================================================
 // User Approval Management
@@ -19,7 +19,7 @@ const BASE_URL = '/api/admin';
  * @returns {Promise<{users: Array}>}
  */
 export async function getPendingUsers(limit = 100) {
-  return apiFetch(`${BASE_URL}/pending-users?limit=${limit}`);
+  return fetchJson(`${BASE_URL}/pending-users?limit=${limit}`);
 }
 
 /**
@@ -28,7 +28,7 @@ export async function getPendingUsers(limit = 100) {
  * @returns {Promise<{message: string, user_id: number}>}
  */
 export async function approveUser(userId) {
-  return apiFetch(`${BASE_URL}/users/${userId}/approve`, {
+  return fetchJson(`${BASE_URL}/users/${userId}/approve`, {
     method: 'POST'
   });
 }
@@ -39,7 +39,7 @@ export async function approveUser(userId) {
  * @returns {Promise<{message: string, username: string}>}
  */
 export async function rejectUser(userId) {
-  return apiFetch(`${BASE_URL}/users/${userId}/reject`, {
+  return fetchJson(`${BASE_URL}/users/${userId}/reject`, {
     method: 'POST'
   });
 }
@@ -60,7 +60,7 @@ export async function getAuditLogs({ limit = 50, offset = 0, userId = null } = {
   const params = new URLSearchParams({ limit, offset });
   if (userId) params.set('user_id', userId);
 
-  return apiFetch(`${BASE_URL}/audit-logs?${params}`);
+  return fetchJson(`${BASE_URL}/audit-logs?${params}`);
 }
 
 // ============================================================================
@@ -81,7 +81,7 @@ export async function getAllAnalyses({ limit = 50, offset = 0, userId = null, st
   if (userId) params.set('user_id', userId);
   if (status) params.set('status', status);
 
-  return apiFetch(`${BASE_URL}/analyses?${params}`);
+  return fetchJson(`${BASE_URL}/analyses?${params}`);
 }
 
 /**
@@ -91,9 +91,9 @@ export async function getAllAnalyses({ limit = 50, offset = 0, userId = null, st
  * @returns {Promise<{message: string, analysis_id: string, new_user_id: number}>}
  */
 export async function reassignAnalysis(analysisId, newUserId) {
-  return apiFetch(`${BASE_URL}/analyses/${analysisId}/reassign`, {
+  return fetchJson(`${BASE_URL}/analyses/${analysisId}/reassign`, {
     method: 'POST',
-    body: JSON.stringify({ new_user_id: newUserId })
+    json: { new_user_id: newUserId }
   });
 }
 
@@ -108,7 +108,7 @@ export async function searchUsers(query, limit = 20) {
     q: query ? query.trim() : "",
     limit
   });
-  return apiFetch(`${BASE_URL}/users/search?${params}`);
+  return fetchJson(`${BASE_URL}/users/search?${params}`);
 }
 
 // ============================================================================
@@ -122,7 +122,7 @@ export async function searchUsers(query, limit = 20) {
  * @returns {Promise<{message: string, user_id: number}>}
  */
 export async function promoteUser(userId) {
-  return apiFetch(`${BASE_URL}/users/${userId}/promote`, {
+  return fetchJson(`${BASE_URL}/users/${userId}/promote`, {
     method: 'POST'
   });
 }
@@ -134,7 +134,7 @@ export async function promoteUser(userId) {
  * @returns {Promise<{message: string, user_id: number}>}
  */
 export async function demoteUser(userId) {
-  return apiFetch(`${BASE_URL}/users/${userId}/demote`, {
+  return fetchJson(`${BASE_URL}/users/${userId}/demote`, {
     method: 'POST'
   });
 }
@@ -146,7 +146,7 @@ export async function demoteUser(userId) {
  * @returns {Promise<{message: string, user_id: number}>}
  */
 export async function deactivateUser(userId) {
-  return apiFetch(`${BASE_URL}/users/${userId}/deactivate`, {
+  return fetchJson(`${BASE_URL}/users/${userId}/deactivate`, {
     method: 'POST'
   });
 }
@@ -159,8 +159,8 @@ export async function deactivateUser(userId) {
  * @returns {Promise<{message: string, user_id: number}>}
  */
 export async function changeUserPassword(userId, newPassword) {
-  return apiFetch(`${BASE_URL}/users/${userId}/change-password`, {
+  return fetchJson(`${BASE_URL}/users/${userId}/change-password`, {
     method: 'POST',
-    body: JSON.stringify({ new_password: newPassword })
+    json: { new_password: newPassword }
   });
 }
