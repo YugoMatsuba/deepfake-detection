@@ -163,22 +163,16 @@ def run_single_frame_ml_analysis(
         # Check for errors
         if results.get("error"):
             error = results["error"]
-            # Classify the error for user-friendly message
-            try:
-                exc = Exception(error.get("message", "Unknown error"))
-                ml_error = classify_error(exc, error.get("stage", "unknown"))
-                raise Exception(f"{ml_error.message} (Code: {ml_error.error_code})")
-            except Exception:
-                # Fallback to original format
-                raise Exception(f"ML single frame analysis failed: {error.get('message', 'Unknown error')}")
+            # Raise with original error message - don't wrap it
+            raise Exception(error.get("message", "Unknown error"))
 
     except MLAnalysisError:
         # Re-raise MLAnalysisError as-is
         raise
     except Exception as e:
-        # Classify unexpected errors
-        ml_error = classify_error(e, "single_frame")
-        raise Exception(f"{ml_error.message} (Code: {ml_error.error_code})") from e
+        # For ad-hoc single frame, let the original error message through
+        # Don't classify as INTERNAL_ERROR - preserve specific error like "No face detected"
+        raise
 
     # Transform output format for API
     # ML runner returns: {"frame_number": 42, "time": 1.4, "models": {"xception": {"score": 0.856}, ...}, ...}
