@@ -7,6 +7,7 @@ import {
   IntegrityStatus,
   FrameHashesSummary
 } from "./MetadataResults";
+import Toast from "../components/Toast";
 
 const FrameViewer = ({
   videoSrc,
@@ -40,7 +41,9 @@ const FrameViewer = ({
   const [mlData, setMLData] = useState(deepfakeMeta || {});
   const [mlFrames, setMLFrames] = useState(deepfakeFrames || []);
   const [markerType, setMarkerType] = useState("ml");
-  const [isTooltipHovered, setIsTooltipHovered] = useState(false); 
+  const [isTooltipHovered, setIsTooltipHovered] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+  const [toastType, setToastType] = useState('error'); 
   const [selectedMarkerType, setSelectedMarkerType] = useState(null);
   const [showAllMarkers, setShowAllMarkers] = useState(false);
 
@@ -673,7 +676,8 @@ useEffect(() => {
       );
     } catch (error) {
       console.error("Error analyzing frame:", error);
-      alert(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
+      setToastMessage(`Error during ${analysisType.toUpperCase()} analysis: ${error.message}`);
+      setToastType('error');
     } finally {
       setIsAnalysing(false);
       setCurrentAnalysisType(null);
@@ -1522,6 +1526,13 @@ const handleRunFullAnalysis = async (method) => {
             )}
           </div>
         </div>
+      )}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setToastMessage(null)}
+        />
       )}
     </>
   );
