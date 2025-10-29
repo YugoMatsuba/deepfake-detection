@@ -40,10 +40,12 @@ export async function fetchJson(path, options = {}) {
 
     // Handle non-2xx responses
     if (!response.ok) {
-      // Handle session expired
+      // Handle session expired - redirect immediately, hang promise to prevent component crashes
       if (response.status === 401) {
         window.location.href = '/login';
-        throw new Error('Session expired. Please login again.');
+        // Never-resolving promise prevents components from catching error and updating state
+        // No memory leak: page navigates away immediately, entire context is destroyed
+        return new Promise(() => {});
       }
 
       const error = new Error(data?.error || `HTTP ${response.status}`);
@@ -56,8 +58,8 @@ export async function fetchJson(path, options = {}) {
 
     return data;
   } catch (err) {
-    // Re-throw API errors (including 401)
-    if (err.name === 'ApiError' || err.message?.includes('Session expired')) {
+    // Re-throw API errors
+    if (err.name === 'ApiError') {
       throw err;
     }
 
