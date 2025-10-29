@@ -84,6 +84,7 @@ def list_reports():
             report = {
                 "analysis_id": analysis.id,
                 "original_filename": analysis.original_filename or "unknown.mp4",
+                "media_type": analysis.media_type,
                 "status": analysis.status,
                 "created_at": analysis.created_at.isoformat(),
                 "completed_at": analysis.updated_at.isoformat() if analysis.updated_at else None,

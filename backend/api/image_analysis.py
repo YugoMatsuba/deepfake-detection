@@ -206,15 +206,25 @@ def _run_traditional_on_image(
                     analysis_id=analysis_id
                 )
 
-                # Extract the single frame result
-                if raw_result and raw_result.get("frames"):
-                    frame_result = raw_result["frames"][0]  # Only one frame
-                    results["ela"] = {
-                        "score": frame_result.get("score", 0),
-                        "raw_score": frame_result.get("raw_score", 0),
-                        "frame_number": 0,
-                        "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/0/overlay"
-                    }
+                # Handle both single-frame and multi-frame responses
+                if raw_result:
+                    if raw_result.get("mode") == "single_frame":
+                        # Single frame returns: {"mode": "single_frame", "frame": "frame_0.jpg", "score": 2.34}
+                        results["ela"] = {
+                            "score": raw_result.get("score", 0),
+                            "raw_score": raw_result.get("score", 0),
+                            "frame_number": 0,
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/0/overlay"
+                        }
+                    elif raw_result.get("frames"):
+                        # Multi-frame returns: {"frames": [{...}]}
+                        frame_result = raw_result["frames"][0]
+                        results["ela"] = {
+                            "score": frame_result.get("score", 0),
+                            "raw_score": frame_result.get("raw_score", 0),
+                            "frame_number": 0,
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/0/overlay"
+                        }
 
             elif method_name == "noise":
                 raw_result = run_noise_analysis(
@@ -224,15 +234,24 @@ def _run_traditional_on_image(
                     analysis_id=analysis_id
                 )
 
-                if raw_result and raw_result.get("frames"):
-                    frame_result = raw_result["frames"][0]
-                    results["noise"] = {
-                        "score": frame_result.get("score", 0),
-                        "confidence": frame_result.get("confidence", 0),
-                        "raw_score": frame_result.get("raw_score", 0),
-                        "frame_number": 0,
-                        "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/0/overlay"
-                    }
+                if raw_result:
+                    if raw_result.get("mode") == "single_frame":
+                        results["noise"] = {
+                            "score": raw_result.get("confidence", 0),
+                            "confidence": raw_result.get("confidence", 0),
+                            "raw_score": raw_result.get("confidence", 0),
+                            "frame_number": 0,
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/0/overlay"
+                        }
+                    elif raw_result.get("frames"):
+                        frame_result = raw_result["frames"][0]
+                        results["noise"] = {
+                            "score": frame_result.get("score", 0),
+                            "confidence": frame_result.get("confidence", 0),
+                            "raw_score": frame_result.get("raw_score", 0),
+                            "frame_number": 0,
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/0/overlay"
+                        }
 
             elif method_name == "lbp":
                 raw_result = run_lbp_analysis(
@@ -242,14 +261,22 @@ def _run_traditional_on_image(
                     analysis_id=analysis_id
                 )
 
-                if raw_result and raw_result.get("frames"):
-                    frame_result = raw_result["frames"][0]
-                    results["lbp"] = {
-                        "score": frame_result.get("score", 0),
-                        "raw_score": frame_result.get("raw_score", 0),
-                        "frame_number": 0,
-                        "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/0/overlay"
-                    }
+                if raw_result:
+                    if raw_result.get("mode") == "single_frame":
+                        results["lbp"] = {
+                            "score": raw_result.get("score", 0),
+                            "raw_score": raw_result.get("score", 0),
+                            "frame_number": 0,
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/0/overlay"
+                        }
+                    elif raw_result.get("frames"):
+                        frame_result = raw_result["frames"][0]
+                        results["lbp"] = {
+                            "score": frame_result.get("score", 0),
+                            "raw_score": frame_result.get("raw_score", 0),
+                            "frame_number": 0,
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/0/overlay"
+                        }
 
         except Exception as e:
             logger.error(f"Traditional forensics error for {method_name}: {e}")
