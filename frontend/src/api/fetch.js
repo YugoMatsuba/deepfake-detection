@@ -21,8 +21,7 @@ export async function apiFetch(url, options = {}) {
   // 401 Unauthorized → session expired, auto logout and redirect
   if (res.status === 401) {
     window.location.href = '/login';
-    // Return a promise that never resolves - page will redirect before it matters
-    return new Promise(() => {});
+    throw new Error('Session expired. Please login again.');
   }
 
   // 403 Forbidden → access denied (insufficient permissions)
