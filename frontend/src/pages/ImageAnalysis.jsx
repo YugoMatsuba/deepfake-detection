@@ -93,10 +93,12 @@ const ImageAnalysis = () => {
 
   // Calculate overall ML score (average across models)
   const calculateOverallMLScore = () => {
-    const scores = Object.values(mlResults).map(model => {
-      const frameData = model.frames?.find(f => f.index === 0);
-      return frameData?.score;
-    }).filter(score => typeof score === 'number');
+    if (!mlResults || typeof mlResults !== 'object') return null;
+
+    // Image analysis returns flat structure: {xception: {score: 0.87}, ...}
+    const scores = Object.values(mlResults)
+      .map(model => model?.score)
+      .filter(score => typeof score === 'number');
 
     if (scores.length === 0) return null;
     const avg = scores.reduce((sum, score) => sum + score, 0) / scores.length;
@@ -204,11 +206,22 @@ const ImageAnalysis = () => {
                       if (!anomalies || anomalies.length === 0) return null;
                       return (
                         <div key={category} className="mb-2">
-                          <h4 className="font-semibold text-red-600 text-sm uppercase">{category}</h4>
+                          <h4 className="font-semibold text-red-600 text-sm uppercase">
+                            {category.replace(/_/g, ' ')}
+                          </h4>
                           <ul className="list-disc list-inside text-sm text-gray-700">
-                            {anomalies.map((anomaly, idx) => (
-                              <li key={idx}>{anomaly}</li>
-                            ))}
+                            {anomalies.map((anomaly, idx) => {
+                              // Anomalies are objects: {type, fields, note}
+                              if (typeof anomaly === 'string') {
+                                return <li key={idx}>{anomaly}</li>;
+                              }
+                              return (
+                                <li key={idx}>
+                                  {anomaly.note}
+                                  {anomaly.fields && ` (${anomaly.fields.join(', ')})`}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       );
@@ -228,13 +241,13 @@ const ImageAnalysis = () => {
                     )}
                     <div className="space-y-2">
                       {Object.entries(mlResults).map(([modelName, modelData]) => {
-                        const frameData = modelData.frames?.find(f => f.index === 0);
-                        if (!frameData || typeof frameData.score !== 'number') return null;
+                        // Image analysis returns flat structure: {score: 0.87}
+                        if (!modelData || typeof modelData.score !== 'number') return null;
                         return (
                           <div key={modelName} className="flex items-center justify-between text-sm border-b pb-2">
                             <span className="font-medium">{modelName.toUpperCase()}</span>
                             <span className="font-bold text-blue-600">
-                              {Math.round(frameData.score * 100)}%
+                              {Math.round(modelData.score * 100)}%
                             </span>
                           </div>
                         );
