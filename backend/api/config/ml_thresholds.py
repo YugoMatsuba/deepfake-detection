@@ -15,9 +15,9 @@ ML_THRESHOLDS: List[Tuple[float, str]] = [
     (0.9, "Very likely fake"),
     (0.85, "Likely fake"),
     (0.8, "Possibly fake"),
-    (0.7, "Uncertain"),
-    (0.6, "Likely real"),
-    (0.0, "Very likely real"),  # Catch-all for < 0.6
+    (0.6, "Uncertain"),
+    (0.4, "Likely real"),
+    (0.0, "Very likely real"),
 ]
 
 
@@ -52,30 +52,16 @@ def get_methodology_description() -> str:
 
     for i in range(len(ML_THRESHOLDS)):
         current_score, current_label = ML_THRESHOLDS[i]
+        current_pct = int(current_score * 100)
 
-        if i + 1 < len(ML_THRESHOLDS):
-            next_score, _ = ML_THRESHOLDS[i + 1]
-
-            min_pct = int(current_score * 100)
-            next_pct = int(next_score * 100)
-
-            if min_pct == next_pct:
-                # Skip if range would be empty
-                continue
-
-            bands.append(f"{current_label}: {next_pct + 1}-{min_pct}%")
+        if i == 0:
+            # First threshold: goes up to 100%
+            bands.append(f"{current_label}: {current_pct}-100%")
         else:
-            # Last threshold (catch-all)
-            min_pct = int(current_score * 100)
-            bands.append(f"{current_label}: < {min_pct}%")
-
-    # Special note for binary decision threshold (0.80)
-    binary_threshold = 0.8
-    binary_pct = int(binary_threshold * 100)
-    for i, (score, label) in enumerate(ML_THRESHOLDS):
-        if score == binary_threshold:
-            bands[i] += f' (binary decision flips to "fake" at {binary_pct}%)'
-            break
+            # Other thresholds: range from current to (previous - 1)
+            previous_score, _ = ML_THRESHOLDS[i - 1]
+            previous_pct = int(previous_score * 100)
+            bands.append(f"{current_label}: {current_pct}-{previous_pct - 1}%")
 
     bands_text = ", ".join(bands)
 
