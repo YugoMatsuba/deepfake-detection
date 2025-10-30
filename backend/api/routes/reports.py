@@ -22,6 +22,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 from api import get_db
 from api.auth_utils import require_user, check_analysis_ownership_or_admin
+from api.config.ml_thresholds import get_classification, get_methodology_description
 from models import Analysis, User
 
 reports_bp = Blueprint("reports", __name__)
@@ -278,8 +279,22 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     if ml_results:
         story.append(Paragraph("Machine Learning Analysis", heading_style))
 
+        # Calculate overall ensemble score
+        ensemble_result = _calculate_top5_ensemble_score(ml_results)
+
         ml_data = [["Model", "Deepfake Score", "Suspicious Frames", "Assessment"]]
 
+        # Add overall ensemble row first
+        if ensemble_result:
+            ensemble_score_pct = f"{ensemble_result['score'] * 100:.1f}%"
+            ml_data.append([
+                "OVERALL (Top-5 Ensemble)",
+                ensemble_score_pct,
+                "—",
+                ensemble_result['classification']
+            ])
+
+        # Add individual model rows
         for model_name, model_data in ml_results.items():
             score = model_data.get("score")
             frames = model_data.get("frames", [])
@@ -466,14 +481,83 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     story.append(Spacer(1, 0.5 * inch))
     footer_text = (
         "This report provides a summary of deepfake detection analysis. "
-        "Scores represent the probability that the video contains manipulated content. "
-        "Higher scores indicate greater likelihood of manipulation. "
+        f"{get_methodology_description()} "
         "All metadata is captured for reproducibility and transparency."
     )
     story.append(Paragraph(footer_text, styles['Normal']))
 
     # Build PDF
     doc.build(story)
+
+
+def _calculate_top5_ensemble_score(ml_results: Dict[str, Any]):
+    """
+    Calculate top-5 ensemble score from ML results.
+
+    For each frame:
+    1. Calculate ensemble average: (xception + spsl + ucf) / 3
+    2. Sort all ensemble scores descending
+    3. Take mean of top 5 scores
+
+    Args:
+        ml_results: ML results dict with model data
+
+    Returns:
+        Dict with {score: 0.85, classification: "Likely fake"} or None
+    """
+    if not ml_results:
+        return None
+
+    # Extract models
+    models = ['xception', 'spsl', 'ucf']
+    model_data = {name: ml_results.get(name) for name in models}
+
+    # Check if we have data
+    if not any(model_data.values()):
+        return None
+
+    # Collect frame scores by index
+    frame_scores_map = {}  # frame_index -> {xception: score, spsl: score, ucf: score}
+
+    for model_name, data in model_data.items():
+        if not data:
+            continue
+        frames = data.get("frames", [])
+        for frame in frames:
+            index = frame.get("index")
+            score = frame.get("score")
+            if index is not None and score is not None:
+                if index not in frame_scores_map:
+                    frame_scores_map[index] = {}
+                frame_scores_map[index][model_name] = score
+
+    # Calculate ensemble scores for frames with all 3 models
+    ensemble_scores = []
+    for index, scores in frame_scores_map.items():
+        if all(model in scores for model in models):
+            ensemble_score = (scores['xception'] + scores['spsl'] + scores['ucf']) / 3
+            ensemble_scores.append(ensemble_score)
+
+    if not ensemble_scores:
+        return None
+
+    # Sort descending
+    ensemble_scores.sort(reverse=True)
+
+    # Take top 5 (or all if fewer than 5)
+    top_n = min(5, len(ensemble_scores))
+    top5_scores = ensemble_scores[:top_n]
+
+    # Calculate mean
+    mean_score = sum(top5_scores) / len(top5_scores)
+
+    # Get classification
+    classification = get_classification(mean_score)
+
+    return {
+        "score": mean_score,
+        "classification": classification
+    }
 
 
 def _get_assessment(score: float) -> str:

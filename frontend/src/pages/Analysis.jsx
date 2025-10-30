@@ -7,6 +7,8 @@ import {
   IntegrityStatus,
   FrameHashesSummary
 } from "./MetadataResults";
+import { calculateTop5EnsembleScore, getScoringMethodologyInfo } from "../utils/mlScoreCalculation";
+import InfoButton from "../components/InfoButton";
 
 const baseButton = "justify-center items-center mt-[15px] text-[17px] font-semibold px-10 py-3.5 rounded-lg shadow";
 
@@ -20,6 +22,7 @@ export default function Analysis() {
   } = useAnalysis();
   const [status, setStatus] = useState('running'); // Start directly in running state
   const [fakeVideoPercentage, setFakeVideoPercentage] = useState(null);
+  const [classification, setClassification] = useState(null);
   const [ela, setEla] = useState(null);
   const [noise, setNoise] = useState(null);
   const [lbp, setLbp] = useState(null);
@@ -79,13 +82,17 @@ export default function Analysis() {
         setLbp(null);
       }
 
-      // Calculate ML score from response
-      const mlScores = Object.values(mlResults).map(r => r.score).filter(s => s != null);
-      const avgScore = mlScores.length > 0
-        ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
-        : null;
+      // Calculate ML score using top-5 ensemble method
+      const ensembleResult = calculateTop5EnsembleScore(mlResults);
 
-      setFakeVideoPercentage(avgScore);
+      if (ensembleResult) {
+        setFakeVideoPercentage(ensembleResult.scorePercent);
+        setClassification(ensembleResult.classification);
+      } else {
+        setFakeVideoPercentage(null);
+        setClassification(null);
+      }
+
       setAnalysisResult(result);
       setStatus('success');
     } catch (err) {
@@ -127,9 +134,17 @@ export default function Analysis() {
   // Success - show results
   return (
     <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[100px]">
-      <h1 className="mt-[40px] text-4xl text-[#0D47A1] text-center">
-        Initial Analysis: Synthetic Media Chance = {fakeVideoPercentage !== null ? `${fakeVideoPercentage}%` : 'N/A'}
-      </h1>
+      <div className="flex items-center justify-center gap-3 mt-[40px]">
+        <h1 className="text-4xl text-[#0D47A1] text-center">
+          Synthetic Media Chance: {fakeVideoPercentage !== null ? `${fakeVideoPercentage}%` : 'N/A'}
+        </h1>
+        <InfoButton content={getScoringMethodologyInfo()} />
+      </div>
+      {classification && (
+        <p className="mt-[15px] text-2xl text-gray-700 text-center">
+          {classification}
+        </p>
+      )}
       {ela !== null && (
         <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
           ELA Top Z-score = {ela}

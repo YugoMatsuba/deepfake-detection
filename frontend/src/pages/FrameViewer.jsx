@@ -10,6 +10,7 @@ import {
 import Toast from "../components/Toast";
 import InfoButton from "../components/InfoButton";
 import { forensicsInfo } from "../utils/ForensicsInfo";
+import { calculateTop5EnsembleScore, getScoringMethodologyInfo } from "../utils/mlScoreCalculation";
 
 const FrameViewer = ({
   videoSrc,
@@ -836,11 +837,10 @@ const handleRunFullAnalysis = async (method) => {
 
   // Calculate overall statistics
   const overallStats = useMemo(() => {
-    // ML: Calculate average score across all models (use state, not prop)
-    const mlScores = Object.values(mlData || {}).map(r => r.score).filter(s => s != null);
-    const mlAverage = mlScores.length > 0
-      ? Math.round(mlScores.reduce((a, b) => a + b, 0) / mlScores.length * 100)
-      : null;
+    // ML: Calculate top-5 ensemble score (automatically includes ad-hoc frames!)
+    const ensembleResult = calculateTop5EnsembleScore(mlData);
+    const mlAverage = ensembleResult ? ensembleResult.scorePercent : null;
+    const mlClassification = ensembleResult ? ensembleResult.classification : null;
 
     // ML frame counts (min across all models)
     const mlFrameCounts = Object.values(mlData || {})
@@ -860,6 +860,7 @@ const handleRunFullAnalysis = async (method) => {
 
     return {
       syntheticMediaChance: mlAverage,
+      mlClassification: mlClassification,
       mlFrameCount,
       showMLButton: mlFrameCount === 0 || mlFrameCount < 10,
 
@@ -1420,9 +1421,12 @@ const handleRunFullAnalysis = async (method) => {
             {overallStats.syntheticMediaChance !== null ? (
               <div className="mb-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-blue-700">
-                    Synthetic Media Chance = {overallStats.syntheticMediaChance}%
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-blue-700">
+                      Synthetic Media Chance: {overallStats.syntheticMediaChance}%
+                    </h3>
+                    <InfoButton content={getScoringMethodologyInfo()} />
+                  </div>
                   {overallStats.showMLButton && (
                     <button
                       onClick={() => handleRunFullAnalysis('ml')}
@@ -1433,6 +1437,9 @@ const handleRunFullAnalysis = async (method) => {
                     </button>
                   )}
                 </div>
+                {overallStats.mlClassification && (
+                  <p className="text-md text-gray-700 mt-1">{overallStats.mlClassification}</p>
+                )}
                 {overallStats.mlFrameCount > 0 && overallStats.mlFrameCount < 10 && (
                   <p className="text-sm text-gray-500 mt-1">({overallStats.mlFrameCount} frames analyzed)</p>
                 )}
@@ -1441,9 +1448,12 @@ const handleRunFullAnalysis = async (method) => {
               overallStats.showMLButton && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-700">
-                      Synthetic Media Chance = N/A
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-gray-700">
+                        Synthetic Media Chance: N/A
+                      </h3>
+                      <InfoButton content={getScoringMethodologyInfo()} />
+                    </div>
                     <button
                       onClick={() => handleRunFullAnalysis('ml')}
                       disabled={isAnalysing}
