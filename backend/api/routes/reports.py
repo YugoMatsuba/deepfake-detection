@@ -490,7 +490,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     doc.build(story)
 
 
-def _calculate_top5_ensemble_score(ml_results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _calculate_top5_ensemble_score(ml_results: Dict[str, Any]):
     """
     Calculate top-5 ensemble score from ML results.
 
