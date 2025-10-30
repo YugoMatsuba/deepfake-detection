@@ -4,6 +4,8 @@
  * Calculates ensemble scores from ML model results using top-5 averaging.
  */
 
+import { getClassification, getMethodologyInfo } from "../config/mlThresholds";
+
 /**
  * Calculate top-5 ensemble score from ML model data.
  *
@@ -78,40 +80,15 @@ export function calculateTop5EnsembleScore(mlData) {
   };
 }
 
-/**
- * Get classification band for a given score.
- *
- * @param {number} score - Score between 0.0 and 1.0
- * @returns {string} - Classification text
- */
-export function getClassification(score) {
-  if (score >= 0.90) {
-    return "Very likely fake";
-  } else if (score >= 0.85) {
-    return "Likely fake";
-  } else if (score >= 0.80) {
-    return "Possibly fake";
-  } else if (score >= 0.60) {
-    return "Likely real";
-  } else {
-    return "Very likely real";
-  }
-}
+// Re-export classification functions from config for backward compatibility
+export { getClassification };
 
 /**
  * Get info text explaining the scoring methodology.
+ * Re-exported from config with legacy name for backward compatibility.
  *
  * @returns {string} - Multi-line explanation text
  */
 export function getScoringMethodologyInfo() {
-  return `This score represents the average of the 5 highest-scoring frames from the analysis.
-
-Each frame's score is calculated as the ensemble average across all 3 ML models (Xception, SPSL, UCF).
-
-Classification Bands:
-• Very likely fake: ≥ 90%
-• Likely fake: 85-90%
-• Possibly fake: 80-85% (binary decision flips to "fake" at 80%)
-• Likely real: 60-80%
-• Very likely real: < 60%`;
+  return getMethodologyInfo();
 }

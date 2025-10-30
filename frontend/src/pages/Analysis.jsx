@@ -138,7 +138,7 @@ export default function Analysis() {
         <h1 className="text-4xl text-[#0D47A1] text-center">
           Synthetic Media Chance: {fakeVideoPercentage !== null ? `${fakeVideoPercentage}%` : 'N/A'}
         </h1>
-        <InfoButton info={getScoringMethodologyInfo()} />
+        <InfoButton content={getScoringMethodologyInfo()} />
       </div>
       {classification && (
         <p className="mt-[15px] text-2xl text-gray-700 text-center">

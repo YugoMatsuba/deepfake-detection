@@ -22,6 +22,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 from api import get_db
 from api.auth_utils import require_user, check_analysis_ownership_or_admin
+from api.config.ml_thresholds import get_classification, get_methodology_description
 from models import Analysis, User
 
 reports_bp = Blueprint("reports", __name__)
@@ -480,9 +481,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     story.append(Spacer(1, 0.5 * inch))
     footer_text = (
         "This report provides a summary of deepfake detection analysis. "
-        "The overall score represents the average of the top 5 highest-scoring frames, "
-        "where each frame's score is the ensemble average across all ML models (Xception, SPSL, UCF). "
-        "Higher scores indicate greater likelihood of manipulation. "
+        f"{get_methodology_description()} "
         "All metadata is captured for reproducibility and transparency."
     )
     story.append(Paragraph(footer_text, styles['Normal']))
@@ -553,34 +552,12 @@ def _calculate_top5_ensemble_score(ml_results: Dict[str, Any]) -> Optional[Dict[
     mean_score = sum(top5_scores) / len(top5_scores)
 
     # Get classification
-    classification = _get_classification(mean_score)
+    classification = get_classification(mean_score)
 
     return {
         "score": mean_score,
         "classification": classification
     }
-
-
-def _get_classification(score: float) -> str:
-    """
-    Get classification band for a given score (based on evaluation findings).
-
-    Args:
-        score: Float between 0.0 and 1.0
-
-    Returns:
-        Classification string
-    """
-    if score >= 0.90:
-        return "Very likely fake"
-    elif score >= 0.85:
-        return "Likely fake"
-    elif score >= 0.80:
-        return "Possibly fake"
-    elif score >= 0.60:
-        return "Likely real"
-    else:
-        return "Very likely real"
 
 
 def _get_assessment(score: float) -> str:

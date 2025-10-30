@@ -1425,7 +1425,7 @@ const handleRunFullAnalysis = async (method) => {
                     <h3 className="text-lg font-semibold text-blue-700">
                       Synthetic Media Chance: {overallStats.syntheticMediaChance}%
                     </h3>
-                    <InfoButton info={getScoringMethodologyInfo()} />
+                    <InfoButton content={getScoringMethodologyInfo()} />
                   </div>
                   {overallStats.showMLButton && (
                     <button
@@ -1452,7 +1452,7 @@ const handleRunFullAnalysis = async (method) => {
                       <h3 className="text-lg font-semibold text-gray-700">
                         Synthetic Media Chance: N/A
                       </h3>
-                      <InfoButton info={getScoringMethodologyInfo()} />
+                      <InfoButton content={getScoringMethodologyInfo()} />
                     </div>
                     <button
                       onClick={() => handleRunFullAnalysis('ml')}
