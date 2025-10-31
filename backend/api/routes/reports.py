@@ -282,6 +282,19 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         # Calculate overall ensemble score
         ensemble_result = _calculate_top5_ensemble_score(ml_results)
 
+        # Add summary paragraph with overall score
+        if ensemble_result:
+            score_pct = f"{ensemble_result['score'] * 100:.1f}%"
+            classification = ensemble_result['classification']
+
+            summary_text = (
+                f"<b>Overall Synthetic Media Score: {score_pct}</b><br/>"
+                f"Classification: {classification}<br/>"
+                f"<i>(Averaged from top 5 highest-scoring frames across all models)</i>"
+            )
+            story.append(Paragraph(summary_text, styles['Normal']))
+            story.append(Spacer(1, 0.2 * inch))
+
         ml_data = [["Model", "Deepfake Score", "Suspicious Frames", "Assessment"]]
 
         # Add overall ensemble row first
@@ -481,7 +494,8 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     story.append(Spacer(1, 0.5 * inch))
     footer_text = (
         "This report provides a summary of deepfake detection analysis. "
-        f"{get_methodology_description()} "
+        "Scores represent the probability that the media contains manipulated content. "
+        "Higher scores indicate greater likelihood of manipulation. "
         "All metadata is captured for reproducibility and transparency."
     )
     story.append(Paragraph(footer_text, styles['Normal']))
