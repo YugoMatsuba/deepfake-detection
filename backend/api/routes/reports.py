@@ -282,13 +282,26 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         # Calculate overall ensemble score
         ensemble_result = _calculate_top5_ensemble_score(ml_results)
 
+        # Add summary paragraph with overall score
+        if ensemble_result:
+            score_pct = f"{ensemble_result['score'] * 100:.1f}%"
+            classification = ensemble_result['classification']
+
+            summary_text = (
+                f"<b>Overall Synthetic Media Score: {score_pct}</b><br/>"
+                f"Classification: {classification}<br/>"
+                f"<i>(Overall averaged from top 5 highest-scoring frames across all models)</i>"
+            )
+            story.append(Paragraph(summary_text, styles['Normal']))
+            story.append(Spacer(1, 0.2 * inch))
+
         ml_data = [["Model", "Deepfake Score", "Suspicious Frames", "Assessment"]]
 
         # Add overall ensemble row first
         if ensemble_result:
             ensemble_score_pct = f"{ensemble_result['score'] * 100:.1f}%"
             ml_data.append([
-                "OVERALL (Top-5 Ensemble)",
+                "OVERALL",
                 ensemble_score_pct,
                 "—",
                 ensemble_result['classification']
@@ -304,7 +317,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
 
             if score is not None:
                 score_pct = f"{score * 100:.1f}%"
-                assessment = _get_assessment(score)
+                assessment = get_classification(score)
             else:
                 score_pct = "N/A"
                 assessment = "Unknown"
@@ -336,17 +349,15 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     if traditional_results:
         story.append(Paragraph("Traditional Forensics Analysis", heading_style))
 
-        trad_data = [["Method", "Z-score", "Assessment"]]
+        trad_data = [["Method", "Max Z-score"]]
 
         for method_name, method_data in traditional_results.items():
             score = method_data.get("score")
 
             if score is not None:
                 score_display = f"{score:.2f}"
-                assessment = _get_zscore_assessment(score)
             else:
                 score_display = "N/A"
-                assessment = "Unknown"
 
             method_display = method_name.upper()
             if method_name == "ela":
@@ -356,9 +367,9 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
             elif method_name == "lbp":
                 method_display = "LBP (Local Binary Pattern)"
 
-            trad_data.append([method_display, score_display, assessment])
+            trad_data.append([method_display, score_display])
 
-        trad_table = Table(trad_data, colWidths=[2.5 * inch, 1.5 * inch, 2.5 * inch])
+        trad_table = Table(trad_data, colWidths=[4 * inch, 2.5 * inch])
         trad_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -479,11 +490,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
 
     # Footer note
     story.append(Spacer(1, 0.5 * inch))
-    footer_text = (
-        "This report provides a summary of deepfake detection analysis. "
-        f"{get_methodology_description()} "
-        "All metadata is captured for reproducibility and transparency."
-    )
+    footer_text = f"<i>Report generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p UTC')}</i>"
     story.append(Paragraph(footer_text, styles['Normal']))
 
     # Build PDF
@@ -580,21 +587,3 @@ def _get_assessment(score: float) -> str:
         return "Critical"
 
 
-def _get_zscore_assessment(zscore: float) -> str:
-    """
-    Convert z-score to human-readable assessment.
-
-    Args:
-        zscore: Z-score value (typically -3 to +3, but can be outside this range)
-
-    Returns:
-        Assessment string: "Low Risk", "Medium Risk", "High Risk", "Critical"
-    """
-    if zscore < 1.0:
-        return "Low Risk"
-    elif zscore < 2.0:
-        return "Medium Risk"
-    elif zscore < 3.0:
-        return "High Risk"
-    else:
-        return "Critical"
