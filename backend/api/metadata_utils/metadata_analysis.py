@@ -118,13 +118,14 @@ def generate_frame_hashes(video_path: str) -> Optional[list]:
         None if generation fails
     """
     # DEBUG: Log what we're trying to hash
-    logger.info(f"[DEBUG-HASH] Attempting to generate frame hashes for: {video_path}")
-    logger.info(f"[DEBUG-HASH] File exists: {os.path.exists(video_path)}")
+    print(f"[DEBUG-HASH] ===== ENTERED generate_frame_hashes() =====")
+    print(f"[DEBUG-HASH] Attempting to generate frame hashes for: {video_path}")
+    print(f"[DEBUG-HASH] File exists: {os.path.exists(video_path)}")
     if os.path.exists(video_path):
-        logger.info(f"[DEBUG-HASH] File size: {os.path.getsize(video_path)} bytes")
+        print(f"[DEBUG-HASH] File size: {os.path.getsize(video_path)} bytes")
 
     cmd = ["ffmpeg", "-i", video_path, "-f", "framemd5", "-"]
-    logger.info(f"[DEBUG-HASH] Running command: {' '.join(cmd)}")
+    print(f"[DEBUG-HASH] Running command: {' '.join(cmd)}")
 
     result = subprocess.run(
         cmd,
@@ -134,16 +135,16 @@ def generate_frame_hashes(video_path: str) -> Optional[list]:
         timeout=120
     )
 
-    logger.info(f"[DEBUG-HASH] FFmpeg return code: {result.returncode}")
-    logger.info(f"[DEBUG-HASH] stdout length: {len(result.stdout)} chars")
-    logger.info(f"[DEBUG-HASH] stderr length: {len(result.stderr)} chars")
+    print(f"[DEBUG-HASH] FFmpeg return code: {result.returncode}")
+    print(f"[DEBUG-HASH] stdout length: {len(result.stdout)} chars")
+    print(f"[DEBUG-HASH] stderr length: {len(result.stderr)} chars")
 
     if result.returncode != 0:
-        logger.error(f"[DEBUG-HASH] Error generating frame hashes: {result.stderr}")
+        print(f"[DEBUG-HASH] Error generating frame hashes: {result.stderr[:500]}")
         return None
 
     hashes = result.stdout.strip().splitlines()
-    logger.info(f"[DEBUG-HASH] Parsed {len(hashes)} hash lines from output")
+    print(f"[DEBUG-HASH] Parsed {len(hashes)} hash lines from output")
     return hashes
 
 
@@ -159,9 +160,10 @@ def parse_frame_hashes(raw_hashes: list) -> list:
     Returns:
         list of hex hash strings (32+ chars for MD5)
     """
-    logger.info(f"[DEBUG-HASH] parse_frame_hashes received {len(raw_hashes)} raw lines")
+    print(f"[DEBUG-HASH] ===== ENTERED parse_frame_hashes() =====")
+    print(f"[DEBUG-HASH] parse_frame_hashes received {len(raw_hashes)} raw lines")
     if raw_hashes and len(raw_hashes) > 0:
-        logger.info(f"[DEBUG-HASH] First 3 lines: {raw_hashes[:3]}")
+        print(f"[DEBUG-HASH] First 3 lines: {raw_hashes[:3]}")
 
     hashes = []
 
@@ -176,7 +178,7 @@ def parse_frame_hashes(raw_hashes: list) -> list:
             if hash_val and len(hash_val) >= 32:
                 hashes.append(hash_val)
 
-    logger.info(f"[DEBUG-HASH] parse_frame_hashes extracted {len(hashes)} hashes")
+    print(f"[DEBUG-HASH] parse_frame_hashes extracted {len(hashes)} hashes")
     return hashes
 
 
@@ -519,11 +521,10 @@ def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
 
     # 3. Generate frame hashes
     print(f"[DEBUG-HASH] Step 3: About to call generate_frame_hashes()")
-    logger.info(f"[DEBUG-HASH] run_metadata_analysis calling generate_frame_hashes with: {video_path}")
     frame_hashes_raw = generate_frame_hashes(video_path)
-    logger.info(f"[DEBUG-HASH] generate_frame_hashes returned: {type(frame_hashes_raw)}, length={len(frame_hashes_raw) if frame_hashes_raw else 0}")
+    print(f"[DEBUG-HASH] generate_frame_hashes returned: {type(frame_hashes_raw)}, length={len(frame_hashes_raw) if frame_hashes_raw else 0}")
     frame_hashes = parse_frame_hashes(frame_hashes_raw) if frame_hashes_raw else []
-    logger.info(f"[DEBUG-HASH] Final frame_hashes count: {len(frame_hashes)}")
+    print(f"[DEBUG-HASH] Final frame_hashes count: {len(frame_hashes)}")
 
     # 4. Detect anomalies and duplicates
     anomalies = detect_metadata_anomalies(metadata) if metadata else {
