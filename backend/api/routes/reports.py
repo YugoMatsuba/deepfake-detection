@@ -492,11 +492,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
 
     # Footer note
     story.append(Spacer(1, 0.5 * inch))
-    footer_text = (
-        "<i>This automated analysis is provided for informational purposes only and should not be "
-        "used as sole evidence in legal or official proceedings. For critical applications, consult "
-        "a professional forensic analyst.</i>"
-    )
+    footer_text = f"<i>Report generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p UTC')}</i>"
     story.append(Paragraph(footer_text, styles['Normal']))
 
     # Build PDF
