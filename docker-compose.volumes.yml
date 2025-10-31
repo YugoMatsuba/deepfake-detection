@@ -1,0 +1,55 @@
+# Minimal Volume Configuration for Deepfake Backend
+#
+# This file demonstrates the data volume configuration needed for persistent storage.
+# Your teammate orchestrating the full deployment should merge this into the complete
+# docker-compose.yml that includes PostgreSQL, Gunicorn, Nginx, and networking.
+#
+# BEFORE FIRST DEPLOYMENT:
+#   1. Create the host directory: sudo mkdir -p /var/lib/deepfake/data
+#   2. Set permissions: sudo chown -R 1000:1000 /var/lib/deepfake/data
+#   3. Set DATA_VOLUME_PATH in .env (or use the default shown below)
+#
+# IMPORTANT: This assumes PostgreSQL runs in a separate container.
+# The DATABASE_URL should point to that container (e.g., postgres:5432).
+
+version: '3.8'
+
+services:
+  backend:
+    image: deepfake:latest  # Or your registry path
+    container_name: deepfake_backend
+
+    # Mount persistent data volume
+    volumes:
+      # Analysis data: videos, frames, ELA/noise/LBP overlays
+      - analyses-data:/data
+
+    environment:
+      # Internal container path (do not change)
+      - DATA_DIR=/data
+
+      # PostgreSQL connection (adjust for your postgres service)
+      - DATABASE_URL=postgresql+psycopg://deepfake_user:password@postgres:5432/deepfake_db
+
+      # Other backend config
+      - ENVIRONMENT=production
+      - SECRET_KEY=${SECRET_KEY}
+      - FORENSICS_WORKERS=${FORENSICS_WORKERS:-4}
+      - DEVICE=${DEVICE:-cpu}
+
+    # TODO (for teammate orchestrating full deployment):
+    # - Add 'ports' section (e.g., 5050:5050 or behind nginx)
+    # - Add 'depends_on' for postgres service
+    # - Add 'networks' for inter-service communication
+    # - Add 'restart' policy (e.g., unless-stopped)
+    # - Configure Gunicorn command or entrypoint
+
+# Named volume with configurable host path
+volumes:
+  analyses-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      # Host path from environment variable, defaults to /var/lib/deepfake/data
+      device: ${DATA_VOLUME_PATH:-/var/lib/deepfake/data}

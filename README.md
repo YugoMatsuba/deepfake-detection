@@ -15,7 +15,7 @@ The system consists of four main components:
 
 ```
 ├── frontend/           # React + Vite + Tailwind UI
-├── backend/            # Flask API + SQLite database
+├── backend/            # Flask API + PostgreSQL database
 ├── ml/                 # ML inference pipeline (PyTorch + CUDA)
 └── tests/              # Test suites for all components
 ```
@@ -68,7 +68,7 @@ npm run dev  # Runs on port 5173
 
 ## 🔧 Backend Component
 
-**Technology Stack:** Flask + SQLAlchemy + SQLite (dev) / PostgreSQL (prod)
+**Technology Stack:** Flask + SQLAlchemy + PostgreSQL
 
 ### Core Features:
 - **RESTful API**: Clean API design with proper error handling
@@ -104,10 +104,10 @@ npm run dev  # Runs on port 5173
 - `POST /admin/users/<id>/role` - Change user role (owner only)
 
 ### Configuration:
-- **Database**: SQLite (dev) with planned PostgreSQL migration
+- **Database**: PostgreSQL (required for all environments)
 - **CORS**: Configured for frontend development at localhost:5173
 - **Security**: Environment-based secret keys and session configuration
-- **File Storage**: Local filesystem with configurable upload directory
+- **File Storage**: Volume-mounted persistent storage at `/data` (production)
 
 ### Development:
 ```bash
@@ -526,33 +526,93 @@ pytest tests/ -v
 
 ## 🏭 Production Deployment
 
-### Docker Compose (Recommended):
+### Prerequisites
+
+**⚠️ IMPORTANT: Create host directories before first deployment:**
+
+```bash
+# On your Linux VM, create persistent data directory
+sudo mkdir -p /var/lib/deepfake/data
+sudo chown -R 1000:1000 /var/lib/deepfake/data
+
+# This directory will store:
+# - Uploaded videos
+# - Extracted frames
+# - Forensic analysis overlays (ELA, Noise, LBP)
+```
+
+**Why this matters:** Without a mounted volume, all analysis data is lost when the container restarts. The host directory at `/var/lib/deepfake/data` persists data independently of the container lifecycle.
+
+### Environment Configuration
+
+Configure deployment via `.env` file:
+
+```bash
+# PostgreSQL connection (required - SQLite not supported in production)
+DATABASE_URL=postgresql+psycopg://deepfake_user:password@postgres:5432/deepfake_db
+
+# Host directory for persistent data (must exist before deployment)
+DATA_VOLUME_PATH=/var/lib/deepfake/data
+
+# Application config
+ENVIRONMENT=production
+SECRET_KEY=your-production-secret-key-here
+FORENSICS_WORKERS=6  # CPU cores - 2 (leave headroom for Gunicorn)
+```
+
+### Docker Compose Example
+
+See `docker-compose.volumes.yml` for the minimal volume configuration. Your deployment orchestrator should merge this into the full stack:
+
 ```yaml
 version: '3.8'
+
 services:
-  frontend:
-    build: ./frontend
-    ports: ["80:80"]
-
   backend:
-    build: ./backend
-    environment:
-      - DATABASE_URL=postgresql://...
-      - ENVIRONMENT=production
-
-  ml-inference:
-    build: ./ml
-    runtime: nvidia
+    image: deepfake:latest
     volumes:
-      - ./weights:/ml/weights
-      - ./dlib:/ml/dlib
+      # Persistent storage for analysis data
+      - analyses-data:/data
+    environment:
+      - DATABASE_URL=postgresql+psycopg://user:pass@postgres:5432/deepfake_db
+      - DATA_DIR=/data
+      - ENVIRONMENT=production
+    # Add: ports, depends_on (postgres), networks, restart policy
+
+  postgres:
+    image: postgres:16
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=deepfake_user
+      - POSTGRES_PASSWORD=secure_password
+      - POSTGRES_DB=deepfake_db
+
+volumes:
+  # Analysis data: videos, frames, forensic overlays
+  analyses-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_VOLUME_PATH:-/var/lib/deepfake/data}
+
+  # PostgreSQL database
+  postgres-data:
+    driver: local
 ```
+
+**Key Points:**
+- ✅ Named volumes persist data across container restarts
+- ✅ PostgreSQL required (SQLite not supported in production)
+- ✅ Host path `/var/lib/deepfake/data` must exist before `docker compose up`
+- ✅ Configure `DATA_VOLUME_PATH` in `.env` to override default location
 
 ### Infrastructure Requirements:
 - **CPU**: 4+ cores for API handling
 - **RAM**: 8GB+ (16GB+ recommended for ML)
 - **GPU**: NVIDIA GPU with CUDA 11.3+ support (ML inference)
-- **Storage**: SSD recommended for video processing
+- **Storage**: SSD recommended for video processing; plan for analysis data growth
 
 
 

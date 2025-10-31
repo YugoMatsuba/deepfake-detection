@@ -73,6 +73,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Create ML directories
 RUN mkdir -p /ml/weights /ml/dlib /ml/data
 
+# Create persistent data directory for analysis artifacts
+RUN mkdir -p /data
+
 # Default command
 CMD ["/bin/bash"]
 
@@ -132,6 +135,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Create ML directories
 RUN mkdir -p /ml/weights /ml/dlib /ml/data
 
+# Create persistent data directory for analysis artifacts
+RUN mkdir -p /data
+
 # Default command
 CMD ["/bin/bash"]
 
@@ -150,9 +156,13 @@ ENV ML_WEIGHTS_DIR=/workspaces/deepfake_AI/ml/weights \
 # Expose Flask port
 EXPOSE 5050
 
-# The VS Code devcontainer will bind-mount the repo into /workspaces/deepfake_AI
-# For standalone deployment, you would COPY the application code here:
-# COPY . /workspaces/deepfake_AI
+# Copy application code for standalone deployment
+# (devcontainer will override with bind mount)
+COPY . /workspaces/deepfake_AI
+
+# Declare volume mount points for persistent data
+# - /data: Analysis artifacts (videos, frames, forensic overlays)
+VOLUME ["/data"]
 
 # Default command (override as needed for ML runner or Flask app)
 CMD ["/bin/bash"]
