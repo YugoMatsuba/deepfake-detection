@@ -103,12 +103,24 @@ export function IntegrityStatus({ metadata }) {
 export function FrameHashesSummary({ metadata }) {
   const frameHashes = metadata?.frame_hashes || {};
   const duplicates = frameHashes.duplicates || [];
+  const frameCount = frameHashes.count;
 
   if (duplicates.length === 0) {
+    // If count is 0 or undefined, frame hash analysis likely failed
+    if (!frameCount || frameCount === 0) {
+      return (
+        <div className="bg-gray-50 border-l-4 border-gray-400 p-4 mb-4">
+          <p className="text-gray-700 font-semibold">
+            Frame hash analysis unavailable
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
         <p className="text-blue-700 font-semibold">
-          ✓ No duplicate frames detected ({frameHashes.count || 0} unique frames)
+          ✓ No duplicate frames detected ({frameCount} unique frames)
         </p>
       </div>
     );
