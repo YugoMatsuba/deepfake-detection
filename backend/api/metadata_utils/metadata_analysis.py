@@ -490,10 +490,19 @@ def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
         - integrity: FFmpeg structural validation
         - frame_hashes: Per-frame MD5 hashes + duplicate detection
     """
-    if not os.path.exists(video_path):
+    print(f"[DEBUG-HASH] ===== ENTERED run_metadata_analysis() =====")
+    print(f"[DEBUG-HASH] video_path param: {video_path}")
+    print(f"[DEBUG-HASH] video_sha256 param: {video_sha256}")
+
+    file_exists = os.path.exists(video_path)
+    print(f"[DEBUG-HASH] os.path.exists({video_path}): {file_exists}")
+
+    if not file_exists:
+        print(f"[DEBUG-HASH] FILE NOT FOUND - returning error")
         logger.error(f"File not found: {video_path}")
         return {"error": f"File not found: {video_path}"}
 
+    print(f"[DEBUG-HASH] File exists, continuing with metadata analysis")
     logger.info(f"Running metadata analysis on: {video_path}")
 
     # 1. Extract metadata
