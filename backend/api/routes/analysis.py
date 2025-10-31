@@ -239,11 +239,8 @@ def start_analysis(analysis_id: str):
                     print(f"✓ Traditional forensics completed for {analysis.id}")
 
                 # Run metadata forensics analysis (always run, fast ~1-3s)
-                print("[DEBUG-HASH] ========== ABOUT TO RUN METADATA ANALYSIS ==========")
-                logger.info("[DEBUG-HASH] ========== ABOUT TO RUN METADATA ANALYSIS ==========")
                 metadata_result = {}
                 try:
-                    print(f"[DEBUG-HASH] Calling run_metadata_analysis with path: {analysis.video_path}")
                     metadata_result = run_metadata_analysis(
                         video_path=analysis.video_path,
                         video_sha256=analysis.video_sha256
