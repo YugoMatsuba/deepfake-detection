@@ -317,7 +317,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
 
             if score is not None:
                 score_pct = f"{score * 100:.1f}%"
-                assessment = _get_assessment(score)
+                assessment = get_classification(score)
             else:
                 score_pct = "N/A"
                 assessment = "Unknown"
