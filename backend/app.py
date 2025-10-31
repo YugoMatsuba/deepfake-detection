@@ -53,8 +53,11 @@ def bootstrap_owner_from_env():
     """
     owner_username = os.getenv("OWNER_USERNAME")
     if not owner_username:
-        print("⚠ No OWNER_USERNAME set, skipping owner bootstrap")
-        return  # No owner pinning configured
+        # Only warn if user is trying to bootstrap (ALLOW_OWNER_TRANSFER=1) but forgot username
+        if os.getenv("ALLOW_OWNER_TRANSFER", "0") == "1":
+            print("⚠ ALLOW_OWNER_TRANSFER=1 but no OWNER_USERNAME set - cannot bootstrap")
+        # Otherwise silently skip (normal operation when owner already exists)
+        return
 
     with get_db() as db:
         # Count existing owners
