@@ -506,13 +506,19 @@ def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
     logger.info(f"Running metadata analysis on: {video_path}")
 
     # 1. Extract metadata
+    print(f"[DEBUG-HASH] Step 1: About to call extract_metadata()")
     metadata = extract_metadata(video_path)
+    print(f"[DEBUG-HASH] Step 1 complete: extract_metadata returned {type(metadata)}")
 
     # 2. Check structural integrity
+    print(f"[DEBUG-HASH] Step 2: About to call check_integrity_ffmpeg()")
     ffmpeg_raw = check_integrity_ffmpeg(video_path)
+    print(f"[DEBUG-HASH] Step 2a: check_integrity_ffmpeg returned, about to parse")
     integrity_result = parse_ffmpeg_log(ffmpeg_raw)
+    print(f"[DEBUG-HASH] Step 2 complete: parse_ffmpeg_log returned")
 
     # 3. Generate frame hashes
+    print(f"[DEBUG-HASH] Step 3: About to call generate_frame_hashes()")
     logger.info(f"[DEBUG-HASH] run_metadata_analysis calling generate_frame_hashes with: {video_path}")
     frame_hashes_raw = generate_frame_hashes(video_path)
     logger.info(f"[DEBUG-HASH] generate_frame_hashes returned: {type(frame_hashes_raw)}, length={len(frame_hashes_raw) if frame_hashes_raw else 0}")
@@ -529,7 +535,8 @@ def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
     duplicates = detect_duplicate_frames(frame_hashes_raw) if frame_hashes_raw else []
 
     # 5. Build report (no file I/O, just return dict)
-    return {
+    print(f"[DEBUG-HASH] Step 5: Building final report, frame_hashes count={len(frame_hashes)}")
+    result = {
         "analyzed_at": datetime.now().isoformat(),
         "file_hash": video_sha256,
         "metadata": {
@@ -543,3 +550,5 @@ def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
             "duplicates": duplicates
         }
     }
+    print(f"[DEBUG-HASH] RETURNING from run_metadata_analysis, frame count={len(frame_hashes)}")
+    return result
