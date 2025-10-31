@@ -493,10 +493,9 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
     # Footer note
     story.append(Spacer(1, 0.5 * inch))
     footer_text = (
-        "This report provides a summary of deepfake detection analysis. "
-        "Scores represent the probability that the media contains manipulated content. "
-        "Higher scores indicate greater likelihood of manipulation. "
-        "All metadata is captured for reproducibility and transparency."
+        "<i>This automated analysis is provided for informational purposes only and should not be "
+        "used as sole evidence in legal or official proceedings. For critical applications, consult "
+        "a professional forensic analyst.</i>"
     )
     story.append(Paragraph(footer_text, styles['Normal']))
 
