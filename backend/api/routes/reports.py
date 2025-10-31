@@ -290,7 +290,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
             summary_text = (
                 f"<b>Overall Synthetic Media Score: {score_pct}</b><br/>"
                 f"Classification: {classification}<br/>"
-                f"<i>(Averaged from top 5 highest-scoring frames across all models)</i>"
+                f"<i>(Overall averaged from top 5 highest-scoring frames across all models)</i>"
             )
             story.append(Paragraph(summary_text, styles['Normal']))
             story.append(Spacer(1, 0.2 * inch))
@@ -301,7 +301,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         if ensemble_result:
             ensemble_score_pct = f"{ensemble_result['score'] * 100:.1f}%"
             ml_data.append([
-                "OVERALL (Top-5 Ensemble)",
+                "OVERALL",
                 ensemble_score_pct,
                 "—",
                 ensemble_result['classification']
