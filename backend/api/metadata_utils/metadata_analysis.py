@@ -166,19 +166,31 @@ def parse_frame_hashes(raw_hashes: list) -> list:
         print(f"[DEBUG-HASH] First 3 lines: {raw_hashes[:3]}")
 
     hashes = []
+    lines_processed = 0
 
     for line in raw_hashes:
         if line.startswith('#'):
             continue
+
+        lines_processed += 1
+
+        # Show first 3 non-comment lines in detail
+        if lines_processed <= 3:
+            print(f"[DEBUG-HASH] Data line {lines_processed}: '{line}'")
+            parts = line.strip().split(',')
+            print(f"[DEBUG-HASH] Split into {len(parts)} parts: {parts}")
+
         # FFmpeg framemd5 format: stream_index, frame_number, frame_size, hash
         # Parse by splitting on commas and extract 4th field (the hash)
         parts = line.strip().split(',')
         if len(parts) >= 4:
             hash_val = parts[3].strip()
+            if lines_processed <= 3:
+                print(f"[DEBUG-HASH] Hash value at index 3: '{hash_val}', length={len(hash_val)}")
             if hash_val and len(hash_val) >= 32:
                 hashes.append(hash_val)
 
-    print(f"[DEBUG-HASH] parse_frame_hashes extracted {len(hashes)} hashes")
+    print(f"[DEBUG-HASH] parse_frame_hashes extracted {len(hashes)} hashes from {lines_processed} data lines")
     return hashes
 
 
