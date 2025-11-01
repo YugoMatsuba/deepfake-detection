@@ -13,10 +13,10 @@ services:
     env_file:
       - .env
     environment:
-      # Override defaults from .env for production deployment
-      - ENVIRONMENT=production
-      - PORT=5050
-      - DATA_DIR=/data
+      # Read from .env, default to production if not set
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - PORT=${PORT:-5050}
+      - DATA_DIR=${DATA_DIR:-/data}
       # DATABASE_URL should come from .env file (not hardcoded here)
       # POSTGRES credentials should come from .env file (not hardcoded here)
     volumes:
