@@ -50,6 +50,20 @@ Internet → [Load Balancer/Cloudflare with HTTPS] → [Server Firewall] → You
 - `5050` (backend) - Internal only, not exposed
 - `5432` (postgres) - Internal only, not exposed
 
+### ⚠️ CRITICAL: HTTPS Requirement for Production
+
+**This application REQUIRES HTTPS in production.** The `deploy/.env` sets `ENVIRONMENT=production`, which configures Flask to use secure session cookies (`Secure` flag). These cookies will **only work over HTTPS**.
+
+**Why:** Modern browsers refuse to send cookies marked `Secure` over plain HTTP. Without HTTPS, users can log in but will immediately be logged out on the next request.
+
+**Solutions:**
+1. **Recommended:** Use Cloudflare, AWS ALB, or nginx on host to provide HTTPS termination
+2. **Internal deployment:** If truly internal-only, you can set `ENVIRONMENT=development` in `deploy/.env` (not recommended for production)
+
+**Testing locally without HTTPS:**
+- Set `ENVIRONMENT=development` in `deploy/.env` for local testing
+- Remember to change back to `production` before deployment
+
 ---
 
 ## Pre-Deployment Checklist
@@ -666,6 +680,49 @@ docker compose logs backend
 # 3. Missing environment variables
 #    → Verify .env file exists and is readable
 #    → Check required vars are set (see Step 4)
+```
+
+### Login Works but Immediately Logged Out
+
+**Symptom:** User can log in (POST /api/auth/login returns 200), but subsequent requests return 401 Unauthorized. User is immediately redirected back to login page.
+
+**Root Cause:** Session cookies not working. Most commonly caused by:
+1. **Missing HTTPS in production** - `ENVIRONMENT=production` requires HTTPS (cookies marked `Secure`)
+2. **Testing locally without HTTPS** - Using `ENVIRONMENT=production` on `http://localhost`
+
+**Solutions:**
+
+```bash
+# Check what ENVIRONMENT is set to
+cat deploy/.env | grep ENVIRONMENT
+
+# If ENVIRONMENT=production and you're NOT using HTTPS:
+```
+
+**Option 1: Add HTTPS (recommended for production)**
+- Set up Cloudflare, Let's Encrypt, or reverse proxy with SSL
+- Keep `ENVIRONMENT=production`
+
+**Option 2: Use development mode for local testing**
+```bash
+# Edit deploy/.env
+ENVIRONMENT=development  # Change from production
+
+# Restart backend
+docker compose restart backend
+```
+
+**Option 3: Internal deployment without HTTPS (not recommended)**
+- If truly internal-only and HTTPS not possible
+- Set `ENVIRONMENT=development` in deploy/.env
+- Understand security implications (cookies not secure)
+
+**Verification:**
+```bash
+# Check browser developer tools
+# Network tab → Look at /api/auth/login response
+# Should see "Set-Cookie: session=..." in response headers
+# Subsequent requests should send "Cookie: session=..." in request headers
 ```
 
 ### CORS Errors in Frontend
