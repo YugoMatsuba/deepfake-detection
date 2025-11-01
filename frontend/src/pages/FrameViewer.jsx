@@ -444,7 +444,7 @@ useEffect(() => {
       // Handle ML analysis differently
       if (analysisType === "ml") {
         const response = await fetch(
-          `http://localhost:5050/api/analyses/${analysisId}/frames/${targetFrame}/ml`,
+          `/api/analyses/${analysisId}/frames/${targetFrame}/ml`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -502,7 +502,7 @@ useEffect(() => {
 
         // Fetch fresh data from DB to ensure consistency and persistence
         try {
-          const freshResponse = await fetch(`http://localhost:5050/api/analyses/${analysisId}`, {
+          const freshResponse = await fetch(`/api/analyses/${analysisId}`, {
             credentials: "include"
           });
           if (freshResponse.ok) {
@@ -596,7 +596,7 @@ useEffect(() => {
       console.log("1. Starting traditional forensics request for", analysisType, "frame", targetFrame);
 
       const response = await fetch(
-        `http://localhost:5050/api/analyses/${analysisId}/frames/${targetFrame}/forensics`,
+        `/api/analyses/${analysisId}/frames/${targetFrame}/forensics`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -622,7 +622,7 @@ useEffect(() => {
 
       // Fetch fresh data from DB to ensure consistency and persistence
       console.log("5. Fetching fresh data from DB...");
-      const freshResponse = await fetch(`http://localhost:5050/api/analyses/${analysisId}`, {
+      const freshResponse = await fetch(`/api/analyses/${analysisId}`, {
         credentials: "include"
       });
 
@@ -751,7 +751,7 @@ const handleRunFullAnalysis = async (method) => {
     console.log(`Starting full ${method} analysis...`);
 
     const response = await fetch(
-      `http://localhost:5050/api/analyses/${analysisId}/run-full/${method}`,
+      `/api/analyses/${analysisId}/run-full/${method}`,
       {
         method: "POST",
         credentials: "include"
@@ -935,11 +935,7 @@ const handleRunFullAnalysis = async (method) => {
             {(() => {
               let overlaySrc = overlayResult?.overlay;
 
-              // If overlay starts with /, it's a URL path - prepend API base
-              if (overlaySrc && overlaySrc.startsWith('/')) {
-                overlaySrc = `http://localhost:5050${overlaySrc}`;
-              }
-
+              // Overlay URL is already relative (starts with /api)
               if (!overlaySrc) {
                 return null;
               }
@@ -1319,10 +1315,7 @@ const handleRunFullAnalysis = async (method) => {
             {(() => {
               let overlaySrc = analysisResult.overlay;
 
-              if (overlaySrc && overlaySrc.startsWith('/')) {
-                overlaySrc = `http://localhost:5050${overlaySrc}`;
-              }
-
+              // Overlay URL is already relative (starts with /api)
               if (!overlaySrc) {
                 return null;
               }
