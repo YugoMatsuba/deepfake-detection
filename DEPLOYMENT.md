@@ -11,14 +11,13 @@
 This guide walks through deploying the Deepfake Detection system on a production Linux VM. Follow these steps in order - they're designed to catch issues early.
 
 **What you're deploying:**
-- PostgreSQL 16 database (persistent storage)
+- PostgreSQL 15 database (persistent storage via Docker-managed volume)
 - Flask backend with Gunicorn (deepfake detection API)
-- React frontend (if applicable - separate guide)
-- Nginx reverse proxy (optional)
+- Nginx reverse proxy (serves React frontend + proxies API requests)
 
 **What persists across restarts:**
-- PostgreSQL database (`/var/lib/docker/volumes/postgres-data`)
-- Analysis data: uploaded videos, frames, forensic overlays (`/var/lib/deepfake/data`)
+- PostgreSQL database (Docker-managed volume - survives container restarts/recreates)
+- Analysis data: uploaded videos, frames, forensic overlays (`/var/lib/deepfake/data` bind mount)
 
 ---
 
@@ -131,6 +130,9 @@ openssl rand -base64 16
 ### 4.1 Create Production .env File
 
 ```bash
+# Navigate to deploy directory
+cd deploy
+
 # Copy example template
 cp .env.example .env
 
@@ -138,46 +140,59 @@ cp .env.example .env
 nano .env  # or vim .env
 ```
 
+**Important:** The deployment configuration lives in `deploy/.env` (NOT the root `.env`). The root `.env` is for local development only.
+
 ### 4.2 Required Configuration
 
-Edit `.env` and set these values (replace `CHANGE_ME` with your generated secrets):
+Edit `deploy/.env` and set these values (replace `CHANGE_ME` with your generated secrets):
 
 ```bash
-# === PostgreSQL Database ===
-POSTGRES_USER=deepfake_user
-POSTGRES_PASSWORD=PASTE_GENERATED_POSTGRES_PASSWORD_HERE
-POSTGRES_DB=deepfake_db
-
-# === Flask Security ===
+# === SECURITY (REQUIRED - Generate with commands from Step 3) ===
 SECRET_KEY=PASTE_GENERATED_SECRET_KEY_HERE
 
-# === Environment ===
-ENVIRONMENT=production
+# === POSTGRESQL DATABASE (REQUIRED) ===
+# Generate password with: openssl rand -base64 32
+POSTGRES_USER=deepfake
+POSTGRES_PASSWORD=PASTE_GENERATED_POSTGRES_PASSWORD_HERE
+POSTGRES_DB=deepfake_prod
 
-# === CORS (adjust for your frontend domain) ===
-# Include protocol (https://) and NO trailing slashes
-CORS_ORIGINS=https://deepfake.your-domain.com,https://www.deepfake.your-domain.com
+# Database connection string (update password to match above)
+DATABASE_URL=postgresql+psycopg://deepfake:PASTE_GENERATED_POSTGRES_PASSWORD_HERE@db:5432/deepfake_prod
 
-# === Data Storage ===
-DATA_DIR=/data  # Container path - do not change
-DATA_VOLUME_PATH=/var/lib/deepfake/data  # Host path - matches Step 1
+# === DATA STORAGE (REQUIRED) ===
+# Container path (do not change)
+DATA_DIR=/data
 
-# === Performance ===
-# Set to (total CPU cores - 2) to leave headroom for Gunicorn
+# Host path for analysis data bind mount (must match Step 1 directory)
+DATA_VOLUME_PATH=/var/lib/deepfake/data
+
+# NOTE: PostgreSQL data uses Docker-managed volume (no host path configuration needed)
+
+# === PERFORMANCE ===
+# Set to (total CPU cores - 2) to leave headroom for system
 FORENSICS_WORKERS=6
 
 # Device for ML inference
-DEVICE=cpu  # or 'cuda' if you have NVIDIA GPU
+DEVICE=cpu  # or 'cuda' if you have NVIDIA GPU with drivers
 
-# === Database Bootstrap ===
+# === ENVIRONMENT ===
+ENVIRONMENT=production
+PORT=5050
+
+# === CORS (adjust for your domain) ===
+# Include protocol (https://) and NO trailing slashes
+CORS_ORIGINS=http://localhost
+
+# === DATABASE BOOTSTRAP ===
 # MUST be 0 in production (use migrations instead)
 DB_BOOTSTRAP=0
 
-# === Owner Account Bootstrap (First Deployment Only) ===
-# Set these ONLY for initial deployment, then remove/comment out
+# === OWNER ACCOUNT BOOTSTRAP (First Deployment Only) ===
+# Set ALLOW_OWNER_TRANSFER=1 for initial deployment
+# After first login, set ALLOW_OWNER_TRANSFER=0 and restart to prevent account takeover
 OWNER_USERNAME=admin
 OWNER_SEED_PASSWORD=PASTE_GENERATED_OWNER_PASSWORD_HERE
-ALLOW_OWNER_TRANSFER=0
+ALLOW_OWNER_TRANSFER=1
 ```
 
 ### 4.3 Secure the .env File
@@ -198,43 +213,49 @@ ls -l .env
 
 ---
 
-## Step 5: Build Docker Image
+## Step 5: Build Docker Images
 
 ```bash
-# Build the production image
-docker build -t deepfake:latest .
+# Navigate to deploy directory (if not already there)
+cd deploy
 
-# This will take 5-10 minutes (downloads PyTorch, OpenCV, etc.)
-# Final image size: ~2.5GB (includes ML models)
+# Build all images (backend + nginx)
+docker compose build
+
+# This will take 5-10 minutes (downloads PyTorch, OpenCV, builds frontend)
+# Backend image size: ~2.5GB (includes ML models)
+# Nginx image size: ~50MB (frontend + nginx)
 ```
 
 ### 5.1 Verify Model Files Are Included
 
 ```bash
 # Check ML weights (should show ~84MB each for xception/spsl, ~179MB for ucf)
-docker run --rm deepfake:latest ls -lh /workspaces/deepfake_AI/ml/weights/
+docker compose run --rm backend ls -lh /workspaces/deepfake_AI/ml/weights/
 
 # Check dlib model (should show ~19MB)
-docker run --rm deepfake:latest ls -lh /workspaces/deepfake_AI/ml/dlib/
+docker compose run --rm backend ls -lh /workspaces/deepfake_AI/ml/dlib/
 
 # If files are missing or show small sizes (<1MB):
 # - Check .dockerignore doesn't exclude them
-# - Verify Git LFS pulled the files: git lfs pull
-# - Rebuild image
+# - Verify Git LFS pulled the files: git lfs pull (from repo root)
+# - Rebuild image: docker compose build --no-cache
 ```
 
 ---
 
 ## Step 6: Initialize Database
 
+**Important:** All commands from this point forward assume you are in the `deploy/` directory where `docker-compose.yml` is located. If you're not there: `cd deploy`
+
 ### 6.1 Start PostgreSQL Only
 
 ```bash
-# Start just the database service
-docker compose up -d postgres
+# Start just the database service (from deploy/ directory)
+docker compose up -d db
 
 # Wait for postgres to be ready (watch logs)
-docker compose logs -f postgres
+docker compose logs -f db
 
 # Look for: "database system is ready to accept connections"
 # Press Ctrl+C when you see it
@@ -254,16 +275,16 @@ docker compose run --rm backend bash -c "cd backend && alembic upgrade head"
 ```
 
 **If migrations fail:**
-- Check DATABASE_URL in `.env` is correct
-- Verify postgres service is running: `docker compose ps`
-- Check postgres logs: `docker compose logs postgres`
+- Check DATABASE_URL in `deploy/.env` is correct
+- Verify db service is running: `docker compose ps`
+- Check db logs: `docker compose logs db`
 
 ---
 
 ## Step 7: Start All Services
 
 ```bash
-# Start backend (and any other services defined in docker-compose.yml)
+# Start all services (backend, db, nginx)
 docker compose up -d
 
 # Verify all services are running
@@ -271,8 +292,9 @@ docker compose ps
 
 # Should show:
 # NAME                  STATUS
-# deepfake_postgres     Up (healthy)
-# deepfake_backend      Up
+# deepfake_db          Up (healthy)
+# deploy-backend-1     Up
+# deploy-nginx-1       Up
 ```
 
 ### 7.1 Check Logs
@@ -530,21 +552,23 @@ docker compose restart
 # 1. Pull latest code
 git pull origin main  # or extract new deployment package
 
-# 2. Rebuild image
-docker build -t deepfake:latest .
+# 2. Rebuild images (from deploy/ directory)
+cd deploy
+docker compose build
 
 # 3. Stop services
 docker compose down
 
 # 4. Run any new migrations
-docker compose up -d postgres
+docker compose up -d db
 docker compose run --rm backend bash -c "cd backend && alembic upgrade head"
 
-# 5. Start all services with new image
+# 5. Start all services with new images
 docker compose up -d
 
 # 6. Verify
 docker compose logs -f backend
+docker compose logs -f nginx
 ```
 
 ---
@@ -564,24 +588,26 @@ scp deepfake-data-backup-*.tar.gz user@backup-server:/backups/
 ### Backing Up PostgreSQL Database
 
 ```bash
-# Backup database to file
-docker compose exec postgres pg_dump -U deepfake_user deepfake_db > deepfake-db-backup-$(date +%Y%m%d).sql
+# Backup database to file (adjust credentials to match deploy/.env)
+docker compose exec db pg_dump -U deepfake deepfake_prod > deepfake-db-backup-$(date +%Y%m%d).sql
 
 # Or as postgres user:
-docker compose exec -u postgres postgres pg_dump deepfake_db > backup.sql
+docker compose exec -u postgres db pg_dump deepfake_prod > backup.sql
 
 # Copy to safe location
 scp deepfake-db-backup-*.sql user@backup-server:/backups/
 ```
 
+**Note:** PostgreSQL data is stored in a Docker-managed volume. Regular `pg_dump` backups are recommended over filesystem-level volume backups.
+
 ### Restoring from Backup
 
 ```bash
-# Restore analysis data
+# Restore analysis data (from host directory backup)
 sudo tar -xzf deepfake-data-backup-YYYYMMDD.tar.gz -C /
 
-# Restore database
-cat deepfake-db-backup-YYYYMMDD.sql | docker compose exec -T postgres psql -U deepfake_user deepfake_db
+# Restore database (adjust credentials to match deploy/.env)
+cat deepfake-db-backup-YYYYMMDD.sql | docker compose exec -T db psql -U deepfake deepfake_prod
 ```
 
 ---

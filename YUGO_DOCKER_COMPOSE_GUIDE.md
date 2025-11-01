@@ -2,469 +2,233 @@
 
 **Author:** Finn
 **Date:** 2025-10-31
-**Branch:** `mount-disk`
+**Branch:** `merge-nginx-volumes`
+**Status:** ✅ COMPLETE - Full orchestration ready in `deploy/`
 
 ---
 
 ## Overview
 
-This guide is for **setting up the docker-compose orchestration** that the on-site deployment team will use. You are NOT deploying to production machines - you're building the compose file and testing it locally.
+**GOOD NEWS:** The docker-compose orchestration is complete and merged! This guide now documents what was built and how to test it.
 
-The on-site devs will receive:
-1. The `docker-compose.yml` you create
-2. A separate `DEPLOYMENT.md` with step-by-step deployment instructions
-3. An `.env.example` file they'll customize for their environment
+The on-site deployment team will receive:
+1. **`deploy/docker-compose.yml`** - Full orchestration (backend + db + nginx)
+2. **`deploy/.env.example`** - Production environment template (Linux paths)
+3. **`DEPLOYMENT.md`** - Step-by-step production deployment guide
 
----
-
-## What's Already Done (Data Persistence Setup)
-
-I've set up the foundation for persistent data storage. Here's what was changed:
-
-### 1. Dockerfile - Production Ready
-- ✅ Added `COPY . /workspaces/deepfake_AI` to include application code in image
-- ✅ Created `/data` directory as volume mount point
-- ✅ Added `VOLUME ["/data"]` declaration
-- ✅ ML model files (`.pth` and `.dat`) are baked into the image (~400MB total)
-
-### 2. .env.example - Configuration Template
-- ✅ Added `DATA_VOLUME_PATH=/var/lib/deepfake/data` with setup instructions
-- ✅ Documents all required environment variables
-- ✅ Includes comments explaining host vs container paths
-
-### 3. docker-compose.volumes.yml - Minimal Volume Example
-- ✅ Shows data volume configuration using named volumes
-- ✅ Uses `/var/lib/deepfake/data` (standard Linux FHS location)
-- ✅ Configurable via `DATA_VOLUME_PATH` env var with sensible default
-- ✅ **This is your starting point - merge into full compose file**
-
-### 4. README.md - Updated
-- ✅ Production deployment section with prerequisites
-- ✅ Removed all SQLite references (PostgreSQL only)
+**Key separation:**
+- **`deploy/.env`** - Deployment configuration (for docker-compose)
+- **Root `.env`** - Development configuration (for devcontainer)
 
 ---
 
-## Your Task: Build Full Docker Compose Stack
+## What's Been Built
 
-Take `docker-compose.volumes.yml` and expand it into a complete orchestration with:
-- PostgreSQL database service
-- Backend service (Flask + Gunicorn)
-- Nginx reverse proxy (optional but recommended)
-- Networks and health checks
+### 1. Full Docker Compose Stack (`deploy/docker-compose.yml`)
 
-### Key Requirements
+**Services:**
+- ✅ **backend** - Flask app running under Gunicorn
+  - Uses production-ready Dockerfile
+  - ML models baked into image (~2.5GB)
+  - Mounts analysis data to `/data` via configurable bind mount
+  - Platform: `linux/amd64` (for Mac M1/M2 testing compatibility)
 
-**Environment Configuration:**
-- ✅ All config via `.env` file (use `--env-file .env`)
-- ✅ No hardcoded secrets in docker-compose.yml
-- ✅ Support for configurable `FORENSICS_WORKERS` (multiprocessing)
-- ✅ Support for `OWNER_USERNAME`/`OWNER_SEED_PASSWORD` (initial setup)
-- ✅ All variables documented in `.env.example`
+- ✅ **db** - PostgreSQL 15
+  - Docker-managed volume (no bind mount needed)
+  - Healthcheck with retries
+  - Credentials from `deploy/.env`
 
-**Data Persistence:**
-- ✅ Named volume for analysis data (`/data` in container)
-- ✅ Named volume for PostgreSQL data
-- ✅ Volumes survive container restarts
+- ✅ **nginx** - Reverse proxy + static frontend
+  - Multi-stage build (builds React frontend, serves via nginx)
+  - Proxies `/api/*` requests to backend
+  - Gzip compression and asset caching
+  - Platform: `linux/amd64` (for Mac M1/M2 testing compatibility)
 
-**Networking:**
-- ✅ Internal network for backend ↔ postgres communication
-- ✅ Backend uses service name `postgres:5432` for DATABASE_URL
-- ✅ Only expose necessary ports (nginx: 80/443, or backend: 5050 for testing)
+**Volumes:**
+- `analyses-data` - Bind mount for videos/frames/reports (configurable via `DATA_VOLUME_PATH`)
+- `pgdata` - Docker-managed volume for PostgreSQL (no host path needed)
 
----
+### 2. Environment Configuration
 
-## Step 1: Understand What's in docker-compose.volumes.yml
+**`deploy/.env.example` (Linux Production Template)**
+- All required variables documented
+- Uses Linux paths (`/var/lib/deepfake/data`)
+- Includes security notes and password generation commands
 
-```yaml
-services:
-  backend:
-    image: deepfake:latest
-    volumes:
-      - analyses-data:/data  # This is the key volume mount
-    environment:
-      - DATA_DIR=/data  # Container path (don't change)
-      - DATABASE_URL=postgresql+psycopg://user:pass@postgres:5432/db
-      # ... other env vars
+**Root `.env.example` (Development)**
+- SQLite database for local dev
+- No deployment-specific vars (clean separation)
 
-volumes:
-  analyses-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_VOLUME_PATH:-/var/lib/deepfake/data}  # Host path
-```
+### 3. Documentation
 
-**Key Points:**
-- `analyses-data` is a named volume that wraps a bind mount
-- Host path comes from `DATA_VOLUME_PATH` env var (defaults to `/var/lib/deepfake/data`)
-- Container always sees it at `/data` (via `DATA_DIR` env var)
+**`DEPLOYMENT.md`**
+- Step-by-step production deployment for on-site team
+- Updated to reference `deploy/.env` (not root `.env`)
+- All docker commands updated for `deploy/` directory context
 
 ---
 
-## Step 2: Add PostgreSQL Service
+## How to Test Locally (Mac)
 
-```yaml
-services:
-  postgres:
-    image: postgres:16
-    container_name: deepfake_postgres
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    networks:
-      - app-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+The orchestration is ready to test! Here's how to run it on your Mac.
 
-volumes:
-  postgres-data:
-    driver: local
-```
+### Prerequisites
+- Docker Desktop installed
+- At least 8GB RAM allocated to Docker
+- ~5GB free disk space (for images + volumes)
 
-**Important:**
-- Use env vars for credentials (never hardcode)
-- Add healthcheck so backend waits for postgres to be ready
-- Postgres volume is Docker-managed (not bind mount) - simpler for DB files
-
----
-
-## Step 3: Complete Backend Service
-
-Expand the backend service from `docker-compose.volumes.yml`:
-
-```yaml
-services:
-  backend:
-    image: deepfake:latest
-    container_name: deepfake_backend
-    depends_on:
-      postgres:
-        condition: service_healthy  # Wait for postgres healthcheck
-    volumes:
-      - analyses-data:/data
-    environment:
-      # Database
-      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - DB_BOOTSTRAP=0  # MUST be 0 in production (use Alembic migrations)
-
-      # Data storage
-      - DATA_DIR=/data
-
-      # Flask config
-      - SECRET_KEY=${SECRET_KEY}
-      - ENVIRONMENT=production
-      - CORS_ORIGINS=${CORS_ORIGINS}
-
-      # Performance
-      - FORENSICS_WORKERS=${FORENSICS_WORKERS:-6}
-      - DEVICE=${DEVICE:-cpu}
-
-      # Owner bootstrap (optional - only for initial setup)
-      - OWNER_USERNAME=${OWNER_USERNAME:-}
-      - OWNER_SEED_PASSWORD=${OWNER_SEED_PASSWORD:-}
-      - ALLOW_OWNER_TRANSFER=${ALLOW_OWNER_TRANSFER:-0}
-
-    ports:
-      - "5050:5050"  # Expose directly, or remove if behind nginx
-
-    networks:
-      - app-network
-
-    restart: unless-stopped
-
-    command: gunicorn --config backend/gunicorn.conf.py --chdir backend wsgi:app
-
-networks:
-  app-network:
-    driver: bridge
-```
-
-**Key Points:**
-- `depends_on` with `condition: service_healthy` ensures postgres is ready
-- DATABASE_URL uses service name `postgres:5432` (not `localhost`)
-- `DB_BOOTSTRAP=0` - migrations handled separately (see DEPLOYMENT.md)
-- All sensitive config comes from `.env` file
-- `restart: unless-stopped` for automatic recovery
-
----
-
-## Step 4: Add Nginx (Optional but Recommended)
-
-If you want nginx as reverse proxy:
-
-```yaml
-services:
-  nginx:
-    image: nginx:alpine
-    container_name: deepfake_nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro  # SSL certs (if using HTTPS)
-    depends_on:
-      - backend
-    networks:
-      - app-network
-    restart: unless-stopped
-```
-
-**Note:** If using nginx:
-- Remove `ports` from backend service (keep it internal)
-- Backend only accessible via nginx proxy
-- On-site devs will need to set up SSL certs
-
----
-
-## Step 5: Update .env.example
-
-Make sure `.env.example` documents ALL variables used in compose:
+### Quick Start
 
 ```bash
-# === PostgreSQL Database ===
-POSTGRES_USER=deepfake_user
-POSTGRES_PASSWORD=CHANGE_ME_STRONG_PASSWORD
-POSTGRES_DB=deepfake_db
-
-# === Database Connection (for backend) ===
-# NOTE: Uses 'postgres:5432' (service name) in docker-compose
-DATABASE_URL=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-
-# === Flask Security ===
-# IMPORTANT: Generate random key for production!
-# Run: python3 -c "import secrets; print(secrets.token_hex(32))"
-SECRET_KEY=GENERATE_RANDOM_64_CHAR_HEX
-
-# === Environment ===
-ENVIRONMENT=production
-
-# === CORS (frontend domains) ===
-# Comma-separated list of allowed origins
-CORS_ORIGINS=https://your-frontend-domain.com,https://www.your-frontend-domain.com
-
-# === Data Storage ===
-DATA_DIR=/data  # Container path (don't change)
-DATA_VOLUME_PATH=/var/lib/deepfake/data  # Host path (on-site devs may customize)
-
-# === Performance ===
-# Number of CPU cores for parallel forensics processing
-# Recommendation: total_cores - 2 (leave headroom for Gunicorn)
-FORENSICS_WORKERS=6
-
-# Device for ML inference (cpu or cuda)
-DEVICE=cpu
-
-# === Database Bootstrap ===
-# MUST be 0 in production (use Alembic migrations)
-DB_BOOTSTRAP=0
-
-# === Owner Account Bootstrap (OPTIONAL) ===
-# Only needed for initial deployment or to change owner
-# Leave empty for normal operation
-OWNER_USERNAME=
-OWNER_SEED_PASSWORD=
-ALLOW_OWNER_TRANSFER=0  # Security: prevent ownership hijacking
-```
-
----
-
-## Step 6: Testing Locally (Mac)
-
-Before handing off to deployment team, test your compose file locally.
-
-### Build the Image
-
-```bash
-# From project root
-docker build --platform linux/amd64 -t deepfake:latest .
-```
-
-**Note:** Use `--platform linux/amd64` on Apple Silicon Macs to avoid dlib/libpng ARM issues.
-
-### Create Local .env File
-
-```bash
-# Copy example and customize for local testing
-cp .env.example .env.local
-
-# Edit .env.local:
-# - Set SECRET_KEY to any value (e.g., "local-test-key")
-# - Set POSTGRES_PASSWORD to "localpass123"
-# - Set CORS_ORIGINS to "http://localhost:5173,http://127.0.0.1:5173"
-# - Leave OWNER_USERNAME empty (already have owner in DB)
-```
-
-### Create Local Data Directory
-
-```bash
-# Mac uses ~/deepfake-data for testing (not /var/lib)
+# 1. Create host directory for analysis data
 mkdir -p ~/deepfake-data
 
-# Update .env.local:
-DATA_VOLUME_PATH=~/deepfake-data  # Mac path
-```
+# 2. Navigate to deploy directory
+cd deploy
 
-### Start the Stack
+# 3. Create .env from template (already done if you're on merge-nginx-volumes branch)
+# The branch already has deploy/.env configured for Mac testing
+# If you need to recreate it:
+cp .env.example .env
+# Then edit DATA_VOLUME_PATH=~/deepfake-data (or your home directory absolute path)
 
-```bash
-docker-compose --env-file .env.local up -d
+# 4. Build images (takes 5-10 minutes first time)
+docker compose build
 
-# Watch logs
-docker-compose logs -f
-```
+# 5. Start all services
+docker compose up -d
 
-### Run Migrations (First Time Only)
+# 6. Check status
+docker compose ps
+# Should show: db (healthy), backend (Up), nginx (Up)
 
-```bash
-docker-compose --env-file .env.local run --rm backend bash -c "cd backend && alembic upgrade head"
+# 7. Test frontend
+open http://localhost
+# Should load the React app
+
+# 8. Test API
+curl http://localhost/api/health
+# Should return: {"status": "healthy"}
 ```
 
 ### Verify Everything Works
 
 ```bash
-# Check all services are running
-docker-compose ps
+# Check logs
+docker compose logs -f backend
+docker compose logs -f nginx
 
-# Test backend health
-curl http://localhost:5050/api/auth/me
-# Should return: {"authenticated": false}
+# Test database connection
+docker compose exec backend python -c "from backend.app import db; print('DB connected!')"
 
-# Check volume mount
-docker-compose exec backend ls -la /data
-# Should show empty directory (or analyses/ if you uploaded videos)
+# Test ML models loaded
+docker compose exec backend ls -lh /workspaces/deepfake_AI/ml/weights/
 
-# Upload a test video via frontend and verify:
-ls ~/deepfake-data/analyses/
-# Should see UUID directories with video files
+# Test data persistence
+docker compose exec backend touch /data/test.txt
+docker compose restart backend
+docker compose exec backend ls /data/test.txt  # Should still exist
 ```
 
-### Cleanup
+### Common Issues on Mac
+
+**Issue: `platform linux/amd64` errors**
+- Solution: Already handled in docker-compose.yml
+
+**Issue: Bind mount permission denied**
+- Solution: Use paths in your home directory (e.g., `~/deepfake-data`)
+- macOS Docker Desktop handles permissions automatically for home directory
+
+**Issue: Database volume not found**
+- Solution: PostgreSQL uses Docker-managed volume (no host path needed)
+- Just ensure deploy/.env has correct POSTGRES credentials
+
+### Clean Up (When Done Testing)
 
 ```bash
-docker-compose down
-# Or to remove volumes too:
-docker-compose down -v
+# Stop services (keeps data)
+docker compose down
+
+# Stop and remove volumes (⚠️ DELETES ALL DATA)
+docker compose down -v
+
+# Remove images too
+docker compose down --rmi all -v
 ```
 
 ---
 
-## Step 7: What NOT to Include in Docker Compose
+## Architecture Decisions Explained
 
-These belong in DEPLOYMENT.md for on-site devs:
+### Why Separate deploy/.env from Root .env?
 
-**Don't include in compose:**
-- ❌ Host directory creation commands (`sudo mkdir`, `sudo chown`)
-- ❌ Secret generation commands
-- ❌ SSL certificate setup
-- ❌ Firewall configuration
-- ❌ Production `.env` file (only provide `.env.example`)
+**Problem:** Docker Compose looks for `.env` in the same directory as `docker-compose.yml`. Running `docker compose` from `deploy/` couldn't read the root `.env`.
 
-**Do include in compose:**
-- ✅ Service definitions (postgres, backend, nginx)
-- ✅ Volume declarations
-- ✅ Network configuration
-- ✅ Health checks and dependencies
-- ✅ Restart policies
+**Solution:** Create two separate env files:
+- **Root `.env`** - For devcontainer/local development (SQLite, localhost paths)
+- **`deploy/.env`** - For Docker Compose deployment (PostgreSQL, production paths)
 
----
+**Benefits:**
+- Clean separation of concerns
+- No confusion about which config is active
+- Mac testing uses different paths than Linux production
+- Development workflow unchanged
 
-## Step 8: Handoff Checklist
+### Why Docker-Managed Volume for PostgreSQL?
 
-Before giving to deployment team, ensure:
+**Considered:** Bind mount like analysis data (configurable host path)
 
-- [ ] `docker-compose.yml` uses `--env-file` pattern (no hardcoded secrets)
-- [ ] `.env.example` documents all required variables with comments
-- [ ] Tested locally on Mac with `.env.local`
-- [ ] All services start and communicate correctly
-- [ ] Volumes persist data across restarts
-- [ ] README.md updated with any changes
-- [ ] `DEPLOYMENT.md` exists with on-site deployment instructions
+**Chose:** Docker-managed volume (no host path needed)
 
----
+**Reasoning:**
+- Industry standard for databases in Docker
+- Deployment team never needs direct filesystem access to DB files
+- Backups via `pg_dump` (SQL export), not file copying
+- Simpler setup (no `mkdir`, `chown` needed)
+- Better performance (no mount overhead)
+- Works identically on Mac/Linux/Windows
 
-## Common Issues & Solutions
+**Data safety:** Persists across container restarts/recreates. Only deleted with explicit `docker compose down -v`.
 
-### Issue: Backend can't connect to postgres
+### Why platform: linux/amd64?
 
-**Solution:**
-- Use `postgres:5432` (service name), not `localhost`
-- Add `depends_on` with `service_healthy` condition
-- Verify `app-network` is shared between services
+**Problem:** Mac M1/M2 chips use ARM64 architecture, but dlib library has compatibility issues with ARM64 builds.
 
-### Issue: "Face detection model not found"
+**Solution:** Force x86_64 architecture for backend and nginx services.
 
-**Solution:**
-- Verify `.dockerignore` doesn't exclude `ml/dlib/*.dat`
-- Check model files exist in image: `docker run --rm deepfake:latest ls /workspaces/deepfake_AI/ml/dlib/`
-
-### Issue: CORS errors in frontend
-
-**Solution:**
-- Set `CORS_ORIGINS` to match frontend domain exactly
-- Include both `http://` and `https://` if needed
-- No trailing slashes in URLs
-
-### Issue: Permission denied for /var/lib/deepfake/data
-
-**Solution:**
-- This is for on-site devs to fix (see DEPLOYMENT.md)
-- They need to run: `sudo chown -R 1000:1000 /var/lib/deepfake/data`
+**Impact:**
+- Slower build and runtime on Mac (emulation overhead)
+- Production Linux deployment unaffected (native x86_64)
+- Alternative: Remove platform flag for production, add back for Mac testing
 
 ---
 
-## Environment Variables Reference
+## Handover Checklist
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `POSTGRES_USER` | Yes | - | PostgreSQL username |
-| `POSTGRES_PASSWORD` | Yes | - | PostgreSQL password (generate strong random) |
-| `POSTGRES_DB` | Yes | - | PostgreSQL database name |
-| `SECRET_KEY` | Yes | - | Flask session signing key (64-char hex) |
-| `CORS_ORIGINS` | Yes | - | Comma-separated frontend URLs |
-| `DATA_VOLUME_PATH` | No | `/var/lib/deepfake/data` | Host directory for analysis data |
-| `FORENSICS_WORKERS` | No | `6` | CPU cores for parallel processing |
-| `DEVICE` | No | `cpu` | ML device (`cpu` or `cuda`) |
-| `OWNER_USERNAME` | No | - | Initial owner account username |
-| `OWNER_SEED_PASSWORD` | No | - | Initial owner password |
-| `ALLOW_OWNER_TRANSFER` | No | `0` | Allow changing owner (security risk) |
-| `DB_BOOTSTRAP` | No | `0` | Auto-create tables (MUST be 0 in prod) |
-| `ENVIRONMENT` | No | `production` | Environment mode |
+When handing off to deployment team, ensure they have:
+
+- [ ] `deploy/docker-compose.yml` - Full orchestration
+- [ ] `deploy/.env.example` - Linux production template
+- [ ] `DEPLOYMENT.md` - Step-by-step deployment guide
+- [ ] Access to Docker registry (if using pre-built images)
+- [ ] Git LFS setup instructions (for pulling ML model weights)
+
+**Optional but recommended:**
+- [ ] Pre-built images pushed to registry (skip build step)
+- [ ] Sample test video for verification
+- [ ] Monitoring/logging setup (not currently implemented)
 
 ---
 
-## Next Steps
+## Questions or Updates Needed?
 
-1. **Build `docker-compose.yml`** from the examples above
-2. **Test locally** on your Mac with `.env.local`
-3. **Commit** to `mount-disk` branch:
-   ```bash
-   git add docker-compose.yml .env.example
-   git commit -m "Add production docker-compose orchestration"
-   ```
-4. **Verify DEPLOYMENT.md exists** with on-site deployment instructions
-5. **Hand off to deployment team** with:
-   - `docker-compose.yml`
-   - `.env.example`
-   - `DEPLOYMENT.md`
-   - This guide for reference
+**The orchestration is complete and ready for production deployment!**
 
----
+If you need to make changes:
+1. Update `deploy/docker-compose.yml`
+2. Update `deploy/.env.example` (production template)
+3. Test locally following "How to Test Locally (Mac)" above
+4. Update `DEPLOYMENT.md` if deployment steps change
+5. Commit and push to branch
 
-## Questions?
-
-Contact Finn if anything is unclear. Focus on building a clean compose file that:
-- Uses environment variables for all config
-- Has no hardcoded secrets
-- Works seamlessly with the volume setup already in place
-- Can be deployed by following DEPLOYMENT.md step-by-step
-
-Good luck! 🚀
+Good luck with deployment! 🚀

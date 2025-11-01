@@ -2,6 +2,7 @@ version: "3.9"
 
 services:
   backend:
+    platform: linux/amd64
     build:
       context: ..
       dockerfile: Dockerfile
@@ -10,7 +11,7 @@ services:
         DEVICE: cpu
     command: ["gunicorn", "--config", "backend/gunicorn.conf.py", "--chdir", "backend", "wsgi:app"]
     env_file:
-      - ../.env
+      - .env
     environment:
       # Override defaults from .env for production deployment
       - ENVIRONMENT=production
@@ -35,7 +36,7 @@ services:
     container_name: deepfake_db
     restart: unless-stopped
     env_file:
-      - ../.env
+      - .env
     environment:
       # These should be set in .env file:
       # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
@@ -54,6 +55,7 @@ services:
       start_period: 5s
 
   nginx:
+    platform: linux/amd64
     build:
       context: ..
       dockerfile: deploy/nginx/Dockerfile
@@ -63,16 +65,20 @@ services:
       - "80:80"
     restart: unless-stopped
 
-# Named volumes with configurable bind mounts for persistent data
-# BEFORE FIRST DEPLOYMENT:
-#   1. Create host directories:
-#      sudo mkdir -p /var/lib/deepfake/data /var/lib/deepfake/postgres
-#   2. Set permissions:
-#      sudo chown -R 1000:1000 /var/lib/deepfake/data
-#      sudo chown -R 999:999 /var/lib/deepfake/postgres  # postgres uid
-#   3. Set paths in .env:
-#      DATA_VOLUME_PATH=/var/lib/deepfake/data
-#      PG_VOLUME_PATH=/var/lib/deepfake/postgres
+# Persistent data volumes
+#
+# analyses-data: Bind mount to host directory for easy access to videos/frames/reports
+#   - Configurable via DATA_VOLUME_PATH in .env
+#   - BEFORE FIRST DEPLOYMENT:
+#     1. Create host directory: sudo mkdir -p /var/lib/deepfake/data
+#     2. Set permissions: sudo chown -R 1000:1000 /var/lib/deepfake/data
+#     3. Set DATA_VOLUME_PATH=/var/lib/deepfake/data in deploy/.env
+#
+# pgdata: Docker-managed volume for PostgreSQL database files
+#   - Managed internally by Docker (no host directory needed)
+#   - Data persists across container restarts/recreates
+#   - Only deleted with explicit `docker compose down -v` (⚠️ never use -v in production!)
+#   - Backup via: docker compose exec db pg_dump -U deepfake > backup.sql
 volumes:
   analyses-data:
     driver: local
@@ -84,8 +90,3 @@ volumes:
 
   pgdata:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      # Host path from environment variable, defaults to /var/lib/deepfake/postgres
-      device: ${PG_VOLUME_PATH:-/var/lib/deepfake/postgres}
