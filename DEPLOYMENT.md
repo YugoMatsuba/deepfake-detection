@@ -19,6 +19,37 @@ This guide walks through deploying the Deepfake Detection system on a production
 - PostgreSQL database (Docker-managed volume - survives container restarts/recreates)
 - Analysis data: uploaded videos, frames, forensic overlays (`/var/lib/deepfake/data` bind mount)
 
+**Network exposure:**
+- Nginx exposes port 80 (HTTP) on the host machine
+- Backend and database are internal (not exposed to network)
+
+---
+
+## Important: Production Networking (Infrastructure Team)
+
+**This guide covers application deployment only.** The following networking/security tasks are **outside the scope** of this guide and should be handled by your infrastructure/IT team:
+
+- ✅ **HTTPS/SSL certificates** - Use Cloudflare, Let's Encrypt, or a reverse proxy
+- ✅ **Firewall configuration** - Restrict access to port 80 (or use internal network only)
+- ✅ **Domain/DNS setup** - Point your domain to the server IP
+- ✅ **Load balancing** - If you need multiple instances
+- ✅ **DDoS protection** - Cloudflare, AWS Shield, etc.
+
+**Recommended architecture for internet-facing deployment:**
+```
+Internet → [Load Balancer/Cloudflare with HTTPS] → [Server Firewall] → Your Docker Stack (port 80)
+```
+
+**For internal-only deployment:**
+- Server accessible only from company network
+- No HTTPS needed if internal traffic is trusted
+- Still recommend firewall rules to restrict access
+
+**Ports exposed by this stack:**
+- `80` (nginx) - Frontend + API proxy (exposed to host)
+- `5050` (backend) - Internal only, not exposed
+- `5432` (postgres) - Internal only, not exposed
+
 ---
 
 ## Pre-Deployment Checklist
