@@ -230,30 +230,31 @@ ls -lh ml/weights/ucf_best.pth
 
 If you see small file sizes (~100 bytes), you have LFS pointer files instead of actual weights. Run `git lfs pull`.
 
-### Quick Start (Dev Container)
+### Integration with Backend
 
-The ML module runs in a containerized environment for dependency isolation and GPU support.
+The ML module is **integrated into the backend API** and runs automatically during video analysis. You don't need to run the ML module separately - it's invoked by the backend when you upload a video and start analysis via the web interface.
 
-**1. Open in VS Code Dev Container:**
-   - Open project in VS Code
-   - Command palette: "Dev Containers: Reopen in Container"
-   - Container builds from `ml/Dockerfile` (CUDA 11.3 + PyTorch 1.12.1)
-   - **Git LFS automatically pulls weights** in dev container
+**How it works:**
+1. User uploads video via frontend
+2. Backend calls ML inference via `ml/runner.py`
+3. ML module processes video: face detection → alignment → model inference
+4. Results returned to backend and stored in database
+5. Frontend displays results with per-frame scores
 
-**2. Run Inference:**
+**Direct CLI usage (optional, for testing):**
+
+If you want to test ML inference directly (without the full backend):
+
 ```bash
+# Run inside backend container
+docker compose exec backend bash
+
+# Run ML inference on a video
 cd /workspaces/deepfake_AI/ml
-
-# Analyze a video with all three models
-python runner.py data/your_video.mp4 \
-  --models xception,spsl,ucf \
-  --json-out results.json
-
-# Or use default weights (auto-detected from ml/weights/)
-python runner.py data/your_video.mp4
+python runner.py data/sample_video.mp4 --models xception,spsl,ucf --json-out results.json
 ```
 
-### CLI Options:
+**CLI Options:**
 - `video` (positional): Path to input video
 - `--models`: Comma-separated list (default: all three)
 - `--json-out`: Output JSON path (default: stdout)
@@ -329,17 +330,17 @@ export UCF_WEIGHTS=/custom/path/ucf.pth
 }
 ```
 
-### Testing:
+### ML Module Testing:
 
-Run tests inside the dev container:
+ML tests validate model architectures without requiring weight files:
+
 ```bash
-cd /workspaces/deepfake_AI
-pytest tests/test_checkpoint_loader_pr4.py -v
-pytest tests/test_pr5.py -v
-pytest tests/ -v  # Run all ML tests
+# Run ML architecture tests
+docker compose run --rm backend bash -c "pytest tests/test_checkpoint_loader_pr4.py -v"
+docker compose run --rm backend bash -c "pytest tests/test_pr5.py -v"
 ```
 
-Tests validate architecture compatibility without requiring weight files.
+These tests ensure DeepfakeBench model architectures are correctly implemented for weight loading.
 
 ---
 
