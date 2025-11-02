@@ -2,13 +2,20 @@ version: "3.9"
 
 services:
   backend:
+    # Platform flag ensures compatibility with Apple M1/M2 Macs during development
+    # On Linux production servers, this has no effect and can be safely ignored
     platform: linux/amd64
     build:
       context: ..
       dockerfile: Dockerfile
       target: runtime
       args:
-        DEVICE: cpu
+        # CRITICAL: DEVICE build arg determines which PyTorch version is installed
+        # - cpu: Installs CPU-only PyTorch (smaller image, works everywhere)
+        # - cuda: Installs CUDA-enabled PyTorch (larger image, requires NVIDIA GPU)
+        # MUST match runtime DEVICE env var below for CUDA inference to work
+        # If changing from cpu to cuda, you MUST rebuild: docker compose build --no-cache
+        DEVICE: ${DEVICE:-cpu}
     command: ["gunicorn", "--config", "backend/gunicorn.conf.py", "--chdir", "backend", "wsgi:app"]
     env_file:
       - .env
@@ -17,6 +24,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - PORT=${PORT:-5050}
       - DATA_DIR=${DATA_DIR:-/data}
+      - DEVICE=${DEVICE:-cpu}  # Runtime device for ML inference (must match build arg)
       # DATABASE_URL should come from .env file (not hardcoded here)
       # POSTGRES credentials should come from .env file (not hardcoded here)
     volumes:
@@ -26,6 +34,14 @@ services:
       - analyses-data:/data
     expose:
       - "5050"
+    # Uncomment the section below to enable GPU/CUDA acceleration:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
     depends_on:
       db:
         condition: service_healthy
@@ -45,8 +61,11 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-deepfake_prod}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Port 5432 is NOT exposed to host (security best practice)
+    # Backend connects via internal Docker network (db:5432)
+    # For database admin tools, use: docker compose exec db psql -U deepfake deepfake_prod
+    expose:
+      - "5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deepfake} -d ${POSTGRES_DB:-deepfake_prod} || exit 1"]
       interval: 5s
@@ -55,6 +74,7 @@ services:
       start_period: 5s
 
   nginx:
+    # Platform flag for Apple M1/M2 compatibility (no effect on Linux)
     platform: linux/amd64
     build:
       context: ..

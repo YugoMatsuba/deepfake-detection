@@ -29,7 +29,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_DB_URL = "postgresql+psycopg://deepfake:secret@localhost:5431/deepfake_dev"
+# DATABASE_URL must be set via environment variable (no hardcoded default with credentials)
+# For production: Set in deploy/.env
+# For local development: Set in root .env (devcontainer)
+# Example: postgresql+psycopg://user:password@host:port/dbname
 
 
 def bootstrap_owner_from_env():
@@ -146,7 +149,15 @@ def create_app() -> Flask:
     # TODO: set a real secret in production (.env)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-insecure")
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
-    db_url = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
+
+    # DATABASE_URL is required (no fallback to avoid hardcoded credentials)
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable not set. "
+            "Set it in .env file (root for dev, deploy/ for production). "
+            "Example: DATABASE_URL=postgresql+psycopg://user:password@host:port/dbname"
+        )
 
     # Ensure instance dir exists for SQLite file (only when using SQLite)
     if db_url.startswith("sqlite"):

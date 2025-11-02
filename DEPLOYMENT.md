@@ -12,7 +12,7 @@ This guide walks through deploying the Deepfake Detection system on a production
 
 **What you're deploying:**
 - PostgreSQL 15 database (persistent storage via Docker-managed volume)
-- Flask backend with Gunicorn (deepfake detection API)
+- Flask backend with Gunicorn (deepfake detection and web app API)
 - Nginx reverse proxy (serves React frontend + proxies API requests)
 
 **What persists across restarts:**
@@ -27,7 +27,7 @@ This guide walks through deploying the Deepfake Detection system on a production
 
 ## Important: Production Networking (Infrastructure Team)
 
-**This guide covers application deployment only.** The following networking/security tasks are **outside the scope** of this guide and should be handled by your infrastructure/IT team:
+**This guide covers application deployment only.** The following networking/security tasks are **outside the scope** of this guide and should be handled by the infrastructure/IT team:
 
 - ✅ **HTTPS/SSL certificates** - Use Cloudflare, Let's Encrypt, or a reverse proxy
 - ✅ **Firewall configuration** - Restrict access to port 80 (or use internal network only)
@@ -37,18 +37,27 @@ This guide walks through deploying the Deepfake Detection system on a production
 
 **Recommended architecture for internet-facing deployment:**
 ```
-Internet → [Load Balancer/Cloudflare with HTTPS] → [Server Firewall] → Your Docker Stack (port 80)
+Internet → [Load Balancer/Cloudflare with HTTPS] → [Server Firewall] → Docker Stack (port 80)
 ```
 
 **For internal-only deployment:**
 - Server accessible only from company network
 - No HTTPS needed if internal traffic is trusted
-- Still recommend firewall rules to restrict access
 
 **Ports exposed by this stack:**
-- `80` (nginx) - Frontend + API proxy (exposed to host)
-- `5050` (backend) - Internal only, not exposed
-- `5432` (postgres) - Internal only, not exposed
+- `80` (nginx) - Frontend + API proxy (exposed to host machine, accessible from network)
+- `5050` (backend) - Internal Docker network only (backend:5050), NOT exposed to host
+- `5432` (postgres) - Internal Docker network only (db:5432), NOT exposed to host
+
+**Note:** Internal services (backend, postgres) communicate via Docker's internal network and are not accessible from outside the Docker stack. This is a security best practice.
+
+**Internal port architecture:**
+- The port `5050` is hardcoded in the nginx reverse proxy configuration (`deploy/nginx/default.conf`)
+- This is an **internal implementation detail** for service-to-service communication
+- The nginx container proxies requests from port 80 to `http://backend:5050` on the Docker network
+- This port is NOT exposed to the host machine or network (only accessible within Docker)
+- You do NOT need to change this unless you also change the backend `PORT` env var
+- If you change `PORT` in `.env`, you must also update the nginx config to match
 
 ### ⚠️ CRITICAL: HTTPS Requirement for Production
 
@@ -73,7 +82,7 @@ Before starting, ensure you have:
 - [ ] Root/sudo access to the Linux VM
 - [ ] Docker Engine 20.10+ installed (`docker --version`)
 - [ ] Docker Compose v2.0+ installed (`docker compose version`)
-- [ ] Git installed (to clone repo) or deployment package provided
+- [ ] Git installed (to clone repo), including Git-LFS for weights, if cloning from our repo.
 - [ ] Network access for pulling Docker images
 - [ ] Firewall rules configured (if applicable)
 
@@ -106,20 +115,6 @@ ls -ld /var/lib/deepfake/data
 
 ### 1.2 Install Docker (if not already installed)
 
-```bash
-# Ubuntu/Debian
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-
-# Log out and back in for group membership to take effect
-
-# Verify
-docker --version
-docker compose version
-```
-
----
 
 ## Step 2: Clone Repository or Extract Deployment Package
 
@@ -166,6 +161,7 @@ openssl rand -base64 32
 openssl rand -base64 16
 
 # Example output: vH3xK9mL2pQ5rT8w
+# Also feel free to use something more memorable.
 ```
 
 ---
@@ -182,7 +178,7 @@ cd deploy
 cp .env.example .env
 
 # Edit with your preferred editor
-nano .env  # or vim .env
+nano .env  # or vim .env, VSCode, etc.
 ```
 
 **Important:** The deployment configuration lives in `deploy/.env` (NOT the root `.env`). The root `.env` is for local development only.
@@ -214,18 +210,33 @@ DATA_VOLUME_PATH=/var/lib/deepfake/data
 # NOTE: PostgreSQL data uses Docker-managed volume (no host path configuration needed)
 
 # === PERFORMANCE ===
-# Set to (total CPU cores - 2) to leave headroom for system
+# Do not exceed (total CPU cores - 2) to leave headroom for system
 FORENSICS_WORKERS=6
 
 # Device for ML inference
-DEVICE=cpu  # or 'cuda' if you have NVIDIA GPU with drivers
+# - cpu: Safe default (CPU-only PyTorch, works everywhere)
+# - cuda: NVIDIA GPU acceleration (requires CUDA 11.3+ drivers on host)
+#
+# ⚠️  CRITICAL: If changing from cpu to cuda, you MUST rebuild the Docker image:
+#    1. Edit DEVICE=cuda in this file (deploy/.env)
+#    2. Rebuild image: docker compose build --no-cache
+#    3. Restart: docker compose up -d
+#    (Required because PyTorch installation is different for CPU vs CUDA)
+#
+# ⚠️  WARNING: CUDA is relatively untested due to our hardware constraints - expect potential issues, test thoroughly
+DEVICE=cpu
 
 # === ENVIRONMENT ===
 ENVIRONMENT=production
 PORT=5050
 
-# === CORS (adjust for your domain) ===
-# Include protocol (https://) and NO trailing slashes
+# === CORS (REQUIRED - adjust for your deployment) ===
+# IMPORTANT: Update this to match how users will access the application!
+# - If accessing via IP address: CORS_ORIGINS=http://192.168.1.100
+# - If using domain with HTTPS: CORS_ORIGINS=https://yourdomain.com
+# - Multiple origins (www and non-www): CORS_ORIGINS=https://www.example.com,https://example.com
+# - Include protocol (http:// or https://), NO trailing slashes
+# Default below ONLY works for http://localhost access:
 CORS_ORIGINS=http://localhost
 
 # === DATABASE BOOTSTRAP ===
@@ -451,6 +462,38 @@ rm /var/lib/deepfake/data/test-persist.txt
 - Verify `DATA_VOLUME_PATH` in `.env` matches Step 1 directory
 - Check `docker volume inspect` output for mount point
 
+### 8.5 Test Web Interface
+
+**Access the application in a web browser:**
+
+```bash
+# If testing on the server itself:
+# Open browser to: http://localhost
+
+# If testing from another machine on the network:
+# Open browser to: http://SERVER_IP
+# (Replace SERVER_IP with your server's IP address, e.g., http://192.168.1.100)
+```
+
+**Expected behavior:**
+1. You should see the **login page**
+2. Login with the owner credentials from `deploy/.env`:
+   - Username: `admin` (or your `OWNER_USERNAME` value)
+   - Password: (your `OWNER_SEED_PASSWORD` value)
+3. After successful login, you should see the **dashboard/reports page**
+4. Try navigating to different pages (upload, analysis, etc.)
+
+**If login immediately logs you out (401 errors):**
+- See troubleshooting section "Login Works but Immediately Logged Out"
+- Most common cause: `ENVIRONMENT=production` without HTTPS
+- Solution: Set `ENVIRONMENT=development` in `deploy/.env` for testing, or add HTTPS
+
+**If you see CORS errors:**
+- Check browser console (F12 → Console tab)
+- Update `CORS_ORIGINS` in `deploy/.env` to match the URL you're accessing from
+- Example: If accessing via `http://192.168.1.100`, set `CORS_ORIGINS=http://192.168.1.100`
+- Restart backend: `docker compose restart backend`
+
 ---
 
 ## Step 9: Configure Firewall (if applicable)
@@ -616,6 +659,72 @@ docker compose logs -f backend
 docker compose logs -f nginx
 ```
 
+### Switching to GPU/CUDA Acceleration
+
+**⚠️ CRITICAL: Requires image rebuild!**
+
+If you have an NVIDIA GPU and want to enable CUDA acceleration for ML inference:
+
+```bash
+# Prerequisites:
+# 1. NVIDIA GPU with CUDA 11.3+ drivers installed on host
+# 2. nvidia-docker2 installed (for GPU passthrough to containers)
+# 3. Test: nvidia-smi should work on host
+
+# Step 1: Edit deploy/.env
+nano deploy/.env
+# Change: DEVICE=cpu
+# To:     DEVICE=cuda
+
+# Step 2: Rebuild backend image with CUDA-enabled PyTorch
+# This will install a different PyTorch version (~2GB larger)
+cd deploy
+docker compose build --no-cache backend
+
+# Step 3: Enable GPU access in docker-compose.yml
+# Edit deploy/docker-compose.yml and find the commented GPU section under backend:
+nano docker-compose.yml
+
+# Uncomment these lines (around line 37-44):
+#    # Uncomment the section below to enable GPU/CUDA acceleration:
+#    # deploy:
+#    #   resources:
+#    #     reservations:
+#    #       devices:
+#    #         - driver: nvidia
+#    #           count: 1
+#    #           capabilities: [gpu]
+
+# Change to:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+# Step 4: Restart services
+docker compose down
+docker compose up -d
+
+# Step 5: Verify CUDA is available
+docker compose exec backend python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+# Should print: CUDA available: True
+
+# Step 6: Test ML inference
+# Upload a video and run analysis
+# Check backend logs for confirmation it's using GPU
+docker compose logs -f backend | grep -i cuda
+```
+
+**Troubleshooting CUDA:**
+- If `torch.cuda.is_available()` returns False, check host CUDA drivers
+- Verify nvidia-docker2 is installed: `docker run --rm --gpus all nvidia/cuda:11.3.1-base-ubuntu20.04 nvidia-smi`
+- Check Docker can see GPU: `docker compose exec backend nvidia-smi`
+
+**⚠️ WARNING:** CUDA support is relatively untested as development was done without GPU. Expect potential issues and test thoroughly before production use.
+
 ---
 
 ## Backup Procedures
@@ -633,10 +742,13 @@ scp deepfake-data-backup-*.tar.gz user@backup-server:/backups/
 ### Backing Up PostgreSQL Database
 
 ```bash
-# Backup database to file (adjust credentials to match deploy/.env)
+# Backup database to file
+# NOTE: Replace "deepfake" and "deepfake_prod" below with your actual
+# POSTGRES_USER and POSTGRES_DB values from deploy/.env if different
+
 docker compose exec db pg_dump -U deepfake deepfake_prod > deepfake-db-backup-$(date +%Y%m%d).sql
 
-# Or as postgres user:
+# Alternative: As postgres superuser (works regardless of POSTGRES_USER)
 docker compose exec -u postgres db pg_dump deepfake_prod > backup.sql
 
 # Copy to safe location
@@ -651,7 +763,8 @@ scp deepfake-db-backup-*.sql user@backup-server:/backups/
 # Restore analysis data (from host directory backup)
 sudo tar -xzf deepfake-data-backup-YYYYMMDD.tar.gz -C /
 
-# Restore database (adjust credentials to match deploy/.env)
+# Restore database
+# NOTE: Replace "deepfake" and "deepfake_prod" with values from deploy/.env if different
 cat deepfake-db-backup-YYYYMMDD.sql | docker compose exec -T db psql -U deepfake deepfake_prod
 ```
 
