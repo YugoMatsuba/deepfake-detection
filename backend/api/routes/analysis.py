@@ -607,7 +607,8 @@ def _merge_and_recompute_traditional(
         "frame_number": frame_number,
         "raw_score": float(raw_score),
         "overlay_url": f"/api/analyses/{analysis_id}/forensics/{method_name}/frames/{frame_number}/overlay",
-        "flagged": True  # Ad-hoc frames are explicitly requested by user, so flagged
+        "flagged": True,  # Ad-hoc frames are explicitly requested by user, so flagged
+        "requested_adhoc": True  # Mark as user-requested ad-hoc analysis
     }
 
     if frame_index is not None:
@@ -799,18 +800,21 @@ def analyze_frame(analysis_id: str, frame_number: int):
                 if "traditional" not in current_json:
                     current_json["traditional"] = {}
 
-                # Check if frame already analyzed for ALL requested methods (short-circuit if so)
-                all_methods_exist = True
+                # Check if frame already analyzed AND has overlay saved for ALL requested methods
+                # Only cache if frame is flagged (has overlay on disk)
+                all_methods_exist_with_overlay = True
                 for method in methods:
                     method_data = current_json["traditional"].get(method, {})
                     existing_frames = method_data.get("frames", [])
-                    frame_exists = any(f.get("frame_number") == frame_number for f in existing_frames)
-                    if not frame_exists:
-                        all_methods_exist = False
+                    frame_data = next((f for f in existing_frames if f.get("frame_number") == frame_number), None)
+
+                    # Only cache if frame exists AND is flagged (overlay was saved)
+                    if not frame_data or not frame_data.get("flagged", False):
+                        all_methods_exist_with_overlay = False
                         break
 
-                if all_methods_exist:
-                    # Frame already analyzed for all requested methods - return cached results
+                if all_methods_exist_with_overlay:
+                    # Frame already analyzed with overlay for all requested methods - return cached results
                     results = {}
                     for method in methods:
                         method_data = current_json["traditional"].get(method, {})
