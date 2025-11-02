@@ -6,7 +6,7 @@ services:
     # On Linux production servers, this has no effect and can be safely ignored
     platform: linux/amd64
     build:
-      context: ..
+      context: .
       dockerfile: Dockerfile
       target: runtime
       args:
@@ -29,7 +29,7 @@ services:
       # POSTGRES credentials should come from .env file (not hardcoded here)
     volumes:
       # Code bind mount (for production; devcontainer uses different setup)
-      - ..:/workspaces/deepfake_AI:ro
+      - .:/workspaces/deepfake_AI:ro
       # Persistent analysis data (videos, frames, forensic overlays)
       - analyses-data:/data
     expose:
@@ -77,7 +77,7 @@ services:
     # Platform flag for Apple M1/M2 compatibility (no effect on Linux)
     platform: linux/amd64
     build:
-      context: ..
+      context: .
       dockerfile: deploy/nginx/Dockerfile
     depends_on:
       - backend
@@ -92,7 +92,7 @@ services:
 #   - BEFORE FIRST DEPLOYMENT:
 #     1. Create host directory: sudo mkdir -p /var/lib/deepfake/data
 #     2. Set permissions: sudo chown -R 1000:1000 /var/lib/deepfake/data
-#     3. Set DATA_VOLUME_PATH=/var/lib/deepfake/data in deploy/.env
+#     3. Set DATA_VOLUME_PATH=/var/lib/deepfake/data in .env (root .env file)
 #
 # pgdata: Docker-managed volume for PostgreSQL database files
 #   - Managed internally by Docker (no host directory needed)

@@ -39,32 +39,21 @@ def engine() -> Engine:
 def init_engine(db_url: str) -> None:
     """
     Initialize global Engine + SessionLocal once per process.
-    - db_url: e.g., "postgresql+psycopg://user:pass@host:port/db" or "sqlite:///instance/app.db"
+    - db_url: PostgreSQL connection string (e.g., "postgresql+psycopg://user:pass@host:port/db")
+    - SQLite is not supported
     """
     global _engine, _SessionLocal
     if _engine is not None:
         return  # already initialized
 
-    # Configure connect_args and pool settings based on database type
-    if db_url.startswith("sqlite"):
-        # SQLite: check_same_thread False for Flask threaded server
-        connect_args = {"check_same_thread": False}
-        pool_settings = {}
-    else:
-        # PostgreSQL: connection pooling settings
-        connect_args = {}
-        pool_settings = {
-            "pool_size": 10,
-            "max_overflow": 20,
-            "pool_recycle": 300,
-        }
-
+    # PostgreSQL connection pooling settings
     _engine = create_engine(
         db_url,
         future=True,
         pool_pre_ping=True,
-        connect_args=connect_args,
-        **pool_settings
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=300,
     )
     _SessionLocal = sessionmaker(bind=_engine, autoflush=False, expire_on_commit=False, future=True)
     # NOTE: do NOT create tables here; Alembic migrations will handle it later.

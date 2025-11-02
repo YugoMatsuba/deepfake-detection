@@ -491,25 +491,33 @@ python app.py
 
 ## 🔐 Environment Configuration
 
-Create `.env` files for configuration:
+Configure the application using `.env` file in the root directory:
 
-### Backend `.env`:
+### For Local Development (devcontainer):
 ```bash
-SECRET_KEY=your-production-secret-key
-DATABASE_URL=postgresql://user:pass@localhost/deepfake_db
-ENVIRONMENT=production
-CORS_ORIGINS=https://your-frontend-domain.com
+# Copy the local development template
+cp .env.local.example .env
+
+# Key settings for local development:
+# - ENVIRONMENT=development
+# - DATABASE_URL=postgresql+psycopg://deepfake:secret@localhost:5431/deepfake_dev
+# - CORS_ORIGINS includes Vite dev server (port 5173)
 ```
 
-### ML `.env`:
+### For Production Deployment (docker-compose):
 ```bash
-ML_WEIGHTS_DIR=/path/to/model/weights
-ML_DLIB_DIR=/path/to/dlib/models
-ML_DATA_DIR=/path/to/input/videos
-XCEPTION_WEIGHTS=/weights/xception_best.pth
-SPSL_WEIGHTS=/weights/spsl_best.pth
-UCF_WEIGHTS=/weights/ucf_best.pth
+# Copy the production template
+cp .env.production.example .env
+
+# Edit and set:
+# - SECRET_KEY (generate with: python3 -c "import secrets; print(secrets.token_hex(32))")
+# - POSTGRES_PASSWORD (generate strong password)
+# - OWNER_SEED_PASSWORD (for initial admin account)
+# - CORS_ORIGINS (match your deployment domain)
+# - DATA_VOLUME_PATH (Linux host path for analysis data)
 ```
+
+**Important:** PostgreSQL is required for all environments. SQLite is not supported.
 
 ---
 
@@ -545,11 +553,11 @@ sudo chown -R 1000:1000 /var/lib/deepfake/data
 
 ### Environment Configuration
 
-Configure deployment via `.env` file:
+Configure deployment via `.env` file (copy from `.env.production.example`):
 
 ```bash
-# PostgreSQL connection (required - SQLite not supported in production)
-DATABASE_URL=postgresql+psycopg://deepfake_user:password@postgres:5432/deepfake_db
+# PostgreSQL connection (required)
+DATABASE_URL=postgresql+psycopg://deepfake:password@db:5432/deepfake_prod
 
 # Host directory for persistent data (must exist before deployment)
 DATA_VOLUME_PATH=/var/lib/deepfake/data
@@ -604,7 +612,7 @@ volumes:
 
 **Key Points:**
 - ✅ Named volumes persist data across container restarts
-- ✅ PostgreSQL required (SQLite not supported in production)
+- ✅ PostgreSQL required for all environments
 - ✅ Host path `/var/lib/deepfake/data` must exist before `docker compose up`
 - ✅ Configure `DATA_VOLUME_PATH` in `.env` to override default location
 

@@ -61,16 +61,16 @@ Internet → [Load Balancer/Cloudflare with HTTPS] → [Server Firewall] → Doc
 
 ### ⚠️ CRITICAL: HTTPS Requirement for Production
 
-**This application REQUIRES HTTPS in production.** The `deploy/.env` sets `ENVIRONMENT=production`, which configures Flask to use secure session cookies (`Secure` flag). These cookies will **only work over HTTPS**.
+**This application REQUIRES HTTPS in production.** The `.env` sets `ENVIRONMENT=production`, which configures Flask to use secure session cookies (`Secure` flag). These cookies will **only work over HTTPS**.
 
 **Why:** Modern browsers refuse to send cookies marked `Secure` over plain HTTP. Without HTTPS, users can log in but will immediately be logged out on the next request.
 
 **Solutions:**
 1. **Recommended:** Use Cloudflare, AWS ALB, or nginx on host to provide HTTPS termination
-2. **Internal deployment:** If truly internal-only, you can set `ENVIRONMENT=development` in `deploy/.env` (not recommended for production)
+2. **Internal deployment:** If truly internal-only, you can set `ENVIRONMENT=development` in `.env` (not recommended for production)
 
 **Testing locally without HTTPS:**
-- Set `ENVIRONMENT=development` in `deploy/.env` for local testing
+- Set `ENVIRONMENT=development` in `.env` for local testing
 - Remember to change back to `production` before deployment
 
 ---
@@ -171,21 +171,18 @@ openssl rand -base64 16
 ### 4.1 Create Production .env File
 
 ```bash
-# Navigate to deploy directory
-cd deploy
-
-# Copy example template
-cp .env.example .env
+# Copy production example template to .env
+cp .env.production.example .env
 
 # Edit with your preferred editor
 nano .env  # or vim .env, VSCode, etc.
 ```
 
-**Important:** The deployment configuration lives in `deploy/.env` (NOT the root `.env`). The root `.env` is for local development only.
+**Important:** Use `.env.production.example` as your template for deployment. For local development with devcontainer, use `.env.local.example` instead.
 
 ### 4.2 Required Configuration
 
-Edit `deploy/.env` and set these values (replace `CHANGE_ME` with your generated secrets):
+Edit `.env` (root directory) and set these values (replace `CHANGE_ME` with your generated secrets):
 
 ```bash
 # === SECURITY (REQUIRED - Generate with commands from Step 3) ===
@@ -218,7 +215,7 @@ FORENSICS_WORKERS=6
 # - cuda: NVIDIA GPU acceleration (requires CUDA 11.3+ drivers on host)
 #
 # ⚠️  CRITICAL: If changing from cpu to cuda, you MUST rebuild the Docker image:
-#    1. Edit DEVICE=cuda in this file (deploy/.env)
+#    1. Edit DEVICE=cuda in this file (.env)
 #    2. Rebuild image: docker compose build --no-cache
 #    3. Restart: docker compose up -d
 #    (Required because PyTorch installation is different for CPU vs CUDA)
@@ -272,10 +269,7 @@ ls -l .env
 ## Step 5: Build Docker Images
 
 ```bash
-# Navigate to deploy directory (if not already there)
-cd deploy
-
-# Build all images (backend + nginx)
+# Build all images (backend + nginx) from root directory
 docker compose build
 
 # This will take 5-10 minutes (downloads PyTorch, OpenCV, builds frontend)
@@ -302,12 +296,12 @@ docker compose run --rm backend ls -lh /workspaces/deepfake_AI/ml/dlib/
 
 ## Step 6: Initialize Database
 
-**Important:** All commands from this point forward assume you are in the `deploy/` directory where `docker-compose.yml` is located. If you're not there: `cd deploy`
+**Note:** All docker compose commands should be run from the **root directory** of the repository (where `docker-compose.yml` is located).
 
 ### 6.1 Start PostgreSQL Only
 
 ```bash
-# Start just the database service (from deploy/ directory)
+# Start just the database service
 docker compose up -d db
 
 # Wait for postgres to be ready (watch logs)
@@ -331,7 +325,7 @@ docker compose run --rm backend bash -c "cd backend && alembic upgrade head"
 ```
 
 **If migrations fail:**
-- Check DATABASE_URL in `deploy/.env` is correct
+- Check DATABASE_URL in `.env` is correct
 - Verify db service is running: `docker compose ps`
 - Check db logs: `docker compose logs db`
 
@@ -477,7 +471,7 @@ rm /var/lib/deepfake/data/test-persist.txt
 
 **Expected behavior:**
 1. You should see the **login page**
-2. Login with the owner credentials from `deploy/.env`:
+2. Login with the owner credentials from `.env`:
    - Username: `admin` (or your `OWNER_USERNAME` value)
    - Password: (your `OWNER_SEED_PASSWORD` value)
 3. After successful login, you should see the **dashboard/reports page**
@@ -486,11 +480,11 @@ rm /var/lib/deepfake/data/test-persist.txt
 **If login immediately logs you out (401 errors):**
 - See troubleshooting section "Login Works but Immediately Logged Out"
 - Most common cause: `ENVIRONMENT=production` without HTTPS
-- Solution: Set `ENVIRONMENT=development` in `deploy/.env` for testing, or add HTTPS
+- Solution: Set `ENVIRONMENT=development` in `.env` for testing, or add HTTPS
 
 **If you see CORS errors:**
 - Check browser console (F12 → Console tab)
-- Update `CORS_ORIGINS` in `deploy/.env` to match the URL you're accessing from
+- Update `CORS_ORIGINS` in `.env` to match the URL you're accessing from
 - Example: If accessing via `http://192.168.1.100`, set `CORS_ORIGINS=http://192.168.1.100`
 - Restart backend: `docker compose restart backend`
 
@@ -640,8 +634,7 @@ docker compose restart
 # 1. Pull latest code
 git pull origin main  # or extract new deployment package
 
-# 2. Rebuild images (from deploy/ directory)
-cd deploy
+# 2. Rebuild images
 docker compose build
 
 # 3. Stop services
@@ -671,18 +664,17 @@ If you have an NVIDIA GPU and want to enable CUDA acceleration for ML inference:
 # 2. nvidia-docker2 installed (for GPU passthrough to containers)
 # 3. Test: nvidia-smi should work on host
 
-# Step 1: Edit deploy/.env
-nano deploy/.env
+# Step 1: Edit .env
+nano .env
 # Change: DEVICE=cpu
 # To:     DEVICE=cuda
 
 # Step 2: Rebuild backend image with CUDA-enabled PyTorch
 # This will install a different PyTorch version (~2GB larger)
-cd deploy
 docker compose build --no-cache backend
 
 # Step 3: Enable GPU access in docker-compose.yml
-# Edit deploy/docker-compose.yml and find the commented GPU section under backend:
+# Edit docker-compose.yml (root directory) and find the commented GPU section under backend:
 nano docker-compose.yml
 
 # Uncomment these lines (around line 37-44):
@@ -744,7 +736,7 @@ scp deepfake-data-backup-*.tar.gz user@backup-server:/backups/
 ```bash
 # Backup database to file
 # NOTE: Replace "deepfake" and "deepfake_prod" below with your actual
-# POSTGRES_USER and POSTGRES_DB values from deploy/.env if different
+# POSTGRES_USER and POSTGRES_DB values from .env if different
 
 docker compose exec db pg_dump -U deepfake deepfake_prod > deepfake-db-backup-$(date +%Y%m%d).sql
 
@@ -764,7 +756,7 @@ scp deepfake-db-backup-*.sql user@backup-server:/backups/
 sudo tar -xzf deepfake-data-backup-YYYYMMDD.tar.gz -C /
 
 # Restore database
-# NOTE: Replace "deepfake" and "deepfake_prod" with values from deploy/.env if different
+# NOTE: Replace "deepfake" and "deepfake_prod" with values from .env if different
 cat deepfake-db-backup-YYYYMMDD.sql | docker compose exec -T db psql -U deepfake deepfake_prod
 ```
 
@@ -807,7 +799,7 @@ docker compose logs backend
 
 ```bash
 # Check what ENVIRONMENT is set to
-cat deploy/.env | grep ENVIRONMENT
+cat .env | grep ENVIRONMENT
 
 # If ENVIRONMENT=production and you're NOT using HTTPS:
 ```
@@ -818,7 +810,7 @@ cat deploy/.env | grep ENVIRONMENT
 
 **Option 2: Use development mode for local testing**
 ```bash
-# Edit deploy/.env
+# Edit .env
 ENVIRONMENT=development  # Change from production
 
 # Restart backend
@@ -827,7 +819,7 @@ docker compose restart backend
 
 **Option 3: Internal deployment without HTTPS (not recommended)**
 - If truly internal-only and HTTPS not possible
-- Set `ENVIRONMENT=development` in deploy/.env
+- Set `ENVIRONMENT=development` in .env
 - Understand security implications (cookies not secure)
 
 **Verification:**

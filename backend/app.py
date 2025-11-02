@@ -151,17 +151,14 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
 
     # DATABASE_URL is required (no fallback to avoid hardcoded credentials)
+    # MUST be PostgreSQL - SQLite is not supported
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise RuntimeError(
             "DATABASE_URL environment variable not set. "
-            "Set it in .env file (root for dev, deploy/ for production). "
+            "Set it in .env file (root .env for local dev, or copy from .env.production.example for deployment). "
             "Example: DATABASE_URL=postgresql+psycopg://user:password@host:port/dbname"
         )
-
-    # Ensure instance dir exists for SQLite file (only when using SQLite)
-    if db_url.startswith("sqlite"):
-        Path(app.instance_path).mkdir(parents=True, exist_ok=True)
 
     # --- DB init ---
     init_engine(db_url=db_url)
