@@ -50,3 +50,4 @@ results/
 
 # Internal documentation (not for client handover)
 docs/metadata_forensics_techniques.md
+DEPLOYMENT.md
