@@ -57,13 +57,6 @@ The system consists of four main components:
 - `/admin` - Admin dashboard (requires admin/owner role)
 - `/role-select` - User role management (requires admin/owner role)
 
-### Development:
-```bash
-cd frontend
-npm install
-npm run dev  # Runs on port 5173
-```
-
 ---
 
 ## 🔧 Backend Component
@@ -105,88 +98,9 @@ npm run dev  # Runs on port 5173
 
 ### Configuration:
 - **Database**: PostgreSQL (required for all environments)
-- **CORS**: Configured for frontend development at localhost:5173
+- **CORS**: Configured via `CORS_ORIGINS` environment variable
 - **Security**: Environment-based secret keys and session configuration
-- **File Storage**: Volume-mounted persistent storage at `/data` (production)
-
-### Development:
-```bash
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python app.py  # Runs on port 5050
-```
-
----
-
-## 🧱 Deepfake AI Backend Setup Guide
-
-Follow these steps if you want to run the Flask API against PostgreSQL locally or inside the dev container.
-
-### 1️⃣ Start the PostgreSQL Database
-```bash
-docker run --name deepfake-db \
-  -p 5431:5432 \
-  -e POSTGRES_USER=deepfake \
-  -e POSTGRES_PASSWORD=secret \
-  -e POSTGRES_DB=deepfake_dev \
-  -d postgres:16
-```
-
-### 2️⃣ Open the Dev Container
-In VS Code, open the project and reopen it in the provided container  
-`⇧⌘P → Dev Containers: Reopen in Container`
-
-### 3️⃣ Install Dependencies
-Inside the dev container shell:
-```bash
-pip install -r requirements.txt
-```
-
-### 4️⃣ Set Environment Variables
-```bash
-cd backend
-export DATABASE_URL="postgresql+psycopg://deepfake:secret@host.docker.internal:5431/deepfake_dev"
-export TEST_DATABASE_URL="postgresql+psycopg://deepfake:secret@host.docker.internal:5431"
-```
-
-### 5️⃣ Apply Database Migrations
-```bash
-alembic upgrade head
-```
-
-### 6️⃣ Start the Flask Server
-```bash
-python app.py
-```
-
-The API will be available at http://localhost:5050 and connected to PostgreSQL.
-
-### 🚀 Production: Run with Gunicorn
-
-For production or containerized runs, use Gunicorn with the provided WSGI entrypoint and config:
-
-```bash
-# From repo root
-pip install -r requirements.txt  # ensures gunicorn is installed
-gunicorn --config backend/gunicorn.conf.py --chdir backend wsgi:app
-```
-
-Notes:
-- Configure port via `PORT` env var (defaults to 5050)
-- Set worker/threads via `WEB_CONCURRENCY` and `GUNICORN_THREADS`
-- Gunicorn is Linux/macOS oriented; use Docker/WSL on Windows
-
-### 🧭 Optional: pgAdmin Setup
-
-1. Install pgAdmin 4 from https://www.pgadmin.org/download/  
-2. In pgAdmin, create a new server with:
-   - **Name**: `it-project`  
-   - **Host**: `localhost`  
-   - **Port**: `5431`  
-   - **Username**: `deepfake`  
-   - **Password**: `secret`
-3. Expand `Servers → localhost → Databases → deepfake_dev` to inspect tables and run queries.
+- **File Storage**: Volume-mounted persistent storage at `/data`
 
 ---
 
@@ -429,93 +343,145 @@ Tests validate architecture compatibility without requiring weight files.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Local Development)
 
 ### Prerequisites:
-- **Node.js 18+** (frontend)
-- **Python 3.9+** (backend & ML)
-- **Docker** (ML inference, optional)
-- **CUDA 11.3+** (ML GPU acceleration, optional)
+- **Docker** and **Docker Compose** v2.0+
+- **Git** with **Git LFS** installed (`git lfs install`)
+- 8GB+ RAM recommended
 
-### Development Setup:
+### Setup Steps:
 
-1. **Clone Repository**:
+#### 1. Clone Repository and Pull ML Weights
 ```bash
 git clone <repository-url>
 cd deepfake_AI
+
+# Pull ML model weights via Git LFS (required - ~382MB total)
+git lfs pull
 ```
 
-2. **Backend Setup**:
+#### 2. Configure Environment
 ```bash
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python app.py  # Runs on port 5050
+# Copy local development environment template
+cp .env.local.example .env
+
+# The default values in .env.local.example work out of the box for local development
+# Key settings:
+# - PostgreSQL database via Docker (port 5431)
+# - Backend on port 5050
+# - CORS enabled for localhost
+# - Owner account: admin / changeme123
 ```
 
-3. **Frontend Setup**:
+#### 3. Start All Services
 ```bash
-cd frontend
-npm install
-npm run dev  # Runs on port 5173
+# Start backend, frontend, PostgreSQL, and nginx with docker-compose
+docker compose up -d
+
+# Wait for services to be ready (watch logs)
+docker compose logs -f
 ```
 
-4. **ML Inference** (Dev Container):
+#### 4. Initialize Database
 ```bash
-# Open in VS Code, then reopen in dev container
-cd /workspaces/deepfake_AI/ml
-python runner.py data/sample.mp4  # Run inference
-pytest tests/ -v  # Run test suite
+# Run database migrations to create tables
+docker compose run --rm backend bash -c "cd backend && alembic upgrade head"
 ```
 
-### Owner Bootstrap:
-The system uses environment variable-based owner account creation instead of hardcoded credentials.
+#### 5. Access the Application
+```
+Frontend: http://localhost (served via nginx)
+Backend API: http://localhost/api
 
-**First-time setup:**
+Default login:
+- Username: admin
+- Password: changeme123
+```
+
+### Common Commands:
+
 ```bash
-# Set owner credentials via environment variables
-export OWNER_USERNAME=admin
-export OWNER_SEED_PASSWORD=your_secure_password
+# View logs
+docker compose logs -f backend
+docker compose logs -f nginx
 
-# Run backend - owner account will be created automatically
-cd backend
-python app.py
+# Restart a service
+docker compose restart backend
+
+# Stop all services
+docker compose down
+
+# Rebuild after code changes
+docker compose build backend
+docker compose up -d
+
+# Run backend tests
+docker compose run --rm backend bash -c "cd backend && pytest tests/ -v"
 ```
 
-**Environment Variables:**
-- `OWNER_USERNAME` - Username for the owner account
-- `OWNER_SEED_PASSWORD` - Password for owner (only needed on first boot or password reset)
-- `ALLOW_OWNER_TRANSFER` - Set to "1" to allow changing owner (default "0" for security)
+### Development Workflow:
+
+**For Frontend changes:**
+- Frontend runs in development mode with hot reload
+- Edit files in `frontend/src/` and changes appear immediately
+- No rebuild needed
+
+**For Backend changes:**
+- Backend uses volume mount for live code reload (via Gunicorn --reload)
+- Edit files in `backend/` and Gunicorn will auto-reload
+- For dependency changes: `docker compose build backend && docker compose restart backend`
+
+**For ML changes:**
+- ML code is volume-mounted read-only
+- Changes to `ml/` require backend restart: `docker compose restart backend`
 
 ---
 
 ## 🔐 Environment Configuration
 
-Configure the application using `.env` file in the root directory:
+The application uses a `.env` file in the root directory for all configuration.
 
-### For Local Development (devcontainer):
+### Local Development
 ```bash
 # Copy the local development template
 cp .env.local.example .env
-
-# Key settings for local development:
-# - ENVIRONMENT=development
-# - DATABASE_URL=postgresql+psycopg://deepfake:secret@localhost:5431/deepfake_dev
-# - CORS_ORIGINS includes Vite dev server (port 5173)
 ```
 
-### For Production Deployment (docker-compose):
+**Default configuration (works out of the box):**
+- PostgreSQL via Docker Compose (localhost:5431)
+- Backend API on port 5050
+- Frontend dev server on port 5173 (served via nginx on port 80)
+- Owner account: admin / changeme123
+- CORS enabled for localhost
+
+### Production Deployment
 ```bash
 # Copy the production template
 cp .env.production.example .env
 
-# Edit and set:
-# - SECRET_KEY (generate with: python3 -c "import secrets; print(secrets.token_hex(32))")
-# - POSTGRES_PASSWORD (generate strong password)
+# Generate secrets and edit:
+# - SECRET_KEY (generate: python3 -c "import secrets; print(secrets.token_hex(32))")
+# - POSTGRES_PASSWORD (generate: openssl rand -base64 32)
 # - OWNER_SEED_PASSWORD (for initial admin account)
-# - CORS_ORIGINS (match your deployment domain)
-# - DATA_VOLUME_PATH (Linux host path for analysis data)
+# - CORS_ORIGINS (match your deployment URL)
+# - DATA_VOLUME_PATH=/var/lib/deepfake/data (Linux host path for analysis data)
 ```
+
+**See [DEPLOYMENT.md](DEPLOYMENT.md) for complete production deployment guide.**
+
+### Key Environment Variables
+
+| Variable | Description | Local Default | Production |
+|----------|-------------|---------------|------------|
+| `ENVIRONMENT` | Runtime mode | `development` | `production` |
+| `DATABASE_URL` | PostgreSQL connection | `postgresql+psycopg://deepfake:secret@db:5432/deepfake_dev` | Set in .env |
+| `SECRET_KEY` | Flask session signing | `dev-insecure` | **Must generate** |
+| `CORS_ORIGINS` | Allowed origins | `http://localhost:5173,http://localhost` | Your domain |
+| `DEVICE` | ML inference device | `cpu` | `cpu` or `cuda` |
+| `FORENSICS_WORKERS` | CPU cores for analysis | `4` | CPU cores - 2 |
+| `OWNER_USERNAME` | Initial admin username | `admin` | Your choice |
+| `OWNER_SEED_PASSWORD` | Initial admin password | `changeme123` | **Must generate** |
 
 **Important:** PostgreSQL is required for all environments. SQLite is not supported.
 
@@ -523,104 +489,88 @@ cp .env.production.example .env
 
 ## 🧪 Testing
 
-### ML Tests *(feature/ml branch)*:
+### Backend Tests
 ```bash
-cd ml
-pytest tests/ -v
-# Tests run without .pth weights (architecture validation only)
+# Run all backend tests
+docker compose run --rm backend bash -c "cd backend && pytest tests/ -v"
+
+# Run specific test file
+docker compose run --rm backend bash -c "cd backend && pytest tests/test_auth.py -v"
+
+# Run with coverage
+docker compose run --rm backend bash -c "cd backend && pytest tests/ --cov=api --cov-report=term-missing"
+```
+
+### Frontend Tests
+```bash
+# Run frontend tests
+docker compose run --rm nginx npm --prefix /usr/share/nginx/html test
+
+# Run integration tests
+cd frontend
+npm run test:integration
+```
+
+### ML Tests
+```bash
+# Tests validate architecture without requiring weight files
+docker compose run --rm backend bash -c "pytest tests/test_xception_pr1.py -v"
+docker compose run --rm backend bash -c "pytest tests/ -k 'ml' -v"
 ```
 
 ---
 
 ## 🏭 Production Deployment
 
-### Prerequisites
+**For complete production deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).**
 
-**⚠️ IMPORTANT: Create host directories before first deployment:**
+The deployment guide covers:
+- ✅ Step-by-step production setup on Linux VM
+- ✅ Environment configuration and secret generation
+- ✅ Docker Compose orchestration (backend + frontend + PostgreSQL + nginx)
+- ✅ Database migrations and initialization
+- ✅ Persistent volume setup for analysis data
+- ✅ SSL/TLS configuration with Let's Encrypt
+- ✅ CUDA/GPU setup for ML acceleration
+- ✅ Troubleshooting and operational procedures
+- ✅ Backup and restore procedures
 
+### Quick Production Overview
+
+**Prerequisites:**
+- Linux VM with Docker and Docker Compose installed
+- 8GB+ RAM (16GB+ recommended)
+- 50GB+ disk space
+- NVIDIA GPU with CUDA 11.3+ (optional, for ML acceleration)
+
+**Deployment Steps:**
 ```bash
-# On your Linux VM, create persistent data directory
+# 1. Clone repository
+git clone <repo-url>
+cd deepfake_AI
+git lfs pull
+
+# 2. Create persistent data directory
 sudo mkdir -p /var/lib/deepfake/data
 sudo chown -R 1000:1000 /var/lib/deepfake/data
 
-# This directory will store:
-# - Uploaded videos
-# - Extracted frames
-# - Forensic analysis overlays (ELA, Noise, LBP)
+# 3. Configure environment
+cp .env.production.example .env
+# Edit .env and set all required values (see DEPLOYMENT.md)
+
+# 4. Build and start services
+docker compose build
+docker compose up -d
+
+# 5. Run migrations
+docker compose run --rm backend bash -c "cd backend && alembic upgrade head"
+
+# 6. Verify deployment
+curl http://localhost/api/auth/me
+# Should return: {"authenticated": false}
 ```
 
-**Why this matters:** Without a mounted volume, all analysis data is lost when the container restarts. The host directory at `/var/lib/deepfake/data` persists data independently of the container lifecycle.
-
-### Environment Configuration
-
-Configure deployment via `.env` file (copy from `.env.production.example`):
-
-```bash
-# PostgreSQL connection (required)
-DATABASE_URL=postgresql+psycopg://deepfake:password@db:5432/deepfake_prod
-
-# Host directory for persistent data (must exist before deployment)
-DATA_VOLUME_PATH=/var/lib/deepfake/data
-
-# Application config
-ENVIRONMENT=production
-SECRET_KEY=your-production-secret-key-here
-FORENSICS_WORKERS=6  # CPU cores - 2 (leave headroom for Gunicorn)
-```
-
-### Docker Compose Example
-
-See `docker-compose.volumes.yml` for the minimal volume configuration. Your deployment orchestrator should merge this into the full stack:
-
-```yaml
-version: '3.8'
-
-services:
-  backend:
-    image: deepfake:latest
-    volumes:
-      # Persistent storage for analysis data
-      - analyses-data:/data
-    environment:
-      - DATABASE_URL=postgresql+psycopg://user:pass@postgres:5432/deepfake_db
-      - DATA_DIR=/data
-      - ENVIRONMENT=production
-    # Add: ports, depends_on (postgres), networks, restart policy
-
-  postgres:
-    image: postgres:16
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=deepfake_user
-      - POSTGRES_PASSWORD=secure_password
-      - POSTGRES_DB=deepfake_db
-
-volumes:
-  # Analysis data: videos, frames, forensic overlays
-  analyses-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_VOLUME_PATH:-/var/lib/deepfake/data}
-
-  # PostgreSQL database
-  postgres-data:
-    driver: local
-```
-
-**Key Points:**
-- ✅ Named volumes persist data across container restarts
-- ✅ PostgreSQL required for all environments
-- ✅ Host path `/var/lib/deepfake/data` must exist before `docker compose up`
-- ✅ Configure `DATA_VOLUME_PATH` in `.env` to override default location
-
-### Infrastructure Requirements:
-- **CPU**: 4+ cores for API handling
-- **RAM**: 8GB+ (16GB+ recommended for ML)
-- **GPU**: NVIDIA GPU with CUDA 11.3+ support (ML inference)
-- **Storage**: SSD recommended for video processing; plan for analysis data growth
+**Access:** Application runs on port 80 (HTTP). For production, configure HTTPS via reverse proxy (Cloudflare, nginx, etc.) - see DEPLOYMENT.md for details.
 
 
 
