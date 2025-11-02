@@ -20,6 +20,7 @@ venv/
 
 # ML temporary data (videos, outputs)
 ml/data/
+ml/eval_metrics.json
 
 # Video data
 *.mp4
@@ -46,3 +47,6 @@ samples/
 logs/
 outputs/
 results/
+
+# Internal documentation (not for client handover)
+docs/metadata_forensics_techniques.md
