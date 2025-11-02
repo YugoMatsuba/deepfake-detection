@@ -151,7 +151,7 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB max upload
 
     # DATABASE_URL is required (no fallback to avoid hardcoded credentials)
-    # MUST be PostgreSQL - SQLite is not supported
+    # MUST be PostgreSQL - SQLite is no longer supported
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise RuntimeError(

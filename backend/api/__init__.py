@@ -85,7 +85,6 @@ def get_db() -> Iterator[Session]:
 def hash_password(plain: str) -> str:
     """
     Return Argon2 hash string for a plaintext password.
-    TODO: call _ph.hash(plain) and return it.
     """
     # reject empty passwords at the helper level
     if not isinstance(plain, str) or not plain:
@@ -96,7 +95,6 @@ def hash_password(plain: str) -> str:
 def verify_password(stored_hash: str, plain: str) -> bool:
     """
     Verify plaintext against Argon2 hash. Return True/False.
-    TODO: call _ph.verify(stored_hash, plain); catch exceptions and return False on failure.
     """
     try:
         _ph.verify(stored_hash, plain)
