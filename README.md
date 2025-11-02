@@ -486,6 +486,16 @@ cp .env.production.example .env
 
 **Important:** PostgreSQL is required for all environments. SQLite is not supported.
 
+### Database Initialization
+
+The system uses Alembic migrations to create and update database tables. After copying your `.env` file, you must run migrations:
+
+```bash
+docker compose run --rm backend bash -c "cd backend && alembic upgrade head"
+```
+
+**Note:** Keep `DB_BOOTSTRAP=0` in your `.env` file. Setting it to 1 bypasses migration history and is not recommended for any environment.
+
 ---
 
 ## 🧪 Testing
