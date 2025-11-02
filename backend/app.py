@@ -30,8 +30,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # DATABASE_URL must be set via environment variable (no hardcoded default with credentials)
-# For production: Set in deploy/.env
-# For local development: Set in root .env (devcontainer)
+# For production: Set in .env (copied from .env.production.example)
+# For local development: Set in .env (copied from .env.local.example, docker-compose reads it)
 # Example: postgresql+psycopg://user:password@host:port/dbname
 
 
@@ -163,8 +163,9 @@ def create_app() -> Flask:
     # --- DB init ---
     init_engine(db_url=db_url)
 
-    # Tables now managed by Alembic migrations (run: alembic upgrade head)
-    # For local dev bootstrap only, set DB_BOOTSTRAP=1 to auto-create tables
+    # Tables managed by Alembic migrations (run: alembic upgrade head)
+    # DB_BOOTSTRAP=1 is deprecated - bypasses migration history, not recommended
+    # Keep DB_BOOTSTRAP=0 and use migrations for proper database versioning
     if os.getenv("DB_BOOTSTRAP", "0") == "1":
         Base.metadata.create_all(bind=db_engine())
 

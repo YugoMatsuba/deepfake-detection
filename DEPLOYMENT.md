@@ -178,7 +178,7 @@ cp .env.production.example .env
 nano .env  # or vim .env, VSCode, etc.
 ```
 
-**Important:** Use `.env.production.example` as your template for deployment. For local development with devcontainer, use `.env.local.example` instead.
+**Important:** Use `.env.production.example` as your template for deployment. For local development, use `.env.local.example` instead.
 
 ### 4.2 Required Configuration
 
@@ -237,7 +237,8 @@ PORT=5050
 CORS_ORIGINS=http://localhost
 
 # === DATABASE BOOTSTRAP ===
-# MUST be 0 in production (use migrations instead)
+# MUST be 0 in all environments (use migrations instead)
+# Setting to 1 bypasses migration history and is not recommended
 DB_BOOTSTRAP=0
 
 # === OWNER ACCOUNT BOOTSTRAP (First Deployment Only) ===
@@ -951,7 +952,7 @@ Before going live:
 - [ ] Firewall configured (only necessary ports open)
 - [ ] Backups configured and tested
 - [ ] Log rotation enabled
-- [ ] `DB_BOOTSTRAP=0` (never 1 in production)
+- [ ] `DB_BOOTSTRAP=0` (never 1 - always use migrations)
 - [ ] Owner bootstrap secrets removed from `.env` after first deployment
 
 ---
