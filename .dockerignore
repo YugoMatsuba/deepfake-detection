@@ -53,10 +53,11 @@ site
 tmp/
 temp/
 
-# ML model artifacts (mounted at runtime)
-ml/weights/*.pth
-ml/dlib/*.dat
-ml/data/*
+# ML model artifacts
+# NOTE: .pth and .dat files are large (Git LFS) but needed in image for standalone deployment
+# ml/weights/*.pth  # Commented out - need these in image
+# ml/dlib/*.dat     # Commented out - need these in image
+ml/data/*           # Exclude data directory (videos/outputs)
 
 # Database files (mounted at runtime)
 instance/

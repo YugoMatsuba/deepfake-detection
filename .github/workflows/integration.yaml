@@ -72,6 +72,8 @@ jobs:
 
     - name: Run backend API↔DB integration tests
       working-directory: backend
+      env:
+        DATABASE_URL: postgresql+psycopg://deepfake:secret@localhost:5431
       run: |
         python -m pytest tests/integration -v
 

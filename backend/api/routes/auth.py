@@ -28,20 +28,6 @@ GET /api/auth/me
     Returns:
       200 { "id": int, "username": "str", "role": "str" }
       401 { "error": "unauthenticated" }
-
-GET /api/auth/audit?limit=100&user_id=...
-    Admin-only.
-    Returns:
-      200 { "logs": [ { "id": int, "user_id": int|null, "event": "login"|"logout"|"login_failed", "ip": "str", "user_agent": "str", "created_at": "ISO8601" }, ... ] }
-      403 { "error": "forbidden" }
-
-POST /api/auth/users/<int:user_id>/toggle
-    Admin-only; activate/deactivate a user.
-    Body: { "active": true|false }
-    Returns:
-      200 { "id": int, "active": bool }
-      404 { "error": "not_found" }
-      403 { "error": "forbidden" }
 """
 
 from __future__ import annotations
@@ -88,7 +74,6 @@ def _require_json() -> dict:
 def _require_auth(db: Session) -> Optional[User]:
     """
     Return current user or None.
-    TODO: fetch by session.get("user_id")
     """
     uid = session.get("user_id")
     if not uid:
@@ -120,15 +105,13 @@ def register():
     """
     with get_db() as db:
         data = _require_json()
-        # TODO: normalize username with .lower() for consistent lookups
-        username = (data.get("username") or "").strip()
+        username = (data.get("username") or "").strip().lower()
         password = data.get("password") or ""
         if not username or not password:
             return jsonify(error="invalid_payload"), 400
 
         # any existing users?
-        # TODO: use SQLAlchemy 2.x style: db.execute(select(func.count()).select_from(User)).scalar_one()
-        count = db.query(User).count()  # SQLAlchemy 2.x allows this legacy; fine for SQLite
+        count = db.query(User).count()
         if count > 0:
             admin = _require_admin(db)
             if not admin:
@@ -161,8 +144,7 @@ def login():
     """
     with get_db() as db:
         data = _require_json()
-        # TODO: normalize username with .lower() for consistent lookups
-        username = (data.get("username") or "").strip()
+        username = (data.get("username") or "").strip().lower()
         password = data.get("password") or ""
         if not username or not password:
             return jsonify(error="invalid_credentials"), 401
@@ -284,34 +266,3 @@ def me():
             }), 200
         except:
             return jsonify(error="unauthenticated"), 401
-
-
-@bp.get("/audit")
-def audit():
-    """
-    Admin-only audit log listing.
-    Query: limit (int, default 100), user_id (optional)
-    Implementation outline:
-      - admin = _require_admin(db); if None: return 403
-      - fetch last N AuditLog rows; serialize
-      - return {logs:[...]}
-    """
-    with get_db() as db:
-        # TODO: implement
-        return jsonify(error="forbidden"), 403
-
-
-@bp.post("/users/<int:user_id>/toggle")
-def toggle_user(user_id: int):
-    """
-    Admin-only: activate/deactivate user.
-    Body: { "active": true|false }
-    Implementation outline:
-      - admin = _require_admin(db); if None: return 403
-      - fetch user; if not found: 404
-      - set active per body; commit; return {id, active}
-    """
-    with get_db() as db:
-        data = _require_json()
-        # TODO: implement
-        return jsonify(error="not_implemented"), 501

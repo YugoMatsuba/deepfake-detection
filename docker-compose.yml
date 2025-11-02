@@ -1,0 +1,112 @@
+version: "3.9"
+
+services:
+  backend:
+    # Platform flag ensures compatibility with Apple M1/M2 Macs during development
+    # On Linux production servers, this has no effect and can be safely ignored
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        # CRITICAL: DEVICE build arg determines which PyTorch version is installed
+        # - cpu: Installs CPU-only PyTorch (smaller image, works everywhere)
+        # - cuda: Installs CUDA-enabled PyTorch (larger image, requires NVIDIA GPU)
+        # MUST match runtime DEVICE env var below for CUDA inference to work
+        # If changing from cpu to cuda, you MUST rebuild: docker compose build --no-cache
+        DEVICE: ${DEVICE:-cpu}
+    command: ["gunicorn", "--config", "backend/gunicorn.conf.py", "--chdir", "backend", "wsgi:app"]
+    env_file:
+      - .env
+    environment:
+      # Read from .env, default to production if not set
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - PORT=${PORT:-5050}
+      - DATA_DIR=${DATA_DIR:-/data}
+      - DEVICE=${DEVICE:-cpu}  # Runtime device for ML inference (must match build arg)
+      # DATABASE_URL should come from .env file (not hardcoded here)
+      # POSTGRES credentials should come from .env file (not hardcoded here)
+    volumes:
+      # Code bind mount (for production; devcontainer uses different setup)
+      - .:/workspaces/deepfake_AI:ro
+      # Persistent analysis data (videos, frames, forensic overlays)
+      - analyses-data:/data
+    expose:
+      - "5050"
+    # Uncomment the section below to enable GPU/CUDA acceleration:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: deepfake_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # These should be set in .env file:
+      # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+      - POSTGRES_USER=${POSTGRES_USER:-deepfake}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secret}
+      - POSTGRES_DB=${POSTGRES_DB:-deepfake_prod}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Port 5432 is NOT exposed to host (security best practice)
+    # Backend connects via internal Docker network (db:5432)
+    # For database admin tools, use: docker compose exec db psql -U deepfake deepfake_prod
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deepfake} -d ${POSTGRES_DB:-deepfake_prod} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  nginx:
+    # Platform flag for Apple M1/M2 compatibility (no effect on Linux)
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: deploy/nginx/Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+# Persistent data volumes
+#
+# analyses-data: Bind mount to host directory for easy access to videos/frames/reports
+#   - Configurable via DATA_VOLUME_PATH in .env
+#   - BEFORE FIRST DEPLOYMENT:
+#     1. Create host directory: sudo mkdir -p /var/lib/deepfake/data
+#     2. Set permissions: sudo chown -R 1000:1000 /var/lib/deepfake/data
+#     3. Set DATA_VOLUME_PATH=/var/lib/deepfake/data in .env (root .env file)
+#
+# pgdata: Docker-managed volume for PostgreSQL database files
+#   - Managed internally by Docker (no host directory needed)
+#   - Data persists across container restarts/recreates
+#   - Only deleted with explicit `docker compose down -v` (⚠️ never use -v in production!)
+#   - Backup via: docker compose exec db pg_dump -U deepfake > backup.sql
+volumes:
+  analyses-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      # Host path from environment variable, defaults to /var/lib/deepfake/data
+      device: ${DATA_VOLUME_PATH:-/var/lib/deepfake/data}
+
+  pgdata:
+    driver: local

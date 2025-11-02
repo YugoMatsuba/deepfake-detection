@@ -29,10 +29,10 @@ const ImageAnalysis = () => {
     const loadOrRunAnalysis = async () => {
       try {
         setIsLoading(true);
-        setImageUrl(`http://localhost:5050/api/analyses/${id}/image`);
+        setImageUrl(`/api/analyses/${id}/image`);
 
         // Always fetch existing analysis first (like FrameViewer)
-        const existingResponse = await fetch(`http://localhost:5050/api/analyses/${id}`, {
+        const existingResponse = await fetch(`/api/analyses/${id}`, {
           credentials: 'include'
         });
 
@@ -171,7 +171,7 @@ const ImageAnalysis = () => {
                       />
                       {activeOverlay && traditionalResults[activeOverlay]?.overlay_url && (
                         <img
-                          src={`http://localhost:5050${traditionalResults[activeOverlay].overlay_url}`}
+                          src={traditionalResults[activeOverlay].overlay_url}
                           alt={`${activeOverlay.toUpperCase()} overlay`}
                           className="absolute top-0 left-0 w-full h-full object-cover opacity-100 rounded-lg pointer-events-none"
                         />

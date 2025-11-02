@@ -156,7 +156,7 @@ export default function FrameViewerPage() {
   }
 
   // Construct the secure video URL
-  const videoSrc = `http://localhost:5050/api/analyses/${analysisId}/video`;
+  const videoSrc = `/api/analyses/${analysisId}/video`;
 
   return (
     <div className="p-4">
