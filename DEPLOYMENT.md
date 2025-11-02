@@ -178,7 +178,7 @@ cp .env.production.example .env
 nano .env  # or vim .env, VSCode, etc.
 ```
 
-**Important:** Use `.env.production.example` as your template for deployment. For local development with devcontainer, use `.env.local.example` instead.
+**Important:** Use `.env.production.example` as your template for deployment. For local development, use `.env.local.example` instead.
 
 ### 4.2 Required Configuration
 

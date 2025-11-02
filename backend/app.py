@@ -30,8 +30,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # DATABASE_URL must be set via environment variable (no hardcoded default with credentials)
-# For production: Set in deploy/.env
-# For local development: Set in root .env (devcontainer)
+# For production: Set in .env (copied from .env.production.example)
+# For local development: Set in .env (copied from .env.local.example, docker-compose reads it)
 # Example: postgresql+psycopg://user:password@host:port/dbname
 
 
