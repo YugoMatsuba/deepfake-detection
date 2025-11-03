@@ -345,12 +345,20 @@ def analyze_single_frame(
     logger.info(f"Analyzing frame {frame_number} from {video_path} with device={device}, models={models}")
 
     try:
-        # Open video to get metadata and extract frame
+        # Open video/image to get metadata and extract frame
         cap = cv2.VideoCapture(video_path)
 
         try:
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             fps = float(cap.get(cv2.CAP_PROP_FPS)) or 0.0
+
+            # Handle images: OpenCV returns invalid frame_count for images (often <0 or 0)
+            # For images, we can successfully read frame 0, so treat them as single-frame videos
+            if frame_count <= 0:
+                # This is likely an image file - try to read as single frame
+                logger.info(f"Invalid frame_count ({frame_count}), treating as image (single frame)")
+                frame_count = 1
+                fps = 0.0  # Images have no FPS
 
             # Validate frame number
             if frame_number < 0 or frame_number >= frame_count:
@@ -363,7 +371,7 @@ def analyze_single_frame(
                     }
                 }
 
-            # Seek to specific frame
+            # Seek to specific frame (for images, frame 0 is the only frame)
             cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_number))
             success, bgr_frame = cap.read()
 
