@@ -704,15 +704,7 @@ function RoleManagementTab() {
                       </>
                     )}
                     {user.role === 'owner' && (
-                      <>
-                        <button
-                          onClick={() => setPasswordModal(user)}
-                          className="px-3 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition"
-                        >
-                          Change Password
-                        </button>
-                        <span className="text-sm text-gray-500 ml-2">Cannot modify owner role</span>
-                      </>
+                      <span className="text-sm text-gray-500">Cannot modify owner</span>
                     )}
                   </td>
                 </tr>
