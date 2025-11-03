@@ -136,14 +136,16 @@ def generate_frame_hashes(video_path: str) -> Optional[list]:
 
 def parse_frame_hashes(raw_hashes: list) -> list:
     """
-    Extract MD5 values from FFmpeg framemd5 output.
+    Extract MD5 values from FFmpeg framemd5 output (VIDEO STREAM ONLY).
 
     FFmpeg framemd5 format (6 fields):
         stream_index, pts, dts, packet_size, frame_size, hash
         0, 0, 0, 1, 1382400, 4bb9a97ce56aabe079b3205a1492aab2
 
+    CRITICAL: Only extracts hashes from stream 0 (video), ignoring audio/subtitle streams.
+
     Returns:
-        list of hex hash strings (32 chars for MD5)
+        list of hex hash strings (32 chars for MD5) for video frames only
     """
     hashes = []
 
@@ -151,9 +153,16 @@ def parse_frame_hashes(raw_hashes: list) -> list:
         if line.startswith('#'):
             continue
 
-        # Parse by splitting on commas and extract last field (the hash)
+        # Parse by splitting on commas
         parts = line.strip().split(',')
         if len(parts) >= 6:
+            stream_index = parts[0].strip()
+
+            # ONLY extract hashes from stream 0 (video stream)
+            # Skip audio (stream 1), subtitles (stream 2+), etc.
+            if stream_index != '0':
+                continue
+
             hash_val = parts[-1].strip()  # Last field is the hash
             if hash_val and len(hash_val) == 32:  # MD5 is exactly 32 hex chars
                 hashes.append(hash_val)
