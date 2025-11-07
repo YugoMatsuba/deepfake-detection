@@ -16,9 +16,11 @@ exclude =
 
 # Ignore specific rules (no inline comments allowed in ignore list)
 ignore =
+    E203,
     E402,
     W503,
-    W504
+    W504,
+    C901
 
 # Error codes to always enforce
 select =
