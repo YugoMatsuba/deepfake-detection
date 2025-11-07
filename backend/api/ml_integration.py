@@ -169,7 +169,7 @@ def run_single_frame_ml_analysis(
     except MLAnalysisError:
         # Re-raise MLAnalysisError as-is
         raise
-    except Exception as e:
+    except Exception:
         # For ad-hoc single frame, let the original error message through
         # Don't classify as INTERNAL_ERROR - preserve specific error like "No face detected"
         raise
