@@ -3,7 +3,8 @@ from unittest.mock import patch, MagicMock
 from flask import Flask
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from api.routes.framerate import frame_rate_bp
 from api import get_db, hash_password
@@ -14,33 +15,33 @@ class TestFrameRateRoutes(unittest.TestCase):
 
     def setUp(self):
         self.app = Flask(__name__)
-        self.app.config['TESTING'] = True
-        self.app.config['SECRET_KEY'] = 'test-secret-key'
-        self.app.register_blueprint(frame_rate_bp, url_prefix='/api')
+        self.app.config["TESTING"] = True
+        self.app.config["SECRET_KEY"] = "test-secret-key"
+        self.app.register_blueprint(frame_rate_bp, url_prefix="/api")
         self.client = self.app.test_client()
 
         # Create a test user for @require_user decorated routes
         with get_db() as db:
             self.test_user = User(
-                username='testuser_framerate',
-                password_hash=hash_password('password123'),
-                role='user',
+                username="testuser_framerate",
+                password_hash=hash_password("password123"),
+                role="user",
                 active=True,
-                pending_approval=False
+                pending_approval=False,
             )
             db.add(self.test_user)
             db.flush()  # Get the ID without committing
             self.test_user_id = self.test_user.id
 
-    @patch('api.routes.framerate.get_db')
-    @patch('api.routes.framerate.DATA_ROOT')
-    @patch('api.routes.framerate.cv2.VideoCapture')
+    @patch("api.routes.framerate.get_db")
+    @patch("api.routes.framerate.DATA_ROOT")
+    @patch("api.routes.framerate.cv2.VideoCapture")
     def test_get_frame_rate_success(self, mock_cv2, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
         mock_analysis = MagicMock()
-        mock_analysis.id = 'test-analysis-id'
-        mock_analysis.original_filename = 'test_video.mp4'
+        mock_analysis.id = "test-analysis-id"
+        mock_analysis.original_filename = "test_video.mp4"
 
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_analysis]
         mock_get_db.return_value.__enter__.return_value = mock_db
@@ -49,7 +50,7 @@ class TestFrameRateRoutes(unittest.TestCase):
         mock_video_dir = MagicMock()
         mock_video_dir.exists.return_value = True
         mock_video_file = MagicMock()
-        mock_video_file.name = 'video.mp4'
+        mock_video_file.name = "video.mp4"
         mock_video_dir.glob.return_value = [mock_video_file]
         mock_data_root.__truediv__.return_value = mock_video_dir
 
@@ -61,17 +62,17 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess["user_id"] = self.test_user_id
 
-        response = self.client.get('/api/framerate')
+        response = self.client.get("/api/framerate")
 
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
-        self.assertEqual(data['video_id'], 'test-analysis-id')
-        self.assertEqual(data['original_name'], 'test_video.mp4')
-        self.assertEqual(data['frame_rate'], 29.97)
+        self.assertEqual(data["video_id"], "test-analysis-id")
+        self.assertEqual(data["original_name"], "test_video.mp4")
+        self.assertEqual(data["frame_rate"], 29.97)
 
-    @patch('api.routes.framerate.get_db')
+    @patch("api.routes.framerate.get_db")
     def test_get_frame_rate_no_videos(self, mock_get_db):
         # Mock database with no analyses
         mock_db = MagicMock()
@@ -80,21 +81,21 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess["user_id"] = self.test_user_id
 
-        response = self.client.get('/api/framerate')
+        response = self.client.get("/api/framerate")
 
         self.assertEqual(response.status_code, 404)
         data = response.get_json()
-        self.assertEqual(data['error'], 'No videos found')
+        self.assertEqual(data["error"], "No videos found")
 
-    @patch('api.routes.framerate.get_db')
-    @patch('api.routes.framerate.DATA_ROOT')
+    @patch("api.routes.framerate.get_db")
+    @patch("api.routes.framerate.DATA_ROOT")
     def test_get_frame_rate_video_file_not_found(self, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
         mock_analysis = MagicMock()
-        mock_analysis.id = 'test-analysis-id'
+        mock_analysis.id = "test-analysis-id"
 
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_analysis]
         mock_get_db.return_value.__enter__.return_value = mock_db
@@ -106,22 +107,22 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess["user_id"] = self.test_user_id
 
-        response = self.client.get('/api/framerate')
+        response = self.client.get("/api/framerate")
 
         self.assertEqual(response.status_code, 404)
         data = response.get_json()
-        self.assertEqual(data['error'], 'No valid video files found')
+        self.assertEqual(data["error"], "No valid video files found")
 
-    @patch('api.routes.framerate.get_db')
-    @patch('api.routes.framerate.DATA_ROOT')
-    @patch('api.routes.framerate.cv2.VideoCapture')
+    @patch("api.routes.framerate.get_db")
+    @patch("api.routes.framerate.DATA_ROOT")
+    @patch("api.routes.framerate.cv2.VideoCapture")
     def test_get_frame_rate_video_cannot_open(self, mock_cv2, mock_data_root, mock_get_db):
         # Mock database and user
         mock_db = MagicMock()
         mock_analysis = MagicMock()
-        mock_analysis.id = 'test-analysis-id'
+        mock_analysis.id = "test-analysis-id"
 
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_analysis]
         mock_get_db.return_value.__enter__.return_value = mock_db
@@ -140,14 +141,14 @@ class TestFrameRateRoutes(unittest.TestCase):
 
         # Set session for auth
         with self.client.session_transaction() as sess:
-            sess['user_id'] = self.test_user_id
+            sess["user_id"] = self.test_user_id
 
-        response = self.client.get('/api/framerate')
+        response = self.client.get("/api/framerate")
 
         self.assertEqual(response.status_code, 404)
         data = response.get_json()
-        self.assertEqual(data['error'], 'No valid video files found')
+        self.assertEqual(data["error"], "No valid video files found")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

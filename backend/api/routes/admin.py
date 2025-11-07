@@ -24,15 +24,11 @@ from sqlalchemy import desc
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from api import get_db, hash_password
-from api.auth_utils import (
-    require_admin,
-    require_owner,
-    is_last_admin,
-    _audit_log
-)
+from api.auth_utils import require_admin, require_owner, is_last_admin, _audit_log
 from models import User, AuditLog, Analysis
 
 admin_bp = Blueprint("admin", __name__)
@@ -41,6 +37,7 @@ admin_bp = Blueprint("admin", __name__)
 # ============================================================================
 # User Approval Management
 # ============================================================================
+
 
 @admin_bp.get("/pending-users")
 @require_admin
@@ -57,15 +54,12 @@ def get_pending_users():
     with get_db() as db:
         limit = min(int(request.args.get("limit", 100)), 500)
 
-        users = db.query(User).filter(
-            User.pending_approval.is_(True)
-        ).order_by(desc(User.created_at)).limit(limit).all()
+        users = db.query(User).filter(User.pending_approval.is_(True)).order_by(desc(User.created_at)).limit(limit).all()
 
-        return jsonify(users=[{
-            "id": u.id,
-            "username": u.username,
-            "created_at": u.created_at.isoformat()
-        } for u in users]), 200
+        return (
+            jsonify(users=[{"id": u.id, "username": u.username, "created_at": u.created_at.isoformat()} for u in users]),
+            200,
+        )
 
 
 @admin_bp.post("/users/<int:user_id>/approve")
@@ -140,6 +134,7 @@ def reject_user(user_id: int):
 # Audit Logs
 # ============================================================================
 
+
 @admin_bp.get("/audit-logs")
 @require_admin
 def get_audit_logs():
@@ -160,9 +155,7 @@ def get_audit_logs():
         user_id_filter = request.args.get("user_id")
 
         # JOIN to get username in one query (avoid N+1)
-        query = db.query(AuditLog, User.username).outerjoin(
-            User, AuditLog.user_id == User.id
-        )
+        query = db.query(AuditLog, User.username).outerjoin(User, AuditLog.user_id == User.id)
 
         if user_id_filter:
             query = query.filter(AuditLog.user_id == int(user_id_filter))
@@ -170,16 +163,19 @@ def get_audit_logs():
         total = query.count()
         results = query.order_by(desc(AuditLog.created_at)).limit(limit).offset(offset).all()
 
-        logs = [{
-            "id": log.id,
-            "user_id": log.user_id,
-            "username": username,
-            "event": log.event,
-            "ip": log.ip,
-            "user_agent": log.user_agent,
-            "details": log.details_json,
-            "created_at": log.created_at.isoformat()
-        } for log, username in results]
+        logs = [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "username": username,
+                "event": log.event,
+                "ip": log.ip,
+                "user_agent": log.user_agent,
+                "details": log.details_json,
+                "created_at": log.created_at.isoformat(),
+            }
+            for log, username in results
+        ]
 
         return jsonify(logs=logs, total=total, limit=limit, offset=offset), 200
 
@@ -187,6 +183,7 @@ def get_audit_logs():
 # ============================================================================
 # Analysis Management
 # ============================================================================
+
 
 @admin_bp.get("/analyses")
 @require_admin
@@ -210,9 +207,7 @@ def get_all_analyses():
         status_filter = request.args.get("status")
 
         # JOIN to avoid N+1
-        query = db.query(Analysis, User.username).join(
-            User, Analysis.user_id == User.id
-        )
+        query = db.query(Analysis, User.username).join(User, Analysis.user_id == User.id)
 
         if user_id_filter:
             query = query.filter(Analysis.user_id == int(user_id_filter))
@@ -222,15 +217,18 @@ def get_all_analyses():
         total = query.count()
         results = query.order_by(desc(Analysis.created_at)).limit(limit).offset(offset).all()
 
-        analyses = [{
-            "id": a.id,
-            "user_id": a.user_id,
-            "username": username,
-            "original_filename": a.original_filename,
-            "status": a.status,
-            "created_at": a.created_at.isoformat(),
-            "updated_at": a.updated_at.isoformat()
-        } for a, username in results]
+        analyses = [
+            {
+                "id": a.id,
+                "user_id": a.user_id,
+                "username": username,
+                "original_filename": a.original_filename,
+                "status": a.status,
+                "created_at": a.created_at.isoformat(),
+                "updated_at": a.updated_at.isoformat(),
+            }
+            for a, username in results
+        ]
 
         return jsonify(analyses=analyses, total=total, limit=limit, offset=offset), 200
 
@@ -272,19 +270,15 @@ def reassign_analysis(analysis_id: str):
         old_user_id = analysis.user_id
         analysis.user_id = new_user_id
 
-        _audit_log(db, "analysis_reassigned", details={
-            "analysis_id": analysis_id,
-            "old_user_id": old_user_id,
-            "new_user_id": new_user_id
-        })
+        _audit_log(
+            db,
+            "analysis_reassigned",
+            details={"analysis_id": analysis_id, "old_user_id": old_user_id, "new_user_id": new_user_id},
+        )
 
         db.commit()
 
-        return jsonify(
-            message="Analysis reassigned",
-            analysis_id=analysis_id,
-            new_user_id=new_user_id
-        ), 200
+        return jsonify(message="Analysis reassigned", analysis_id=analysis_id, new_user_id=new_user_id), 200
 
 
 @admin_bp.get("/users/search")
@@ -307,10 +301,7 @@ def search_users():
         limit = min(int(request.args.get("limit", 20)), 100)
 
         # Build base query for active, approved users
-        base_query = db.query(User).filter(
-            User.active.is_(True),
-            User.pending_approval.is_(False)
-        )
+        base_query = db.query(User).filter(User.active.is_(True), User.pending_approval.is_(False))
 
         # Apply username filter if query is provided
         if query:
@@ -318,16 +309,13 @@ def search_users():
 
         users = base_query.limit(limit).all()
 
-        return jsonify(users=[{
-            "id": u.id,
-            "username": u.username,
-            "role": u.role
-        } for u in users]), 200
+        return jsonify(users=[{"id": u.id, "username": u.username, "role": u.role} for u in users]), 200
 
 
 # ============================================================================
 # Owner-Only: Role Management
 # ============================================================================
+
 
 @admin_bp.post("/users/<int:user_id>/promote")
 @require_owner

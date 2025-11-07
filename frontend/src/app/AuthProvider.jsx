@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiLogin, apiMe, apiLogout, apiSignUp } from '../api/auth.js';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { apiLogin, apiMe, apiLogout, apiSignUp } from "../api/auth.js";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'authenticated' | 'unauthenticated'
+  const [status, setStatus] = useState("idle"); // 'idle' | 'loading' | 'authenticated' | 'unauthenticated'
   const [error, setError] = useState(null);
 
   // Check authentication on mount
@@ -14,24 +14,24 @@ export function AuthProvider({ children }) {
   }, []);
 
   const refreshMe = async () => {
-    setStatus('loading');
+    setStatus("loading");
     setError(null);
-    
+
     try {
       const data = await apiMe();
       setUser(data.user);
-      setStatus('authenticated');
+      setStatus("authenticated");
     } catch (err) {
       setUser(null);
       if (err.status === 401) {
         // Not authenticated
-        setStatus('unauthenticated');
+        setStatus("unauthenticated");
       } else if (err.status === 0) {
         // Backend unavailable
-        setStatus('unauthenticated');
-        setError('backend_unavailable');
+        setStatus("unauthenticated");
+        setError("backend_unavailable");
       } else {
-        setStatus('unauthenticated');
+        setStatus("unauthenticated");
         setError(err.message);
       }
     }
@@ -39,31 +39,20 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     setError(null);
-    
-    try {
-      const data = await apiLogin({ username, password });
-      setUser(data.user);
-      setStatus('authenticated');
-      return data;
-    } catch (err) {
-      // Let the caller handle the error
-      throw err;
-    }
+    const data = await apiLogin({ username, password });
+    setUser(data.user);
+    setStatus("authenticated");
+    return data;
   };
 
   const signup = async (username, password) => {
-  setError(null);
-  try {
+    setError(null);
     const data = await apiSignUp({ username, password });
     // If your backend logs the user in immediately after signup:
     setUser(data.user);
-    setStatus('authenticated'); // or 'registered' if you prefer a separate state
+    setStatus("authenticated"); // or 'registered' if you prefer a separate state
     return data;
-  } catch (err) {
-    // Let caller (e.g., SignUp page) handle display
-    throw err;
-  }
-};
+  };
 
   const logout = async () => {
     try {
@@ -71,9 +60,9 @@ export function AuthProvider({ children }) {
     } catch {
       // Ignore logout errors
     }
-    
+
     setUser(null);
-    setStatus('unauthenticated');
+    setStatus("unauthenticated");
     setError(null);
   };
 
@@ -84,20 +73,16 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
-    refreshMe
+    refreshMe,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 }

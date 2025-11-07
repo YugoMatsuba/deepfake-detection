@@ -5,10 +5,7 @@ Image analysis orchestrator.
 Coordinates ML inference, traditional forensics, and EXIF analysis for single images.
 """
 from __future__ import annotations
-import os
-import shutil
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 import logging
 
 from storage import DATA_ROOT
@@ -21,11 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_image_analysis(
-    image_path: str,
-    image_sha256: str,
-    ml_modules: list[str],
-    traditional_modules: list[str],
-    analysis_id: str
+    image_path: str, image_sha256: str, ml_modules: list[str], traditional_modules: list[str], analysis_id: str
 ) -> dict[str, Any]:
     """
     Orchestrate image analysis pipeline.
@@ -64,11 +57,7 @@ def run_image_analysis(
             }
         }
     """
-    results = {
-        "ml": {},
-        "traditional": {},
-        "exif": {}
-    }
+    results = {"ml": {}, "traditional": {}, "exif": {}}
 
     # 1. ML Analysis (if requested)
     if ml_modules:
@@ -76,9 +65,7 @@ def run_image_analysis(
 
     # 2. Traditional Forensics (if requested)
     if traditional_modules:
-        results["traditional"] = _run_traditional_on_image(
-            image_path, traditional_modules, analysis_id
-        )
+        results["traditional"] = _run_traditional_on_image(image_path, traditional_modules, analysis_id)
 
     # 3. EXIF Analysis (always included)
     results["exif"] = run_image_exif_analysis(image_path, image_sha256)
@@ -112,11 +99,7 @@ def _run_ml_on_image(image_path: str, ml_modules: list[str], analysis_id: str) -
         # The function expects a video_path and frame_number, but for images
         # we can pass the image path directly with frame_number=0
         result = analyze_single_frame(
-            video_path=image_path,
-            frame_number=0,
-            device=None,  # Auto-detect
-            models=ml_modules,
-            weights=None  # Use defaults
+            video_path=image_path, frame_number=0, device=None, models=ml_modules, weights=None  # Auto-detect  # Use defaults
         )
 
         # Check for errors
@@ -143,11 +126,7 @@ def _run_ml_on_image(image_path: str, ml_modules: list[str], analysis_id: str) -
         return {"error": str(e)}
 
 
-def _run_traditional_on_image(
-    image_path: str,
-    traditional_modules: list[str],
-    analysis_id: str
-) -> dict:
+def _run_traditional_on_image(image_path: str, traditional_modules: list[str], analysis_id: str) -> dict:
     """
     Run traditional forensics (ELA, Noise, LBP) on a single image.
 
@@ -179,6 +158,7 @@ def _run_traditional_on_image(
     try:
         # Copy image to frame_0.jpg (convert to JPG if needed)
         from PIL import Image
+
         img = Image.open(image_path)
         # Convert to RGB if necessary (handles RGBA, grayscale, etc.)
         if img.mode != "RGB":
@@ -206,7 +186,7 @@ def _run_traditional_on_image(
                     str(frames_dir),  # Folder containing frame_0.jpg
                     top_percent=100,  # Get result for our single frame
                     output_dir=str(method_dir),
-                    analysis_id=analysis_id
+                    analysis_id=analysis_id,
                 )
 
                 # Handle both single-frame and multi-frame responses
@@ -217,7 +197,7 @@ def _run_traditional_on_image(
                             "score": raw_result.get("score", 0),
                             "raw_score": raw_result.get("score", 0),
                             "frame_number": 0,
-                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/0/overlay"
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/0/overlay",
                         }
                     elif raw_result.get("frames"):
                         # Multi-frame returns: {"frames": [{...}]}
@@ -226,15 +206,12 @@ def _run_traditional_on_image(
                             "score": frame_result.get("score", 0),
                             "raw_score": frame_result.get("raw_score", 0),
                             "frame_number": 0,
-                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/0/overlay"
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/0/overlay",
                         }
 
             elif method_name == "noise":
                 raw_result = run_noise_analysis(
-                    str(frames_dir),
-                    top_percent=100,
-                    output_dir=str(method_dir),
-                    analysis_id=analysis_id
+                    str(frames_dir), top_percent=100, output_dir=str(method_dir), analysis_id=analysis_id
                 )
 
                 if raw_result:
@@ -244,7 +221,7 @@ def _run_traditional_on_image(
                             "confidence": raw_result.get("confidence", 0),
                             "raw_score": raw_result.get("confidence", 0),
                             "frame_number": 0,
-                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/0/overlay"
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/0/overlay",
                         }
                     elif raw_result.get("frames"):
                         frame_result = raw_result["frames"][0]
@@ -253,15 +230,12 @@ def _run_traditional_on_image(
                             "confidence": frame_result.get("confidence", 0),
                             "raw_score": frame_result.get("raw_score", 0),
                             "frame_number": 0,
-                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/0/overlay"
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/0/overlay",
                         }
 
             elif method_name == "lbp":
                 raw_result = run_lbp_analysis(
-                    str(frames_dir),
-                    top_percent=100,
-                    output_dir=str(method_dir),
-                    analysis_id=analysis_id
+                    str(frames_dir), top_percent=100, output_dir=str(method_dir), analysis_id=analysis_id
                 )
 
                 if raw_result:
@@ -270,7 +244,7 @@ def _run_traditional_on_image(
                             "score": raw_result.get("score", 0),
                             "raw_score": raw_result.get("score", 0),
                             "frame_number": 0,
-                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/0/overlay"
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/0/overlay",
                         }
                     elif raw_result.get("frames"):
                         frame_result = raw_result["frames"][0]
@@ -278,7 +252,7 @@ def _run_traditional_on_image(
                             "score": frame_result.get("score", 0),
                             "raw_score": frame_result.get("raw_score", 0),
                             "frame_number": 0,
-                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/0/overlay"
+                            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/0/overlay",
                         }
 
         except Exception as e:

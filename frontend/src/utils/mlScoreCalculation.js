@@ -18,13 +18,13 @@ import { getClassification, getMethodologyInfo } from "../config/mlThresholds";
  * @returns {Object} - {score: 0.85, scorePercent: 85, classification: "Likely fake"} or null if insufficient data
  */
 export function calculateTop5EnsembleScore(mlData) {
-  if (!mlData || typeof mlData !== 'object') {
+  if (!mlData || typeof mlData !== "object") {
     return null;
   }
 
   // Extract models we care about
-  const models = ['xception', 'spsl', 'ucf'];
-  const modelData = models.map(name => mlData[name]).filter(Boolean);
+  const models = ["xception", "spsl", "ucf"];
+  const modelData = models.map((name) => mlData[name]).filter(Boolean);
 
   if (modelData.length === 0) {
     return null;
@@ -49,7 +49,7 @@ export function calculateTop5EnsembleScore(mlData) {
 
   // Filter to frames that have scores from all 3 models
   const ensembleScores = [];
-  for (const [index, scores] of frameScoresMap.entries()) {
+  for (const [_index, scores] of frameScoresMap.entries()) {
     if (scores.xception !== undefined && scores.spsl !== undefined && scores.ucf !== undefined) {
       const ensembleScore = (scores.xception + scores.spsl + scores.ucf) / 3;
       ensembleScores.push(ensembleScore);
@@ -76,7 +76,7 @@ export function calculateTop5EnsembleScore(mlData) {
   return {
     score: meanScore,
     scorePercent: Math.round(meanScore * 100),
-    classification: classification
+    classification: classification,
   };
 }
 

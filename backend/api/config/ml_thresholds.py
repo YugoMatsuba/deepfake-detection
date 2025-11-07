@@ -6,6 +6,7 @@ To modify thresholds or add/remove categories, edit this file only.
 
 Based on evaluation findings: k=5, thresh=0.80 → Acc=0.920
 """
+
 from typing import Tuple, List
 
 
@@ -66,8 +67,8 @@ def get_methodology_description() -> str:
     bands_text = ", ".join(bands)
 
     return (
-        f"The overall score represents the average of the top 5 highest-scoring frames, "
-        f"where each frame's score is the ensemble average across all ML models (Xception, SPSL, UCF). "
+        "The overall score represents the average of the top 5 highest-scoring frames, "
+        "where each frame's score is the ensemble average across all ML models (Xception, SPSL, UCF). "
         f"Classification bands: {bands_text}. "
-        f"Higher scores indicate greater likelihood of manipulation."
+        "Higher scores indicate greater likelihood of manipulation."
     )

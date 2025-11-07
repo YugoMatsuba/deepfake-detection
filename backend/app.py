@@ -11,7 +11,6 @@ Responsibilities (no business logic here):
 
 from __future__ import annotations
 import os
-from pathlib import Path
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_compress import Compress
@@ -23,6 +22,7 @@ from api.routes.video_upload import video_bp
 from api.routes.analysis import analysis_bp
 from api.routes.admin import admin_bp  # Admin dashboard routes
 from api.routes.reports import reports_bp  # PDF report generation
+
 # Models now in consolidated models.py (managed by Alembic)
 from models import User
 from dotenv import load_dotenv
@@ -64,10 +64,7 @@ def bootstrap_owner_from_env():
 
     with get_db() as db:
         # Count existing owners
-        owner_count = db.query(User).filter(
-            User.role == "owner",
-            User.active.is_(True)
-        ).count()
+        owner_count = db.query(User).filter(User.role == "owner", User.active.is_(True)).count()
 
         # Find env user
         user = db.query(User).filter(User.username == owner_username).first()
@@ -79,8 +76,7 @@ def bootstrap_owner_from_env():
                 seed_pw = os.getenv("OWNER_SEED_PASSWORD")
                 if not seed_pw:
                     raise RuntimeError(
-                        f"OWNER_USERNAME={owner_username} set but user doesn't exist "
-                        "and OWNER_SEED_PASSWORD not provided."
+                        f"OWNER_USERNAME={owner_username} set but user doesn't exist " "and OWNER_SEED_PASSWORD not provided."
                     )
                 user = User(
                     username=owner_username,
@@ -113,10 +109,7 @@ def bootstrap_owner_from_env():
                 return
 
             # Transfer ownership: demote current owners and promote env user
-            current_owners = db.query(User).filter(
-                User.role == "owner",
-                User.active.is_(True)
-            ).all()
+            current_owners = db.query(User).filter(User.role == "owner", User.active.is_(True)).all()
 
             for o in current_owners:
                 if o.username != owner_username:
@@ -175,10 +168,7 @@ def create_app() -> Flask:
 
     # --- CORS (dev only) ---
     # For dev Vite at http://localhost:5173. Tighten for prod.
-    frontend_origins = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173"  # default dev FE origins
-    )
+    frontend_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")  # default dev FE origins
     origins_list = [o.strip() for o in frontend_origins.split(",") if o.strip()]
 
     CORS(
@@ -191,8 +181,8 @@ def create_app() -> Flask:
     is_prod = os.getenv("ENVIRONMENT") == "production"
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="Lax",   # good for top-level nav flows
-        SESSION_COOKIE_SECURE=is_prod,   # flips on under HTTPS/nginx
+        SESSION_COOKIE_SAMESITE="Lax",  # good for top-level nav flows
+        SESSION_COOKIE_SECURE=is_prod,  # flips on under HTTPS/nginx
     )
 
     # --- Compression (gzip) ---
@@ -213,8 +203,9 @@ def create_app() -> Flask:
     return app
 
 
-# For `python app.py` dev runs
+# For `python app.py` dev runs (not used in production - gunicorn doesn't call this)
 if __name__ == "__main__":
     app = create_app()
     # Read PORT env if set, else default to 5050
-    app.run(port=int(os.getenv("PORT", 5050)), debug=True)
+    # Debug mode only for local development - production uses gunicorn
+    app.run(port=int(os.getenv("PORT", 5050)), debug=True)  # nosec B201

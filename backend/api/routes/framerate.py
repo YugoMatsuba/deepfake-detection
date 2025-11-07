@@ -1,12 +1,12 @@
-from flask import Blueprint, jsonify, g
+from flask import Blueprint, jsonify
 import cv2
-from pathlib import Path
 from api import get_db
 from api.auth_utils import require_user, current_user
 from models import Analysis
 from storage import DATA_ROOT
 
 frame_rate_bp = Blueprint("framerate", __name__)
+
 
 @frame_rate_bp.get("/framerate")
 @require_user
@@ -30,9 +30,7 @@ def get_frame_rate():
             analyses = db.query(Analysis).order_by(Analysis.created_at.desc()).all()
         else:
             # Regular users see only their own
-            analyses = db.query(Analysis).filter(
-                Analysis.user_id == user.id
-            ).order_by(Analysis.created_at.desc()).all()
+            analyses = db.query(Analysis).filter(Analysis.user_id == user.id).order_by(Analysis.created_at.desc()).all()
 
         if not analyses:
             return jsonify({"error": "No videos found"}), 404
@@ -53,10 +51,12 @@ def get_frame_rate():
                     fps = cap.get(cv2.CAP_PROP_FPS)
                     cap.release()
 
-                    return jsonify({
-                        "video_id": analysis.id,
-                        "original_name": analysis.original_filename or video_path.name,
-                        "frame_rate": fps
-                    })
+                    return jsonify(
+                        {
+                            "video_id": analysis.id,
+                            "original_name": analysis.original_filename or video_path.name,
+                            "frame_rate": fps,
+                        }
+                    )
 
         return jsonify({"error": "No valid video files found"}), 404

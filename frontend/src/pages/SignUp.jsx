@@ -5,13 +5,13 @@ import { useAuth } from "../app/useAuth.js";
 export default function SignUp() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm]   = useState("");
+  const [confirm, setConfirm] = useState("");
 
-  const [showPassword, setShowPassword]       = useState(false);
-  const [showConfirm, setShowConfirm]         = useState(false);
-  const [submitting, setSubmitting]           = useState(false);
-  const [err, setErr]                         = useState(null);
-  const [success, setSuccess]                 = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState(null);
+  const [success, setSuccess] = useState(false);
 
   const navigate = useNavigate();
   const { signup } = useAuth();
@@ -27,7 +27,7 @@ export default function SignUp() {
         throw new Error("Passwords do not match");
       }
       const usernameValue = username.trim();
-      const data = await signup(usernameValue, password);
+      await signup(usernameValue, password);
 
       // Success - show pending approval message (backend doesn't auto-login)
       setSuccess(true);
@@ -52,7 +52,8 @@ export default function SignUp() {
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <p className="text-green-800 font-semibold mb-1">Account created!</p>
             <p className="text-green-700 text-sm mb-3">
-              Your account is awaiting admin approval. You'll be able to log in once an admin reviews your request.
+              Your account is awaiting admin approval. You'll be able to log in once an admin
+              reviews your request.
             </p>
             <button
               onClick={() => navigate("/login")}
@@ -62,102 +63,102 @@ export default function SignUp() {
             </button>
           </div>
         ) : (
-        <form onSubmit={onSubmit} className="grid gap-3">
-          {/* Username */}
-          <div>
-            <label htmlFor="su-username" className="block mb-1 text-[13px]">
-              Username
-            </label>
-            <input
-              id="su-username"
-              type="text"
-              autoComplete="username"
-              required
-              disabled={submitting}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="username"
-              className="w-full box-border px-3 py-2 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="su-password" className="block mb-1 text-[13px]">
-                Password
+          <form onSubmit={onSubmit} className="grid gap-3">
+            {/* Username */}
+            <div>
+              <label htmlFor="su-username" className="block mb-1 text-[13px]">
+                Username
               </label>
+              <input
+                id="su-username"
+                type="text"
+                autoComplete="username"
+                required
+                disabled={submitting}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="username"
+                className="w-full box-border px-3 py-2 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label htmlFor="su-password" className="block mb-1 text-[13px]">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="text-gray-900 underline text-xs disabled:opacity-50"
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              <input
+                id="su-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                disabled={submitting}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full box-border px-3 py-2 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label htmlFor="su-confirm" className="block mb-1 text-[13px]">
+                  Confirm password
+                </label>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setShowConfirm((s) => !s)}
+                  className="text-gray-900 underline text-xs disabled:opacity-50"
+                  aria-pressed={showConfirm}
+                >
+                  {showConfirm ? "Hide" : "Show"}
+                </button>
+              </div>
+              <input
+                id="su-confirm"
+                type={showConfirm ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                disabled={submitting}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="••••••••"
+                className="w-full box-border px-3 py-2 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[13px]">
               <button
                 type="button"
-                disabled={submitting}
-                onClick={() => setShowPassword((s) => !s)}
-                className="text-gray-900 underline text-xs disabled:opacity-50"
-                aria-pressed={showPassword}
+                onClick={() => navigate("/login")}
+                className="text-gray-900 underline"
               >
-                {showPassword ? "Hide" : "Show"}
+                Have an account? Log in
               </button>
             </div>
-            <input
-              id="su-password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              required
-              disabled={submitting}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full box-border px-3 py-2 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            />
-          </div>
 
-          {/* Confirm Password */}
-          <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="su-confirm" className="block mb-1 text-[13px]">
-                Confirm password
-              </label>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setShowConfirm((s) => !s)}
-                className="text-gray-900 underline text-xs disabled:opacity-50"
-                aria-pressed={showConfirm}
-              >
-                {showConfirm ? "Hide" : "Show"}
-              </button>
-            </div>
-            <input
-              id="su-confirm"
-              type={showConfirm ? "text" : "password"}
-              autoComplete="new-password"
-              required
-              disabled={submitting}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="••••••••"
-              className="w-full box-border px-3 py-2 rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-[13px]">
+            {/* Submit */}
             <button
-              type="button"
-              onClick={() => navigate("/login")}
-              className="text-gray-900 underline"
+              type="submit"
+              disabled={submitting}
+              className="w-full box-border px-3 py-3 rounded-lg border border-blue-600 bg-blue-600 text-white font-semibold hover:opacity-95 active:opacity-90 transition disabled:opacity-50"
             >
-              Have an account? Log in
+              {submitting ? "Creating account..." : "Create account"}
             </button>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full box-border px-3 py-3 rounded-lg border border-blue-600 bg-blue-600 text-white font-semibold hover:opacity-95 active:opacity-90 transition disabled:opacity-50"
-          >
-            {submitting ? "Creating account..." : "Create account"}
-          </button>
-        </form>
+          </form>
         )}
       </div>
     </div>

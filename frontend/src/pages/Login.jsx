@@ -9,7 +9,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState(null);
   const [showForgotPopup, setShowForgotPopup] = useState(false);
-  
+
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -23,7 +23,7 @@ export default function Login() {
       const data = await login(usernameValue, password);
 
       // Role-based routing after successful login
-      if (data.user.role === 'admin' || data.user.role === 'owner') {
+      if (data.user.role === "admin" || data.user.role === "owner") {
         navigate("/role-select", { replace: true });
       } else {
         navigate("/upload", { replace: true });
@@ -32,10 +32,10 @@ export default function Login() {
       // Handle specific error cases
       const errorCode = error.body?.error;
 
-      if (errorCode === 'account_pending_approval') {
-        setErr('Your account is awaiting admin approval. Please check back later.');
-      } else if (errorCode === 'invalid_credentials') {
-        setErr('Invalid username or password.');
+      if (errorCode === "account_pending_approval") {
+        setErr("Your account is awaiting admin approval. Please check back later.");
+      } else if (errorCode === "invalid_credentials") {
+        setErr("Invalid username or password.");
       } else {
         setErr(error.message || "Login failed");
       }
@@ -125,19 +125,22 @@ export default function Login() {
 
         <footer className="mt-2 text-center text-xs opacity-80">
           Don't have an account?{" "}
-      <button
-        type="button"
-        onClick={() => navigate("/signup")}
-        className="text-gray-900 underline"
-      >
-        Sign up
-      </button>
-    </footer>
-  </div>
+          <button
+            type="button"
+            onClick={() => navigate("/signup")}
+            className="text-gray-900 underline"
+          >
+            Sign up
+          </button>
+        </footer>
+      </div>
 
       {/* Forgot Password Popup */}
       {showForgotPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowForgotPopup(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setShowForgotPopup(false)}
+        >
           <div
             className="relative w-[400px] max-w-[90%] bg-white rounded-lg shadow-xl p-6"
             onClick={(e) => e.stopPropagation()}
@@ -149,14 +152,17 @@ export default function Login() {
               aria-label="Close"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
 
             {/* Content */}
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              Forgot Password?
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Forgot Password?</h3>
             <p className="text-sm text-gray-700 mb-4">
               Please contact an administrator to reset your password.
             </p>
@@ -169,6 +175,6 @@ export default function Login() {
           </div>
         </div>
       )}
-</div>
-);
+    </div>
+  );
 }

@@ -28,6 +28,7 @@ _ph = PasswordHasher()
 
 class Base(DeclarativeBase):
     """Declarative base for SQLAlchemy models (define in routes for now; move later)."""
+
     pass
 
 

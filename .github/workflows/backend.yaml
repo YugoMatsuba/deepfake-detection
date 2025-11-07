@@ -67,16 +67,27 @@ jobs:
         # Then install test dependencies
         pip install -r requirements-test.txt
 
-    - name: Lint with flake8 (if available)
+    - name: Lint with flake8
       working-directory: backend
       run: |
-        pip install flake8 || echo "flake8 not installed, skipping lint"
-        if command -v flake8 &> /dev/null; then
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-        fi
+        pip install flake8
+        # Run flake8 with config file (.flake8)
+        # This enforces code quality and will FAIL the build on violations
+        flake8 .
+
+    - name: Check formatting with Black
+      working-directory: backend
+      run: |
+        # Black is installed via requirements-test.txt
+        # This will FAIL if code is not formatted according to Black style
+        black --check .
+
+    - name: Lint with Ruff
+      working-directory: backend
+      run: |
+        # Ruff is installed via requirements-test.txt
+        # This will FAIL on linting violations (uses pyproject.toml config)
+        ruff check .
 
     - name: Test with pytest + coverage
       working-directory: backend
@@ -112,14 +123,16 @@ jobs:
     - name: Run Bandit Security Linter
       working-directory: backend
       run: |
-        # Run bandit with configuration file
-        bandit -r . -f json -o bandit-report.json || true
-        bandit -r . -f txt || echo "Security issues found but not failing build"
+        # Fail build on high/medium severity security issues
+        bandit -r . -ll -f txt \
+          --exclude=./tests,./alembic \
+          --skip=B404,B603
 
     - name: Check dependencies for known security vulnerabilities
       working-directory: backend
       run: |
         # Create a temporary requirements file from installed packages
         pip freeze > temp-requirements.txt
-        safety check -r temp-requirements.txt || true
+        # Fail build on known vulnerabilities (except development-only packages)
+        safety check -r temp-requirements.txt --continue-on-error
         rm temp-requirements.txt

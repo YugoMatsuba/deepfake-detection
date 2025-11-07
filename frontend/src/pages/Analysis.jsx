@@ -2,25 +2,17 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAnalysis } from "../app/AnalysisProvider";
 import { startAnalysis } from "../api/videos";
-import {
-  MetadataAnomaliesSummary,
-  IntegrityStatus,
-  FrameHashesSummary
-} from "./MetadataResults";
+import { MetadataAnomaliesSummary, IntegrityStatus, FrameHashesSummary } from "./MetadataResults";
 import { calculateTop5EnsembleScore, getScoringMethodologyInfo } from "../utils/mlScoreCalculation";
 import InfoButton from "../components/InfoButton";
 
-const baseButton = "justify-center items-center mt-[15px] text-[17px] font-semibold px-10 py-3.5 rounded-lg shadow";
+const baseButton =
+  "justify-center items-center mt-[15px] text-[17px] font-semibold px-10 py-3.5 rounded-lg shadow";
 
 export default function Analysis() {
   const navigate = useNavigate();
-  const {
-    analysisId,
-    selectedModules,
-    analysisResult,
-    setAnalysisResult
-  } = useAnalysis();
-  const [status, setStatus] = useState('running'); // Start directly in running state
+  const { analysisId, selectedModules, analysisResult, setAnalysisResult } = useAnalysis();
+  const [status, setStatus] = useState("running"); // Start directly in running state
   const [fakeVideoPercentage, setFakeVideoPercentage] = useState(null);
   const [classification, setClassification] = useState(null);
   const [ela, setEla] = useState(null);
@@ -31,7 +23,7 @@ export default function Analysis() {
 
   useEffect(() => {
     if (!analysisId) {
-      navigate('/upload');
+      navigate("/upload");
       return;
     }
 
@@ -43,7 +35,7 @@ export default function Analysis() {
   }, [analysisId, navigate]);
 
   const handleStartAnalysis = async () => {
-    setStatus('running');
+    setStatus("running");
     setError(null);
     setAnalysisResult(null);
 
@@ -94,35 +86,29 @@ export default function Analysis() {
       }
 
       setAnalysisResult(result);
-      setStatus('success');
+      setStatus("success");
     } catch (err) {
-      setError(err.message || 'Analysis failed');
-      setStatus('error');
+      setError(err.message || "Analysis failed");
+      setStatus("error");
     }
   };
 
-  if (status === 'running') {
+  if (status === "running") {
     return (
       <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[200px]">
-        <h1 className="mt-[60px] text-4xl text-[#0D47A1] text-center">
-          Running Analysis...
-        </h1>
-        <p className="mt-[40px] text-2xl text-gray-600">
-          This may take 1-2 minutes
-        </p>
+        <h1 className="mt-[60px] text-4xl text-[#0D47A1] text-center">Running Analysis...</h1>
+        <p className="mt-[40px] text-2xl text-gray-600">This may take 1-2 minutes</p>
       </div>
     );
   }
 
-  if (status === 'error') {
+  if (status === "error") {
     return (
       <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[200px]">
-        <h1 className="mt-[60px] text-4xl text-red-600 text-center">
-          Analysis Failed
-        </h1>
+        <h1 className="mt-[60px] text-4xl text-red-600 text-center">Analysis Failed</h1>
         <p className="mt-[40px] text-xl text-gray-700">{error}</p>
         <button
-          onClick={() => navigate('/upload')}
+          onClick={() => navigate("/upload")}
           className={`${baseButton} mt-[60px] bg-[#1E88E5] text-white hover:bg-[#114f85] transition-colors`}
         >
           Back to Upload
@@ -136,19 +122,15 @@ export default function Analysis() {
     <div className="flex font-inter font-bold flex-col items-center pt-8 mt-[100px]">
       <div className="flex items-center justify-center gap-3 mt-[40px]">
         <h1 className="text-4xl text-[#0D47A1] text-center">
-          Synthetic Media Chance: {fakeVideoPercentage !== null ? `${fakeVideoPercentage}%` : 'N/A'}
+          Synthetic Media Chance: {fakeVideoPercentage !== null ? `${fakeVideoPercentage}%` : "N/A"}
         </h1>
         <InfoButton content={getScoringMethodologyInfo()} />
       </div>
       {classification && (
-        <p className="mt-[15px] text-2xl text-gray-700 text-center">
-          {classification}
-        </p>
+        <p className="mt-[15px] text-2xl text-gray-700 text-center">{classification}</p>
       )}
       {ela !== null && (
-        <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          ELA Top Z-score = {ela}
-        </h2>
+        <h2 className="mt-[30px] text-2xl text-gray-600 text-center">ELA Top Z-score = {ela}</h2>
       )}
 
       {noise !== null && (
@@ -158,17 +140,13 @@ export default function Analysis() {
       )}
 
       {lbp !== null && (
-        <h2 className="mt-[30px] text-2xl text-gray-600 text-center">
-          LBP Top Z-score = {lbp}
-        </h2>
+        <h2 className="mt-[30px] text-2xl text-gray-600 text-center">LBP Top Z-score = {lbp}</h2>
       )}
 
       {/* Metadata Forensics Results */}
       {analysisResult?.metadata && (
         <div className="mt-[40px] w-full max-w-4xl px-4">
-          <h2 className="text-2xl font-bold text-gray-600 mb-4 text-center">
-            Metadata Forensics
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-600 mb-4 text-center">Metadata Forensics</h2>
 
           {/* Anomalies Summary */}
           <MetadataAnomaliesSummary metadata={analysisResult.metadata} />
@@ -181,24 +159,24 @@ export default function Analysis() {
         </div>
       )}
 
-      <h3 className="mt-[60px] text-4xl">
-        Proceed to frame analysis?
-      </h3>
+      <h3 className="mt-[60px] text-4xl">Proceed to frame analysis?</h3>
 
       <div className="flex flex-row gap-20 mt-[20px]">
         <button
-          onClick={() => navigate('/frame-viewer', {
-            state: {
-              analysisId
-            }
-          })}
+          onClick={() =>
+            navigate("/frame-viewer", {
+              state: {
+                analysisId,
+              },
+            })
+          }
           className={`${baseButton} bg-[#1E88E5] text-white hover:bg-[#114f85] hover:text-[#cccccc] transition-colors`}
           disabled={!analysisResult}
         >
           Yes
         </button>
         <button
-          onClick={() => navigate('/upload')}
+          onClick={() => navigate("/upload")}
           className={`${baseButton} bg-[#E0E0E0] text-[#1702028F] border border-[#1E88E5] hover:bg-[#b5b5b5] hover:text-[#02028f] transition-colors`}
         >
           No

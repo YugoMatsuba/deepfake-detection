@@ -6,7 +6,6 @@ Bridges Flask backend with traditional forensics module.
 Handles traditional forensics execution and output transformation for API responses.
 """
 from __future__ import annotations
-import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -91,55 +90,32 @@ def run_traditional_forensics(video_path: str, modules: list[str], analysis_id: 
                 method_dir.mkdir(parents=True, exist_ok=True)
 
                 if module_name == "ela":
-                    raw_result = run_ela(
-                        frames_folder,
-                        top_percent=10,
-                        output_dir=str(method_dir),
-                        analysis_id=analysis_id
-                    )
+                    raw_result = run_ela(frames_folder, top_percent=10, output_dir=str(method_dir), analysis_id=analysis_id)
                     results["ela"] = transform_ela_result(raw_result, analysis_id)
 
                 elif module_name == "noise":
                     raw_result = run_noise_analysis(
-                        frames_folder,
-                        top_percent=10,
-                        output_dir=str(method_dir),
-                        analysis_id=analysis_id
+                        frames_folder, top_percent=10, output_dir=str(method_dir), analysis_id=analysis_id
                     )
                     results["noise"] = transform_noise_result(raw_result, analysis_id)
 
                 elif module_name == "lbp":
                     raw_result = run_lbp_analysis(
-                        frames_folder,
-                        top_percent=10,
-                        output_dir=str(method_dir),
-                        analysis_id=analysis_id
+                        frames_folder, top_percent=10, output_dir=str(method_dir), analysis_id=analysis_id
                     )
                     results["lbp"] = transform_lbp_result(raw_result, analysis_id)
 
                 else:
-                    results[module_name] = {
-                        "score": None,
-                        "error": f"Unknown forensics module: {module_name}"
-                    }
+                    results[module_name] = {"score": None, "error": f"Unknown forensics module: {module_name}"}
 
             except Exception as e:
-                results[module_name] = {
-                    "score": None,
-                    "error": f"Analysis failed: {str(e)}"
-                }
+                results[module_name] = {"score": None, "error": f"Analysis failed: {str(e)}"}
 
         return results
 
     except Exception as e:
         # If frame extraction fails, return error for all modules
-        return {
-            module: {
-                "score": None,
-                "error": f"Frame extraction failed: {str(e)}"
-            }
-            for module in modules
-        }
+        return {module: {"score": None, "error": f"Frame extraction failed: {str(e)}"} for module in modules}
 
 
 def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[str, Any]:
@@ -150,13 +126,14 @@ def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
             "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
             "frame_number": frame_number,
-            "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None,
-            "requested_adhoc": True  # Ad-hoc single-frame analysis
+            "overlay_url": (
+                f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay"
+                if frame_number is not None
+                else None
+            ),
+            "requested_adhoc": True,  # Ad-hoc single-frame analysis
         }
-        return {
-            "score": frame_entry["score"],
-            "frames": [frame_entry]
-        }
+        return {"score": frame_entry["score"], "frames": [frame_entry]}
 
     # Multi-frame: use first top frame as representative
     top_frames = raw_result.get("top_frames", [])
@@ -164,21 +141,24 @@ def transform_ela_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
         frame_list = []
         for frame in top_frames:
             frame_number = _parse_frame_number(frame.get("frame"))
-            frame_list.append({
-                "frame": frame.get("frame"),
-                "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # Preserve raw score
-                "score": frame.get("score", 0.0),
-                "frame_number": frame_number,
-                "overlay_url": f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay" if frame_number is not None else None,
-                "flagged": frame.get("flagged", False),  # Pass through flagged status
-                "requested_adhoc": False  # Initial analysis frames
-            })
+            frame_list.append(
+                {
+                    "frame": frame.get("frame"),
+                    "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # Preserve raw score
+                    "score": frame.get("score", 0.0),
+                    "frame_number": frame_number,
+                    "overlay_url": (
+                        f"/api/analyses/{analysis_id}/forensics/ela/frames/{frame_number}/overlay"
+                        if frame_number is not None
+                        else None
+                    ),
+                    "flagged": frame.get("flagged", False),  # Pass through flagged status
+                    "requested_adhoc": False,  # Initial analysis frames
+                }
+            )
         # Overall score = MAX z-score (most suspicious frame)
         max_score = max(f["score"] for f in frame_list)
-        return {
-            "score": max_score,
-            "frames": frame_list
-        }
+        return {"score": max_score, "frames": frame_list}
 
     return {"score": 0.0, "frames": []}
 
@@ -191,13 +171,17 @@ def transform_noise_result(raw_result: dict[str, Any], analysis_id: str) -> dict
             "frame": raw_result.get("frame"),
             "confidence": raw_result.get("confidence", 0.0),
             "frame_number": frame_number,
-            "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None,
-            "requested_adhoc": True  # Ad-hoc single-frame analysis
+            "overlay_url": (
+                f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay"
+                if frame_number is not None
+                else None
+            ),
+            "requested_adhoc": True,  # Ad-hoc single-frame analysis
         }
         return {
             "confidence": frame_entry["confidence"],
             "score": frame_entry["confidence"],  # Also set "score" for DB compatibility
-            "frames": [frame_entry]
+            "frames": [frame_entry],
         }
 
     # Multi-frame: use first top frame (z-scores can be negative)
@@ -207,23 +191,25 @@ def transform_noise_result(raw_result: dict[str, Any], analysis_id: str) -> dict
         for frame in top_frames:
             frame_number = _parse_frame_number(frame.get("frame"))
             z_score = frame.get("score", 0.0)
-            frame_list.append({
-                "frame": frame.get("frame"),
-                "raw_score": frame.get("raw_score", z_score),  # Preserve raw score
-                "confidence": z_score,  # Z-score
-                "score": z_score,  # Also store as "score" for consistency
-                "frame_number": frame_number,
-                "overlay_url": f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay" if frame_number is not None else None,
-                "flagged": frame.get("flagged", False),  # Pass through flagged status
-                "requested_adhoc": False  # Initial analysis frames
-            })
+            frame_list.append(
+                {
+                    "frame": frame.get("frame"),
+                    "raw_score": frame.get("raw_score", z_score),  # Preserve raw score
+                    "confidence": z_score,  # Z-score
+                    "score": z_score,  # Also store as "score" for consistency
+                    "frame_number": frame_number,
+                    "overlay_url": (
+                        f"/api/analyses/{analysis_id}/forensics/noise/frames/{frame_number}/overlay"
+                        if frame_number is not None
+                        else None
+                    ),
+                    "flagged": frame.get("flagged", False),  # Pass through flagged status
+                    "requested_adhoc": False,  # Initial analysis frames
+                }
+            )
         # Overall score = MAX z-score (most suspicious frame)
         max_score = max(f["score"] for f in frame_list)
-        return {
-            "confidence": max_score,
-            "score": max_score,
-            "frames": frame_list
-        }
+        return {"confidence": max_score, "score": max_score, "frames": frame_list}
 
     return {"confidence": 0.0, "score": 0.0, "frames": []}
 
@@ -236,13 +222,14 @@ def transform_lbp_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
             "frame": raw_result.get("frame"),
             "score": raw_result.get("score", 0.0),
             "frame_number": frame_number,
-            "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None,
-            "requested_adhoc": True  # Ad-hoc single-frame analysis
+            "overlay_url": (
+                f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay"
+                if frame_number is not None
+                else None
+            ),
+            "requested_adhoc": True,  # Ad-hoc single-frame analysis
         }
-        return {
-            "score": frame_entry["score"],
-            "frames": [frame_entry]
-        }
+        return {"score": frame_entry["score"], "frames": [frame_entry]}
 
     # Multi-frame: use first top frame
     top_frames = raw_result.get("top_frames", [])
@@ -250,20 +237,23 @@ def transform_lbp_result(raw_result: dict[str, Any], analysis_id: str) -> dict[s
         frame_list = []
         for frame in top_frames:
             frame_number = _parse_frame_number(frame.get("frame"))
-            frame_list.append({
-                "frame": frame.get("frame"),
-                "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # Preserve raw score
-                "score": frame.get("normalized_score", frame.get("score", 0.0)),
-                "frame_number": frame_number,
-                "overlay_url": f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay" if frame_number is not None else None,
-                "flagged": frame.get("flagged", False),  # Pass through flagged status
-                "requested_adhoc": False  # Initial analysis frames
-            })
+            frame_list.append(
+                {
+                    "frame": frame.get("frame"),
+                    "raw_score": frame.get("raw_score", frame.get("score", 0.0)),  # Preserve raw score
+                    "score": frame.get("normalized_score", frame.get("score", 0.0)),
+                    "frame_number": frame_number,
+                    "overlay_url": (
+                        f"/api/analyses/{analysis_id}/forensics/lbp/frames/{frame_number}/overlay"
+                        if frame_number is not None
+                        else None
+                    ),
+                    "flagged": frame.get("flagged", False),  # Pass through flagged status
+                    "requested_adhoc": False,  # Initial analysis frames
+                }
+            )
         # Overall score = MAX z-score (most suspicious frame)
         max_score = max(f["score"] for f in frame_list)
-        return {
-            "score": max_score,
-            "frames": frame_list
-        }
+        return {"score": max_score, "frames": frame_list}
 
     return {"score": 0.0, "frames": []}

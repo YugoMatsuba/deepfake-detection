@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from io import BytesIO
-from PIL import Image, ImageChops, ImageEnhance
+from PIL import Image, ImageChops
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -74,7 +74,7 @@ def compute_ela_score(image_path, resave_quality=90):
     # Apply percentile-based contrast stretch for better visibility
     ela_np = np.array(ela_image)
     ela_stretched = stretch_to_uint8(ela_np, ELA_PCTL_LOW, ELA_PCTL_HIGH)
-    ela_image = Image.fromarray(ela_stretched, mode='RGB')
+    ela_image = Image.fromarray(ela_stretched, mode="RGB")
 
     # Downscale for efficient transport
     ela_image = downscale_overlay(ela_image, ELA_MAX_WIDTH)
@@ -126,8 +126,7 @@ def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
     """
     # Collect frames
     if os.path.isdir(input_path):
-        frame_files = [f for f in os.listdir(input_path)
-                       if f.lower().endswith((".jpg", ".png"))]
+        frame_files = [f for f in os.listdir(input_path) if f.lower().endswith((".jpg", ".png"))]
         if not frame_files:
             raise ValueError("No frames found in folder")
         frame_paths = [os.path.join(input_path, f) for f in frame_files]
@@ -144,11 +143,7 @@ def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
         filename = os.path.basename(frame_paths[0])
         # Save overlay to disk
         _save_overlay(ela_image, filename, output_dir)
-        return {
-            "mode": "single_frame",
-            "frame": filename,
-            "score": float(score)
-        }
+        return {"mode": "single_frame", "frame": filename, "score": float(score)}
 
     # Multi-frame case - optimize by only saving overlays for top frames
     # Step 1: Compute scores for ALL frames (without saving overlays yet)
@@ -163,8 +158,7 @@ def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
 
         with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all tasks
-            futures = {executor.submit(_compute_ela_worker, path): path
-                      for path in frame_paths}
+            futures = {executor.submit(_compute_ela_worker, path): path for path in frame_paths}
 
             # Collect results as they complete
             for future in as_completed(futures):
@@ -187,8 +181,7 @@ def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
     mean_score = np.mean(scores_only)
     std_score = np.std(scores_only) + 1e-6
     normalized_results = [
-        (fname, fpath, score, (score - mean_score) / std_score, ela_img)
-        for fname, fpath, score, ela_img in results
+        (fname, fpath, score, (score - mean_score) / std_score, ela_img) for fname, fpath, score, ela_img in results
     ]
 
     # Step 3: Sort ALL frames by z-score (descending)
@@ -207,16 +200,18 @@ def run_ela(input_path, top_percent=10, output_dir=None, analysis_id=None):
         if is_flagged:
             _save_overlay(ela_img, fname, output_dir)
 
-        all_frames.append({
-            "frame": fname,
-            "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
-            "score": float(z_score),
-            "flagged": is_flagged  # Mark top N% as flagged
-        })
+        all_frames.append(
+            {
+                "frame": fname,
+                "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
+                "score": float(z_score),
+                "flagged": is_flagged,  # Mark top N% as flagged
+            }
+        )
 
     # Return JSON-ready dict with ALL frames
     return {
         "mode": "multi_frame",
         "top_percent": top_percent,
-        "top_frames": all_frames  # Now contains ALL frames, not just top
+        "top_frames": all_frames,  # Now contains ALL frames, not just top
     }

@@ -9,7 +9,7 @@ Routes:
 from __future__ import annotations
 import io
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 from flask import Blueprint, jsonify, send_file, g, request
 from sqlalchemy import select, func
@@ -17,12 +17,12 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.enums import TA_CENTER
 
 from api import get_db
 from api.auth_utils import require_user, check_analysis_ownership_or_admin
-from api.config.ml_thresholds import get_classification, get_methodology_description
+from api.config.ml_thresholds import get_classification
 from models import Analysis, User
 
 reports_bp = Blueprint("reports", __name__)
@@ -64,8 +64,8 @@ def list_reports():
     Response (401/403): error message
     """
     # Pagination params
-    limit = min(int(request.args.get('limit', 50)), 500)
-    offset = int(request.args.get('offset', 0))
+    limit = min(int(request.args.get("limit", 50)), 500)
+    offset = int(request.args.get("offset", 0))
 
     with get_db() as db:
         user = g.user  # Set by @require_user decorator
@@ -81,11 +81,7 @@ def list_reports():
                 .order_by(Analysis.created_at.desc())
             )
             # Get total count
-            count_query = (
-                select(func.count())
-                .select_from(Analysis)
-                .where(Analysis.status == "succeeded")
-            )
+            count_query = select(func.count()).select_from(Analysis).where(Analysis.status == "succeeded")
             total = db.execute(count_query).scalar()
 
             # Apply pagination
@@ -99,9 +95,7 @@ def list_reports():
             )
             # Get total count
             count_query = (
-                select(func.count())
-                .select_from(Analysis)
-                .where(Analysis.status == "succeeded", Analysis.user_id == user.id)
+                select(func.count()).select_from(Analysis).where(Analysis.status == "succeeded", Analysis.user_id == user.id)
             )
             total = db.execute(count_query).scalar()
 
@@ -121,7 +115,7 @@ def list_reports():
                 "created_at": analysis.created_at.isoformat(),
                 "completed_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
                 "has_ml_results": bool(result_json.get("ml")),
-                "has_traditional_results": bool(result_json.get("traditional"))
+                "has_traditional_results": bool(result_json.get("traditional")),
             }
 
             # Only include username for admins
@@ -130,12 +124,7 @@ def list_reports():
 
             reports.append(report)
 
-        return jsonify({
-            "reports": reports,
-            "total": total,
-            "limit": limit,
-            "offset": offset
-        }), 200
+        return jsonify({"reports": reports, "total": total, "limit": limit, "offset": offset}), 200
 
 
 @reports_bp.get("/reports/<analysis_id>/pdf")
@@ -160,7 +149,7 @@ def download_pdf_report(analysis_id: str):
 
         # Generate PDF in memory
         buffer = io.BytesIO()
-        pdf = _generate_pdf_report(analysis, buffer)
+        _generate_pdf_report(analysis, buffer)
 
         # Rewind buffer for reading
         buffer.seek(0)
@@ -175,12 +164,7 @@ def download_pdf_report(analysis_id: str):
 
         filename = f"{base_name}_report.pdf"
 
-        return send_file(
-            buffer,
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name=filename
-        )
+        return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name=filename)
 
 
 def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
@@ -205,21 +189,21 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
 
     # Custom styles
     title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
+        "CustomTitle",
+        parent=styles["Heading1"],
         fontSize=24,
-        textColor=colors.HexColor('#1a1a1a'),
+        textColor=colors.HexColor("#1a1a1a"),
         spaceAfter=30,
-        alignment=TA_CENTER
+        alignment=TA_CENTER,
     )
 
     heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
+        "CustomHeading",
+        parent=styles["Heading2"],
         fontSize=16,
-        textColor=colors.HexColor('#2563eb'),
+        textColor=colors.HexColor("#2563eb"),
         spaceAfter=12,
-        spaceBefore=20
+        spaceBefore=20,
     )
 
     # Title
@@ -256,17 +240,21 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
             video_info_data.append(["Resolution", f"{int(width)}x{int(height)}"])
 
     video_table = Table(video_info_data, colWidths=[2.5 * inch, 4 * inch])
-    video_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f4f6')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-    ]))
+    video_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ]
+        )
+    )
     story.append(video_table)
     story.append(Spacer(1, 0.3 * inch))
 
@@ -285,14 +273,14 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         # Add summary paragraph with overall score
         if ensemble_result:
             score_pct = f"{ensemble_result['score'] * 100:.1f}%"
-            classification = ensemble_result['classification']
+            classification = ensemble_result["classification"]
 
             summary_text = (
                 f"<b>Overall Synthetic Media Score: {score_pct}</b><br/>"
                 f"Classification: {classification}<br/>"
-                f"<i>(Overall averaged from top 5 highest-scoring frames across all models)</i>"
+                "<i>(Overall averaged from top 5 highest-scoring frames across all models)</i>"
             )
-            story.append(Paragraph(summary_text, styles['Normal']))
+            story.append(Paragraph(summary_text, styles["Normal"]))
             story.append(Spacer(1, 0.2 * inch))
 
         ml_data = [["Model", "Deepfake Score", "Suspicious Frames", "Assessment"]]
@@ -300,12 +288,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         # Add overall ensemble row first
         if ensemble_result:
             ensemble_score_pct = f"{ensemble_result['score'] * 100:.1f}%"
-            ml_data.append([
-                "OVERALL",
-                ensemble_score_pct,
-                "—",
-                ensemble_result['classification']
-            ])
+            ml_data.append(["OVERALL", ensemble_score_pct, "—", ensemble_result["classification"]])
 
         # Add individual model rows
         for model_name, model_data in ml_results.items():
@@ -322,26 +305,25 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
                 score_pct = "N/A"
                 assessment = "Unknown"
 
-            ml_data.append([
-                model_name.upper(),
-                score_pct,
-                f"{suspicious_count} / {len(frames)}",
-                assessment
-            ])
+            ml_data.append([model_name.upper(), score_pct, f"{suspicious_count} / {len(frames)}", assessment])
 
         ml_table = Table(ml_data, colWidths=[1.5 * inch, 1.5 * inch, 1.5 * inch, 2 * inch])
-        ml_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
-        ]))
+        ml_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563eb")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+                ]
+            )
+        )
         story.append(ml_table)
         story.append(Spacer(1, 0.3 * inch))
 
@@ -370,18 +352,22 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
             trad_data.append([method_display, score_display])
 
         trad_table = Table(trad_data, colWidths=[4 * inch, 2.5 * inch])
-        trad_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')]),
-        ]))
+        trad_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#059669")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0fdf4")]),
+                ]
+            )
+        )
         story.append(trad_table)
         story.append(Spacer(1, 0.3 * inch))
 
@@ -395,10 +381,10 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         # Anomalies
         anomalies = metadata_result.get("metadata", {}).get("anomalies", {})
         total_anomalies = (
-            len(anomalies.get("missing_fields", [])) +
-            len(anomalies.get("timestamp_issues", [])) +
-            len(anomalies.get("software_anomalies", [])) +
-            len(anomalies.get("gps_inconsistencies", []))
+            len(anomalies.get("missing_fields", []))
+            + len(anomalies.get("timestamp_issues", []))
+            + len(anomalies.get("software_anomalies", []))
+            + len(anomalies.get("gps_inconsistencies", []))
         )
 
         if total_anomalies == 0:
@@ -446,18 +432,22 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
             metadata_data.append(["Duplicate Frames", f"⚠ {len(duplicates)} patterns detected"])
 
         metadata_table = Table(metadata_data, colWidths=[2.5 * inch, 4 * inch])
-        metadata_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),  # Orange header
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fef3c7')]),
-        ]))
+        metadata_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f59e0b")),  # Orange header
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fef3c7")]),
+                ]
+            )
+        )
         story.append(metadata_table)
         story.append(Spacer(1, 0.3 * inch))
 
@@ -474,24 +464,28 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
         ]
 
         prov_table = Table(prov_data, colWidths=[2.5 * inch, 4 * inch])
-        prov_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#fef3c7')),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (1, 0), (1, -1), 'Courier'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ]))
+        prov_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#fef3c7")),
+                    ("TEXTCOLOR", (0, 0), (-1, -1), colors.black),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("FONTNAME", (1, 0), (1, -1), "Courier"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ]
+            )
+        )
         story.append(prov_table)
         story.append(Spacer(1, 0.3 * inch))
 
     # Footer note
     story.append(Spacer(1, 0.5 * inch))
     footer_text = f"<i>Report generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p UTC')}</i>"
-    story.append(Paragraph(footer_text, styles['Normal']))
+    story.append(Paragraph(footer_text, styles["Normal"]))
 
     # Build PDF
     doc.build(story)
@@ -516,7 +510,7 @@ def _calculate_top5_ensemble_score(ml_results: Dict[str, Any]):
         return None
 
     # Extract models
-    models = ['xception', 'spsl', 'ucf']
+    models = ["xception", "spsl", "ucf"]
     model_data = {name: ml_results.get(name) for name in models}
 
     # Check if we have data
@@ -542,7 +536,7 @@ def _calculate_top5_ensemble_score(ml_results: Dict[str, Any]):
     ensemble_scores = []
     for index, scores in frame_scores_map.items():
         if all(model in scores for model in models):
-            ensemble_score = (scores['xception'] + scores['spsl'] + scores['ucf']) / 3
+            ensemble_score = (scores["xception"] + scores["spsl"] + scores["ucf"]) / 3
             ensemble_scores.append(ensemble_score)
 
     if not ensemble_scores:
@@ -561,10 +555,7 @@ def _calculate_top5_ensemble_score(ml_results: Dict[str, Any]):
     # Get classification
     classification = get_classification(mean_score)
 
-    return {
-        "score": mean_score,
-        "classification": classification
-    }
+    return {"score": mean_score, "classification": classification}
 
 
 def _get_assessment(score: float) -> str:
@@ -585,5 +576,3 @@ def _get_assessment(score: float) -> str:
         return "High Risk"
     else:
         return "Critical"
-
-

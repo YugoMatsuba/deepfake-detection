@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import FrameViewer from './FrameViewer';
-import { useAnalysis } from '../app/AnalysisProvider';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import FrameViewer from "./FrameViewer";
+import { useAnalysis } from "../app/AnalysisProvider";
 
 export default function FrameViewerPage() {
   const location = useLocation();
@@ -18,26 +18,26 @@ export default function FrameViewerPage() {
   // ALWAYS fetch analysis data from backend on load
   useEffect(() => {
     if (!analysisId) {
-      navigate('/upload', { replace: true });
+      navigate("/upload", { replace: true });
       return;
     }
 
     setIsLoading(true);
     setError(null);
 
-    fetch(`/api/analyses/${analysisId}`, { credentials: 'include' })
-      .then(res => {
+    fetch(`/api/analyses/${analysisId}`, { credentials: "include" })
+      .then((res) => {
         if (!res.ok) {
-          throw new Error('Failed to fetch analysis');
+          throw new Error("Failed to fetch analysis");
         }
         return res.json();
       })
-      .then(data => {
+      .then((data) => {
         setAnalysisData(data);
         setIsLoading(false);
       })
-      .catch(err => {
-        console.error('Failed to fetch analysis data:', err);
+      .catch((err) => {
+        console.error("Failed to fetch analysis data:", err);
         setError(err.message);
         setIsLoading(false);
       });
@@ -82,7 +82,7 @@ export default function FrameViewerPage() {
         return {
           ...prev,
           ml: newML,
-          ml_frames: updatedFrames
+          ml_frames: updatedFrames,
         };
       });
     },
@@ -98,7 +98,7 @@ export default function FrameViewerPage() {
     Object.values(mlModels).forEach((model) => {
       if (model.frames) {
         model.frames.forEach((f) => {
-          if (typeof f.index === 'number') {
+          if (typeof f.index === "number") {
             allFrameIndices.add(f.index);
           }
         });
@@ -115,7 +115,7 @@ export default function FrameViewerPage() {
         if (model.frames) {
           const frameData = model.frames.find((f) => f.index === frameIndex);
           if (frameData) {
-            if (typeof frameData.score === 'number') {
+            if (typeof frameData.score === "number") {
               scores.push(frameData.score);
             }
             if (frameData.requested_adhoc === true) {
@@ -126,9 +126,7 @@ export default function FrameViewerPage() {
       });
 
       // Calculate average score
-      const avgScore = scores.length > 0
-        ? scores.reduce((a, b) => a + b, 0) / scores.length
-        : 0;
+      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
 
       // Show frame if average score > 0.5 OR explicitly requested via ad-hoc
       if (avgScore > 0.5 || isRequestedAdhoc) {

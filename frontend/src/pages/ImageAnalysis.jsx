@@ -2,15 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "./Card";
 import { Button } from "./Button";
-import { startImageAnalysis } from "../api/videos";
-import { useAnalysis } from "../app/AnalysisProvider";
 import InfoButton from "../components/InfoButton";
 import { forensicsInfo } from "../utils/ForensicsInfo";
 
 const ImageAnalysis = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { selectedModules } = useAnalysis();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,29 +30,29 @@ const ImageAnalysis = () => {
 
         // Always fetch existing analysis first (like FrameViewer)
         const existingResponse = await fetch(`/api/analyses/${id}`, {
-          credentials: 'include'
+          credentials: "include",
         });
 
         if (existingResponse.ok) {
           const analysisData = await existingResponse.json();
 
           // If analysis is complete and has results, display them
-          if (analysisData.status === 'succeeded' && analysisData.result) {
+          if (analysisData.status === "succeeded" && analysisData.result) {
             setResults(analysisData.result);
             setIsLoading(false);
             return;
           }
 
           // If analysis exists but not complete, show error (shouldn't run from here)
-          if (analysisData.status === 'created' || analysisData.status === 'running') {
+          if (analysisData.status === "created" || analysisData.status === "running") {
             setError("This analysis is not yet complete. Please start it from the upload page.");
             setIsLoading(false);
             return;
           }
 
           // If failed
-          if (analysisData.status === 'failed') {
-            setError(`Analysis failed: ${analysisData.error || 'Unknown error'}`);
+          if (analysisData.status === "failed") {
+            setError(`Analysis failed: ${analysisData.error || "Unknown error"}`);
             setIsLoading(false);
             return;
           }
@@ -63,7 +60,7 @@ const ImageAnalysis = () => {
           // Log the actual error for debugging
           console.error(`GET /api/analyses/${id} returned ${existingResponse.status}`);
           const errorText = await existingResponse.text();
-          console.error('Error response:', errorText);
+          console.error("Error response:", errorText);
         }
 
         // If we get here, analysis doesn't exist or fetch failed
@@ -89,7 +86,7 @@ const ImageAnalysis = () => {
 
   // Extract EXIF anomalies
   const exifAnomalies = results?.exif?.metadata?.anomalies || {};
-  const hasAnomalies = Object.values(exifAnomalies).some(arr => arr && arr.length > 0);
+  const hasAnomalies = Object.values(exifAnomalies).some((arr) => arr && arr.length > 0);
 
   // Extract ML results
   const mlResults = results?.ml || {};
@@ -102,12 +99,12 @@ const ImageAnalysis = () => {
 
   // Calculate overall ML score (average across models)
   const calculateOverallMLScore = () => {
-    if (!mlResults || typeof mlResults !== 'object') return null;
+    if (!mlResults || typeof mlResults !== "object") return null;
 
     // Image analysis returns flat structure: {xception: {score: 0.87}, ...}
     const scores = Object.values(mlResults)
-      .map(model => model?.score)
-      .filter(score => typeof score === 'number');
+      .map((model) => model?.score)
+      .filter((score) => typeof score === "number");
 
     if (scores.length === 0) return null;
     const avg = scores.reduce((sum, score) => sum + score, 0) / scores.length;
@@ -164,11 +161,7 @@ const ImageAnalysis = () => {
                 <div className="relative">
                   {imageUrl && (
                     <>
-                      <img
-                        src={imageUrl}
-                        alt="Analyzed image"
-                        className="w-full rounded-lg"
-                      />
+                      <img src={imageUrl} alt="Analyzed image" className="w-full rounded-lg" />
                       {activeOverlay && traditionalResults[activeOverlay]?.overlay_url && (
                         <img
                           src={traditionalResults[activeOverlay].overlay_url}
@@ -216,18 +209,18 @@ const ImageAnalysis = () => {
                       return (
                         <div key={category} className="mb-2">
                           <h4 className="font-semibold text-red-600 text-sm uppercase">
-                            {category.replace(/_/g, ' ')}
+                            {category.replace(/_/g, " ")}
                           </h4>
                           <ul className="list-disc list-inside text-sm text-gray-700">
                             {anomalies.map((anomaly, idx) => {
                               // Anomalies are objects: {type, fields, note}
-                              if (typeof anomaly === 'string') {
+                              if (typeof anomaly === "string") {
                                 return <li key={idx}>{anomaly}</li>;
                               }
                               return (
                                 <li key={idx}>
                                   {anomaly.note}
-                                  {anomaly.fields && ` (${anomaly.fields.join(', ')})`}
+                                  {anomaly.fields && ` (${anomaly.fields.join(", ")})`}
                                 </li>
                               );
                             })}
@@ -251,15 +244,20 @@ const ImageAnalysis = () => {
                         {overallMLScore !== null && (
                           <div className="mb-3 p-3 bg-blue-50 rounded">
                             <div className="text-sm text-gray-600">Overall Score</div>
-                            <div className="text-2xl font-bold text-blue-700">{overallMLScore}%</div>
+                            <div className="text-2xl font-bold text-blue-700">
+                              {overallMLScore}%
+                            </div>
                           </div>
                         )}
                         <div className="space-y-2">
                           {Object.entries(mlResults).map(([modelName, modelData]) => {
                             // Image analysis returns flat structure: {score: 0.87}
-                            if (!modelData || typeof modelData.score !== 'number') return null;
+                            if (!modelData || typeof modelData.score !== "number") return null;
                             return (
-                              <div key={modelName} className="flex items-center justify-between text-sm border-b pb-2">
+                              <div
+                                key={modelName}
+                                className="flex items-center justify-between text-sm border-b pb-2"
+                              >
                                 <span className="font-medium">{modelName.toUpperCase()}</span>
                                 <span className="font-bold text-blue-600">
                                   {Math.round(modelData.score * 100)}%
@@ -276,11 +274,13 @@ const ImageAnalysis = () => {
                 {/* Traditional Forensics */}
                 {hasTraditionalResults && (
                   <section>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Traditional Forensics</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Traditional Forensics
+                    </h3>
                     <div className="space-y-3">
                       {Object.entries(traditionalResults).map(([method, methodData]) => {
                         // Image analysis returns flat structure with score directly on methodData
-                        if (!methodData || typeof methodData.score !== 'number') return null;
+                        if (!methodData || typeof methodData.score !== "number") return null;
 
                         const score = methodData.score;
 
@@ -288,19 +288,25 @@ const ImageAnalysis = () => {
                           <div
                             key={method}
                             className={`p-3 rounded cursor-pointer transition ${
-                              activeOverlay === method ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
+                              activeOverlay === method
+                                ? "bg-blue-100 border-2 border-blue-500"
+                                : "bg-gray-50 hover:bg-gray-100"
                             }`}
                             onClick={() => toggleOverlay(method)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
-                                <h4 className="font-semibold text-gray-900">{method.toUpperCase()}</h4>
+                                <h4 className="font-semibold text-gray-900">
+                                  {method.toUpperCase()}
+                                </h4>
                                 <InfoButton
                                   title={forensicsInfo.singleImage[method]?.title}
                                   content={forensicsInfo.singleImage[method]?.content}
                                 />
                               </div>
-                              <span className="text-lg font-semibold text-gray-800">{score.toFixed(2)}</span>
+                              <span className="text-lg font-semibold text-gray-800">
+                                {score.toFixed(2)}
+                              </span>
                             </div>
                           </div>
                         );
@@ -317,14 +323,14 @@ const ImageAnalysis = () => {
                       className="flex items-center justify-between w-full text-left"
                     >
                       <h3 className="text-lg font-semibold text-gray-900">EXIF Metadata</h3>
-                      <span className="text-gray-500">{showExifDetails ? '▼' : '▶'}</span>
+                      <span className="text-gray-500">{showExifDetails ? "▼" : "▶"}</span>
                     </button>
 
                     {showExifDetails && (
                       <div className="mt-2 max-h-96 overflow-y-auto bg-gray-50 p-3 rounded text-xs font-mono">
                         {Object.entries(results.exif.metadata.raw).map(([key, value]) => (
                           <div key={key} className="mb-1">
-                            <span className="text-gray-600">{key}:</span>{' '}
+                            <span className="text-gray-600">{key}:</span>{" "}
                             <span className="text-gray-900">{JSON.stringify(value)}</span>
                           </div>
                         ))}

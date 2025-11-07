@@ -13,6 +13,7 @@ References:
 - Eclipse Forensics timestamp analysis guidelines
 - Belkasoft photo forensics (2024)
 """
+
 import subprocess
 import json
 import os
@@ -34,13 +35,7 @@ def extract_metadata(video_path: str) -> Optional[dict]:
     """
     try:
         cmd = ["exiftool", "-j", video_path]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
         data = json.loads(result.stdout)[0]
         return data
     except subprocess.TimeoutExpired:
@@ -62,13 +57,7 @@ def check_integrity_ffmpeg(video_path: str) -> str:
         Raw stderr output from FFmpeg (empty if no errors)
     """
     cmd = ["ffmpeg", "-v", "error", "-i", video_path, "-f", "null", "-"]
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=60
-    )
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
     return result.stderr.strip()
 
 
@@ -87,7 +76,7 @@ def parse_ffmpeg_log(stderr_text: str) -> dict:
     errors = []
 
     # Match decoding errors for macroblocks
-    mb_errors = re.findall(r'error while decoding MB (\d+) (\d+)', stderr_text)
+    mb_errors = re.findall(r"error while decoding MB (\d+) (\d+)", stderr_text)
     for mb in mb_errors:
         errors.append(f"Macroblock at row {mb[0]}, column {mb[1]} failed to decode")
 
@@ -96,17 +85,13 @@ def parse_ffmpeg_log(stderr_text: str) -> dict:
         errors.append("Top block unavailable for requested intra mode")
 
     # Reference errors
-    references = re.findall(r'Reference (\d+) >= (\d+)', stderr_text)
+    references = re.findall(r"Reference (\d+) >= (\d+)", stderr_text)
     for ref in references:
         errors.append(f"Invalid reference: Reference {ref[0]} >= {ref[1]}")
 
     status = "PASSED" if not errors else "FAILED"
 
-    return {
-        "integrity_status": status,
-        "errors": errors,
-        "summary": f"Video integrity check {status}"
-    }
+    return {"integrity_status": status, "errors": errors, "summary": f"Video integrity check {status}"}
 
 
 def generate_frame_hashes(video_path: str) -> Optional[list]:
@@ -118,13 +103,7 @@ def generate_frame_hashes(video_path: str) -> Optional[list]:
         None if generation fails
     """
     cmd = ["ffmpeg", "-i", video_path, "-f", "framemd5", "-"]
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=120
-    )
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
 
     if result.returncode != 0:
         logger.error(f"Error generating frame hashes: {result.stderr}")
@@ -150,17 +129,17 @@ def parse_frame_hashes(raw_hashes: list) -> list:
     hashes = []
 
     for line in raw_hashes:
-        if line.startswith('#'):
+        if line.startswith("#"):
             continue
 
         # Parse by splitting on commas
-        parts = line.strip().split(',')
+        parts = line.strip().split(",")
         if len(parts) >= 6:
             stream_index = parts[0].strip()
 
             # ONLY extract hashes from stream 0 (video stream)
             # Skip audio (stream 1), subtitles (stream 2+), etc.
-            if stream_index != '0':
+            if stream_index != "0":
                 continue
 
             hash_val = parts[-1].strip()  # Last field is the hash
@@ -195,11 +174,7 @@ def detect_duplicate_frames(frame_hashes_raw: list) -> list:
     duplicates = []
     for h, indices in hash_map.items():
         if len(indices) > 1:
-            duplicates.append({
-                "hash": h,
-                "frame_indices": indices,
-                "count": len(indices)
-            })
+            duplicates.append({"hash": h, "frame_indices": indices, "count": len(indices)})
 
     return duplicates
 
@@ -222,75 +197,66 @@ def detect_image_metadata_anomalies(metadata: dict) -> dict:
             "gps_inconsistencies": [...]
         }
     """
-    anomalies = {
-        "missing_fields": [],
-        "timestamp_issues": [],
-        "software_anomalies": [],
-        "gps_inconsistencies": []
-    }
+    anomalies = {"missing_fields": [], "timestamp_issues": [], "software_anomalies": [], "gps_inconsistencies": []}
 
     if not metadata:
         return anomalies
 
     # 1. MISSING METADATA CHECK (Fotoforensics standard)
     # Critical fields that should be present in authentic camera/phone images
-    expected_fields = {
-        'FileType', 'MIMEType', 'CreateDate',
-        'ImageWidth', 'ImageHeight'
-    }
-    device_fields = {'Make', 'Model'}
+    expected_fields = {"FileType", "MIMEType", "CreateDate", "ImageWidth", "ImageHeight"}
+    device_fields = {"Make", "Model"}
 
     missing_critical = [f for f in expected_fields if not metadata.get(f)]
     missing_device = [f for f in device_fields if not metadata.get(f)]
 
     if missing_critical:
-        anomalies["missing_fields"].append({
-            "type": "critical",
-            "fields": missing_critical,
-            "note": "Missing basic image metadata"
-        })
+        anomalies["missing_fields"].append(
+            {"type": "critical", "fields": missing_critical, "note": "Missing basic image metadata"}
+        )
 
     if len(missing_device) == len(device_fields):
-        anomalies["missing_fields"].append({
-            "type": "device_info",
-            "fields": list(device_fields),
-            "note": "No device information - metadata may be stripped"
-        })
+        anomalies["missing_fields"].append(
+            {"type": "device_info", "fields": list(device_fields), "note": "No device information - metadata may be stripped"}
+        )
 
     # 2. TIMESTAMP CONSISTENCY (Eclipse Forensics standard)
-    create_date = metadata.get('CreateDate') or metadata.get('DateTimeOriginal')
-    modify_date = metadata.get('ModifyDate')
+    create_date = metadata.get("CreateDate") or metadata.get("DateTimeOriginal")
+    modify_date = metadata.get("ModifyDate")
 
     if create_date and modify_date:
         if create_date > modify_date:
-            anomalies["timestamp_issues"].append({
-                "type": "create_after_modify",
-                "create": create_date,
-                "modify": modify_date,
-                "note": "Create date is after modify date (logically impossible)"
-            })
+            anomalies["timestamp_issues"].append(
+                {
+                    "type": "create_after_modify",
+                    "create": create_date,
+                    "modify": modify_date,
+                    "note": "Create date is after modify date (logically impossible)",
+                }
+            )
 
     # 3. SOFTWARE ANOMALIES (Belkasoft 2024 standard)
     # Flag common image editing software
-    software = metadata.get('Software', '').lower()
-    editing_software = ['photoshop', 'gimp', 'affinity', 'pixelmator', 'paint.net', 'canva']
+    software = metadata.get("Software", "").lower()
+    editing_software = ["photoshop", "gimp", "affinity", "pixelmator", "paint.net", "canva"]
 
     if any(edit_sw in software for edit_sw in editing_software):
-        anomalies["software_anomalies"].append({
-            "type": "editing_software",
-            "software": metadata.get('Software'),
-            "note": "Editing software detected in metadata - image may be processed/modified"
-        })
+        anomalies["software_anomalies"].append(
+            {
+                "type": "editing_software",
+                "software": metadata.get("Software"),
+                "note": "Editing software detected in metadata - image may be processed/modified",
+            }
+        )
 
     # 4. GPS CONSISTENCY
-    gps_lat = metadata.get('GPSLatitude')
-    gps_long = metadata.get('GPSLongitude')
+    gps_lat = metadata.get("GPSLatitude")
+    gps_long = metadata.get("GPSLongitude")
 
     if (gps_lat and not gps_long) or (gps_long and not gps_lat):
-        anomalies["gps_inconsistencies"].append({
-            "type": "incomplete_gps",
-            "note": "GPS coordinates incomplete (only latitude or longitude present)"
-        })
+        anomalies["gps_inconsistencies"].append(
+            {"type": "incomplete_gps", "note": "GPS coordinates incomplete (only latitude or longitude present)"}
+        )
 
     return anomalies
 
@@ -313,74 +279,60 @@ def detect_metadata_anomalies(metadata: dict) -> dict:
             "gps_inconsistencies": [...]
         }
     """
-    anomalies = {
-        "missing_fields": [],
-        "timestamp_issues": [],
-        "software_anomalies": [],
-        "gps_inconsistencies": []
-    }
+    anomalies = {"missing_fields": [], "timestamp_issues": [], "software_anomalies": [], "gps_inconsistencies": []}
 
     if not metadata:
         return anomalies
 
     # 1. MISSING METADATA CHECK (Fotoforensics standard)
     # Critical fields that should be present in authentic camera/phone videos
-    expected_fields = {
-        'FileType', 'MIMEType', 'CreateDate',
-        'VideoCodec', 'ImageWidth', 'ImageHeight'
-    }
-    device_fields = {'Make', 'Model', 'Software'}
+    expected_fields = {"FileType", "MIMEType", "CreateDate", "VideoCodec", "ImageWidth", "ImageHeight"}
+    device_fields = {"Make", "Model", "Software"}
 
     missing_critical = [f for f in expected_fields if not metadata.get(f)]
     missing_device = [f for f in device_fields if not metadata.get(f)]
 
     if missing_critical:
-        anomalies["missing_fields"].append({
-            "type": "critical",
-            "fields": missing_critical,
-            "note": "Missing basic video metadata"
-        })
+        anomalies["missing_fields"].append(
+            {"type": "critical", "fields": missing_critical, "note": "Missing basic video metadata"}
+        )
 
     if len(missing_device) == len(device_fields):
-        anomalies["missing_fields"].append({
-            "type": "device_info",
-            "fields": list(device_fields),
-            "note": "No device information - metadata may be stripped"
-        })
+        anomalies["missing_fields"].append(
+            {"type": "device_info", "fields": list(device_fields), "note": "No device information - metadata may be stripped"}
+        )
 
     # 2. TIMESTAMP CONSISTENCY (Eclipse Forensics standard)
     # CreateDate should be <= ModifyDate (basic logic check)
-    create_date = metadata.get('CreateDate')
-    modify_date = metadata.get('ModifyDate')
+    create_date = metadata.get("CreateDate")
+    modify_date = metadata.get("ModifyDate")
 
     if create_date and modify_date:
         # Simple string comparison (ISO format timestamps sort correctly)
         if create_date > modify_date:
-            anomalies["timestamp_issues"].append({
-                "type": "create_after_modify",
-                "create": create_date,
-                "modify": modify_date,
-                "note": "Create date is after modify date (logically impossible)"
-            })
+            anomalies["timestamp_issues"].append(
+                {
+                    "type": "create_after_modify",
+                    "create": create_date,
+                    "modify": modify_date,
+                    "note": "Create date is after modify date (logically impossible)",
+                }
+            )
 
     # 3. SOFTWARE FIELD ANOMALY (Belkasoft 2024)
     # Editing software in device metadata suggests post-processing
-    software = metadata.get('Software', '')
-    editing_software = [
-        'photoshop', 'premiere', 'final cut', 'davinci',
-        'aftereffects', 'ffmpeg', 'handbrake', 'avidemux'
-    ]
+    software = metadata.get("Software", "")
+    editing_software = ["photoshop", "premiere", "final cut", "davinci", "aftereffects", "ffmpeg", "handbrake", "avidemux"]
 
     if any(editor in software.lower() for editor in editing_software):
-        anomalies["software_anomalies"].append({
-            "software": software,
-            "note": "Editing software detected in metadata - video may be processed/modified"
-        })
+        anomalies["software_anomalies"].append(
+            {"software": software, "note": "Editing software detected in metadata - video may be processed/modified"}
+        )
 
     # 4. GPS VALIDATION (Amped Authenticate method)
     # If GPS coordinates present, check for basic plausibility
-    gps_lat = metadata.get('GPSLatitude')
-    gps_lon = metadata.get('GPSLongitude')
+    gps_lat = metadata.get("GPSLatitude")
+    gps_lon = metadata.get("GPSLongitude")
 
     if gps_lat or gps_lon:
         # Basic validation: coordinates should be in valid ranges
@@ -390,11 +342,9 @@ def detect_metadata_anomalies(metadata: dict) -> dict:
             lat_val = float(lat_str)
 
             if lat_val < -90 or lat_val > 90:
-                anomalies["gps_inconsistencies"].append({
-                    "field": "GPSLatitude",
-                    "value": gps_lat,
-                    "note": "GPS latitude out of valid range (-90 to 90)"
-                })
+                anomalies["gps_inconsistencies"].append(
+                    {"field": "GPSLatitude", "value": gps_lat, "note": "GPS latitude out of valid range (-90 to 90)"}
+                )
         except (ValueError, IndexError):
             pass  # Skip if GPS format is unparseable
 
@@ -403,11 +353,9 @@ def detect_metadata_anomalies(metadata: dict) -> dict:
             lon_val = float(lon_str)
 
             if lon_val < -180 or lon_val > 180:
-                anomalies["gps_inconsistencies"].append({
-                    "field": "GPSLongitude",
-                    "value": gps_lon,
-                    "note": "GPS longitude out of valid range (-180 to 180)"
-                })
+                anomalies["gps_inconsistencies"].append(
+                    {"field": "GPSLongitude", "value": gps_lon, "note": "GPS longitude out of valid range (-180 to 180)"}
+                )
         except (ValueError, IndexError):
             pass
 
@@ -441,21 +389,17 @@ def run_image_exif_analysis(image_path: str, image_sha256: str) -> dict:
     metadata = extract_metadata(image_path)
 
     # Detect anomalies using IMAGE-SPECIFIC function
-    anomalies = detect_image_metadata_anomalies(metadata) if metadata else {
-        "missing_fields": [],
-        "timestamp_issues": [],
-        "software_anomalies": [],
-        "gps_inconsistencies": []
-    }
+    anomalies = (
+        detect_image_metadata_anomalies(metadata)
+        if metadata
+        else {"missing_fields": [], "timestamp_issues": [], "software_anomalies": [], "gps_inconsistencies": []}
+    )
 
     # Build simplified report (no integrity checks or frame hashes for images)
     return {
         "analyzed_at": datetime.now().isoformat(),
         "file_hash": image_sha256,
-        "metadata": {
-            "raw": metadata,
-            "anomalies": anomalies
-        }
+        "metadata": {"raw": metadata, "anomalies": anomalies},
     }
 
 
@@ -498,26 +442,18 @@ def run_metadata_analysis(video_path: str, video_sha256: str) -> dict:
     frame_hashes = parse_frame_hashes(frame_hashes_raw) if frame_hashes_raw else []
 
     # 4. Detect anomalies and duplicates
-    anomalies = detect_metadata_anomalies(metadata) if metadata else {
-        "missing_fields": [],
-        "timestamp_issues": [],
-        "software_anomalies": [],
-        "gps_inconsistencies": []
-    }
+    anomalies = (
+        detect_metadata_anomalies(metadata)
+        if metadata
+        else {"missing_fields": [], "timestamp_issues": [], "software_anomalies": [], "gps_inconsistencies": []}
+    )
     duplicates = detect_duplicate_frames(frame_hashes_raw) if frame_hashes_raw else []
 
     # 5. Build report (no file I/O, just return dict)
     return {
         "analyzed_at": datetime.now().isoformat(),
         "file_hash": video_sha256,
-        "metadata": {
-            "raw": metadata,
-            "anomalies": anomalies
-        },
+        "metadata": {"raw": metadata, "anomalies": anomalies},
         "integrity": integrity_result,
-        "frame_hashes": {
-            "hashes": frame_hashes,
-            "count": len(frame_hashes),
-            "duplicates": duplicates
-        }
+        "frame_hashes": {"hashes": frame_hashes, "count": len(frame_hashes), "duplicates": duplicates},
     }

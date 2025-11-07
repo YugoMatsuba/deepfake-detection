@@ -16,4 +16,3 @@ app = create_app()
 # Log database configuration on startup
 db_url = os.getenv("DATABASE_URL", "NOT_SET")
 print(f"[WSGI] Database: PostgreSQL ({db_url})", flush=True)
-

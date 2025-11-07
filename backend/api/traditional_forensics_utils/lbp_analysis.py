@@ -68,7 +68,7 @@ def compute_lbp(frame_path, P=8, R=1):
 
     # Convert LBP to image with percentile-based contrast stretch
     lbp_stretched = stretch_to_uint8(lbp, LBP_PCTL_LOW, LBP_PCTL_HIGH)
-    lbp_img = Image.fromarray(lbp_stretched, mode='L')
+    lbp_img = Image.fromarray(lbp_stretched, mode="L")
 
     # Downscale for efficient transport
     lbp_img = downscale_overlay(lbp_img, LBP_MAX_WIDTH)
@@ -117,8 +117,7 @@ def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=No
     """
     # Collect frame paths
     if os.path.isdir(input_path):
-        frame_files = [f for f in os.listdir(input_path)
-                       if f.lower().endswith((".jpg", ".png"))]
+        frame_files = [f for f in os.listdir(input_path) if f.lower().endswith((".jpg", ".png"))]
         if not frame_files:
             return {"error": f"No frames found in folder: {input_path}"}
         frame_paths = [os.path.join(input_path, f) for f in frame_files]
@@ -141,8 +140,7 @@ def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=No
 
         with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all tasks
-            futures = {executor.submit(_compute_lbp_worker, path): path
-                      for path in frame_paths}
+            futures = {executor.submit(_compute_lbp_worker, path): path for path in frame_paths}
 
             # Collect results as they complete
             for future in as_completed(futures):
@@ -164,11 +162,7 @@ def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=No
         filename, score, lbp_img = results[0]
         # Save overlay to disk
         _save_overlay(lbp_img, filename, output_dir)
-        return {
-            "mode": "single_frame",
-            "frame": filename,
-            "score": score
-        }
+        return {"mode": "single_frame", "frame": filename, "score": score}
 
     # Multi-frame case: Compute z-scores for ALL frames
     scores = [s for _, s, _ in results]
@@ -197,17 +191,19 @@ def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=No
         if is_flagged:
             _save_overlay(lbp_img, fname, output_dir)
 
-        all_frames.append({
-            "frame": fname,
-            "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
-            "score": float(z_score),
-            "normalized_score": float(z_score),  # Keep for backward compatibility
-            "flagged": is_flagged  # Mark top N% as flagged
-        })
+        all_frames.append(
+            {
+                "frame": fname,
+                "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
+                "score": float(z_score),
+                "normalized_score": float(z_score),  # Keep for backward compatibility
+                "flagged": is_flagged,  # Mark top N% as flagged
+            }
+        )
 
     # Return ALL frames JSON
     return {
         "mode": "multi_frame",
         "top_percent": top_percent,
-        "top_frames": all_frames  # Now contains ALL frames, not just top
+        "top_frames": all_frames,  # Now contains ALL frames, not just top
     }

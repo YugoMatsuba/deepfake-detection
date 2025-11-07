@@ -29,9 +29,7 @@ def extract_single_frame(video_path: str, frame_number: int, output_path: str) -
     try:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if frame_number < 0 or frame_number >= total_frames:
-            raise ValueError(
-                f"Frame number {frame_number} out of range (video has {total_frames} frames)"
-            )
+            raise ValueError(f"Frame number {frame_number} out of range (video has {total_frames} frames)")
 
         # Seek to specific frame
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
@@ -44,7 +42,7 @@ def extract_single_frame(video_path: str, frame_number: int, output_path: str) -
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         # Save frame as PNG (lossless)
-        if output_path.lower().endswith('.png'):
+        if output_path.lower().endswith(".png"):
             cv2.imwrite(output_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 3])
         else:
             # Default to PNG if no specific extension

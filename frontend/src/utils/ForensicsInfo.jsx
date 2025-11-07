@@ -17,7 +17,7 @@ How it's calculated:
 
 Interpretation:
 • Higher values indicate more compression artifacts
-• Suggests potential manipulation or editing`
+• Suggests potential manipulation or editing`,
     },
 
     noise: {
@@ -32,7 +32,7 @@ How it's calculated:
 
 Interpretation:
 • Higher values indicate inconsistent noise patterns
-• Suggests potential splicing or local manipulation`
+• Suggests potential splicing or local manipulation`,
     },
 
     lbp: {
@@ -46,8 +46,8 @@ How it's calculated:
 
 Interpretation:
 • Higher values indicate more texture variation/diversity
-• Suggests potential manipulation boundaries or edits`
-    }
+• Suggests potential manipulation boundaries or edits`,
+    },
   },
 
   // Video Explanations (Z-Scores)
@@ -63,7 +63,7 @@ How it's calculated:
 Interpretation:
 • Z = 0: Average compression artifacts
 • Z > 0: Above-average artifacts (more suspicious)
-• Z < 0: Below-average artifacts (less suspicious)`
+• Z < 0: Below-average artifacts (less suspicious)`,
     },
 
     noise: {
@@ -77,7 +77,7 @@ How it's calculated:
 Interpretation:
 • Z = 0: Average noise patterns
 • Z > 0: Above-average noise inconsistency (more suspicious)
-• Z < 0: Below-average noise inconsistency (less suspicious)`
+• Z < 0: Below-average noise inconsistency (less suspicious)`,
     },
 
     lbp: {
@@ -91,7 +91,7 @@ How it's calculated:
 Interpretation:
 • Z = 0: Average texture variation
 • Z > 0: Above-average texture diversity (more suspicious)
-• Z < 0: Below-average texture diversity (less suspicious)`
-    }
-  }
+• Z < 0: Below-average texture diversity (less suspicious)`,
+    },
+  },
 };

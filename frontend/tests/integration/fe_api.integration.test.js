@@ -42,7 +42,7 @@ async function waitForHealthcheck(timeoutMs = 60000) {
     try {
       const res = await fetch(`${BASE_URL}/api/health`);
       if (res.ok) return true;
-    } catch (err) {
+    } catch {
       // Server not ready yet, continue polling
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
