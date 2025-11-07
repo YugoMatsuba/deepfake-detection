@@ -5,8 +5,6 @@ Tests pure logic helpers that don't require full Flask request context.
 """
 
 from unittest.mock import patch, MagicMock
-import subprocess
-from datetime import datetime
 from api.routes.analysis import _capture_ml_provenance, _get_video_metadata
 
 

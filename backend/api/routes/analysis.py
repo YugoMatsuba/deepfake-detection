@@ -176,7 +176,6 @@ def start_analysis(analysis_id: str):
             try:
                 # Run ML analysis
                 ml_frames_meta = []
-                ml_timing_meta = None
 
                 if ml_modules:
                     # Capture provenance metadata before running analysis

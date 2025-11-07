@@ -13,7 +13,7 @@ Flow:
 from __future__ import annotations
 import tempfile
 from pathlib import Path
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, jsonify, request, send_file, session
 from werkzeug.utils import secure_filename
 
 from api import get_db

@@ -34,16 +34,31 @@ class TestVideoUploadRoutes(unittest.TestCase):
             db.flush()  # Get the ID without committing
             self.test_user_id = self.test_user.id
 
+    @patch('api.routes.video_upload.tempfile.NamedTemporaryFile')
     @patch('api.routes.video_upload.get_db')
     @patch('api.routes.video_upload.save_video_for_analysis')
     @patch('api.routes.video_upload.probe_video_metadata')
-    def test_upload_video_success(self, mock_probe, mock_save, mock_get_db):
+    def test_upload_video_success(self, mock_probe, mock_save, mock_get_db, mock_tempfile):
+        # Mock the database session
         mock_db = MagicMock()
-        mock_analysis = MagicMock()
-        mock_analysis.id = 'test-analysis-id'
-        mock_db.add.return_value = None
-        mock_db.flush.return_value = None
+
+        # Mock db.flush() to set the id on the Analysis object after it's added
+        def mock_flush():
+            # Find the Analysis object that was added and set its id
+            for call in mock_db.add.call_args_list:
+                if call[0]:  # If there are positional args
+                    obj = call[0][0]
+                    if hasattr(obj, '__class__') and obj.__class__.__name__ == 'Analysis':
+                        obj.id = 'test-analysis-id'
+
+        mock_db.flush.side_effect = mock_flush
         mock_get_db.return_value.__enter__.return_value = mock_db
+
+        # Mock tempfile
+        mock_tmp = MagicMock()
+        mock_tmp.name = '/tmp/test_video.mp4'
+        mock_tmp.__enter__.return_value = mock_tmp
+        mock_tempfile.return_value = mock_tmp
 
         mock_save.return_value = ('/test/path/video.mp4', 'sha256-hash')
         mock_probe.return_value = {'fps': 30, 'width': 1920, 'height': 1080}

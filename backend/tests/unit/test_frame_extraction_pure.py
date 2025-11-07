@@ -5,8 +5,8 @@ Tests the frame sampling algorithm in frame_extraction.py that determines
 which frames to extract based on video FPS.
 """
 
-from unittest.mock import patch, MagicMock, mock_open
 import cv2
+from unittest.mock import patch, MagicMock
 from api.traditional_forensics_utils.frame_extraction import extract_frames
 
 

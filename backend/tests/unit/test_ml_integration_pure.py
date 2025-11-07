@@ -5,7 +5,7 @@ Tests the dict transformation from ml.runner output format to API response forma
 in api/ml_integration.py by mocking ML runner calls.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from api.ml_integration import run_ml_analysis, run_single_frame_ml_analysis
 
 

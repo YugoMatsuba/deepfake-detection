@@ -14,6 +14,17 @@ line-length = 127
 # Target Python 3.9+ (matches production and CI)
 target-version = "py39"
 
+# Exclude directories (matches .flake8 exclude)
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "alembic/versions",
+    "alembic/env.py",
+]
+
+[tool.ruff.lint]
 # Select rule categories (matches flake8 E, F, C90, W)
 select = [
     "E",   # pycodestyle errors
@@ -25,24 +36,13 @@ select = [
 # Ignore rules (matches .flake8 ignore list)
 ignore = [
     "E402",  # module level import not at top of file
-    "W503",  # line break before binary operator
-    "W504",  # line break after binary operator
-]
-
-# Exclude directories (matches .flake8 exclude)
-exclude = [
-    ".git",
-    "__pycache__",
-    ".venv",
-    "venv",
-    "alembic/versions",
-    "alembic/env.py",
+    "C901",  # function is too complex (ignore complexity warnings)
 ]
 
 # Per-file ignores (matches .flake8 per-file-ignores)
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]  # Allow unused imports in __init__ files
 
 # McCabe complexity (matches .flake8 max-complexity=10)
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 10

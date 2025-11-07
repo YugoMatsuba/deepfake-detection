@@ -5,7 +5,7 @@ Tests the dict transformation functions from api/traditional_integration.py
 that convert forensics module outputs to API response format.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from api.traditional_integration import (
     _parse_frame_number,
     transform_ela_result,
