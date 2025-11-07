@@ -213,8 +213,9 @@ def create_app() -> Flask:
     return app
 
 
-# For `python app.py` dev runs
+# For `python app.py` dev runs (not used in production - gunicorn doesn't call this)
 if __name__ == "__main__":
     app = create_app()
     # Read PORT env if set, else default to 5050
-    app.run(port=int(os.getenv("PORT", 5050)), debug=True)
+    # Debug mode only for local development - production uses gunicorn
+    app.run(port=int(os.getenv("PORT", 5050)), debug=True)  # nosec B201

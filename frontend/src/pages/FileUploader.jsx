@@ -80,7 +80,6 @@ export default function FileUploader() {
   );
 
   const navigate = useNavigate();
-  const { analysisId } = useAnalysis();
 
   const handleGoToAnalysis = async () => {
     if (!selectedFile) {

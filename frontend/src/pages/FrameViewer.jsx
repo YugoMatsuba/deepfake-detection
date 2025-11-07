@@ -28,15 +28,12 @@ const FrameViewer = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [frameRate, setFrameRate] = useState(initialFrameRate);
-  const [deepfakeIndex, setDeepfakeIndex] = useState(0);
   const [duration, setDuration] = useState(0);
   const [durationFrames, setDurationFrames] = useState(0);
   const [analysisResult, setAnalysisResult] = useState(null);
   const[isAnalysing, setIsAnalysing] = useState(false);
   const [currentAnalysisType, setCurrentAnalysisType] = useState(null);
   const [overlayResult, setOverlayResult] = useState(null);
-  const [selectedAnalysis, setSelectedAnalysis] = useState(null); 
-  const [analysisPopupOpen, setAnalysisPopupOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(null);
@@ -53,7 +50,6 @@ const FrameViewer = ({
   // Finish Analysis state
   const [showFinishPopup, setShowFinishPopup] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
-  const [cleaning, setCleaning] = useState(false);
 
   // Stats info popup state
   const [showStatsPopup, setShowStatsPopup] = useState(false);
@@ -162,15 +158,15 @@ useEffect(() => {
   }, [videoSrc]);
 
 
-  // Average anomaly score across frames that have a score
-  const getAverageAnomaly = () => {
-    const entries = Object.values(mlData || {}).filter(
-      (m) => typeof m?.anomalyScore === "number"
-    );
-    if (!entries.length) return null;
-    const sum = entries.reduce((acc, m) => acc + m.anomalyScore, 0);
-    return sum / entries.length; // 0..1
-  };
+  // Average anomaly score across frames that have a score (unused but kept for future features)
+  // const getAverageAnomaly = () => {
+  //   const entries = Object.values(mlData || {}).filter(
+  //     (m) => typeof m?.anomalyScore === "number"
+  //   );
+  //   if (!entries.length) return null;
+  //   const sum = entries.reduce((acc, m) => acc + m.anomalyScore, 0);
+  //   return sum / entries.length; // 0..1
+  // };
 
   // Extract “details” for the currently selected frame
  const details = (() => {
@@ -344,12 +340,9 @@ const jumpToPreviousMarker = (type) => {
     setIsPlaying(false);
   };
 
-  const [currentTime, setCurrentTime] = useState(0);
-
 const handleTimeUpdate = () => {
   const video = videoRef.current;
   if (!video) return;
-  setCurrentTime(video.currentTime);
   if (frameRate) setCurrentFrame(Math.round(video.currentTime * frameRate));
 };
   const handleLoadedMetadata = () => {
@@ -389,38 +382,39 @@ useEffect(() => {
 })();
 
 
-  // Tooltip text: from deepfakeMeta if available, else a fallback
-  const hoveredSummary =
-    hoveredFrame != null && mlData && mlData[hoveredFrame]?.summary
-      ? mlData[hoveredFrame].summary
-      : hoveredFrame != null
-      ? `Flagged at frame ${hoveredFrame}`
-      : "";
+  // Tooltip text: from deepfakeMeta if available, else a fallback (commented out - unused)
+  // const hoveredSummary =
+  //   hoveredFrame != null && mlData && mlData[hoveredFrame]?.summary
+  //     ? mlData[hoveredFrame].summary
+  //     : hoveredFrame != null
+  //     ? `Flagged at frame ${hoveredFrame}`
+  //     : "";
 
-  const mergeFrames = (existing = [], additions = []) => {
-    const byKey = new Map();
-    [...existing, ...additions].forEach((frame) => {
-      if (!frame) {
-        return;
-      }
-      const key =
-        typeof frame.frame_number === "number"
-          ? `idx_${frame.frame_number}`
-          : frame.frame ?? JSON.stringify(frame);
-      const existingEntry = byKey.get(key) || {};
-      byKey.set(key, { ...existingEntry, ...frame });
-    });
-    return Array.from(byKey.values()).sort((a, b) => {
-      const aNum = typeof a.frame_number === "number" ? a.frame_number : Number.POSITIVE_INFINITY;
-      const bNum = typeof b.frame_number === "number" ? b.frame_number : Number.POSITIVE_INFINITY;
-      if (aNum !== bNum) {
-        return aNum - bNum;
-      }
-      const aFrame = a.frame ?? "";
-      const bFrame = b.frame ?? "";
-      return aFrame.localeCompare(bFrame);
-    });
-  };
+  // Helper to merge frame arrays (commented out - unused)
+  // const mergeFrames = (existing = [], additions = []) => {
+  //   const byKey = new Map();
+  //   [...existing, ...additions].forEach((frame) => {
+  //     if (!frame) {
+  //       return;
+  //     }
+  //     const key =
+  //       typeof frame.frame_number === "number"
+  //         ? `idx_${frame.frame_number}`
+  //         : frame.frame ?? JSON.stringify(frame);
+  //     const existingEntry = byKey.get(key) || {};
+  //     byKey.set(key, { ...existingEntry, ...frame });
+  //   });
+  //   return Array.from(byKey.values()).sort((a, b) => {
+  //     const aNum = typeof a.frame_number === "number" ? a.frame_number : Number.POSITIVE_INFINITY;
+  //     const bNum = typeof b.frame_number === "number" ? b.frame_number : Number.POSITIVE_INFINITY;
+  //     if (aNum !== bNum) {
+  //       return aNum - bNum;
+  //     }
+  //     const aFrame = a.frame ?? "";
+  //     const bFrame = b.frame ?? "";
+  //     return aFrame.localeCompare(bFrame);
+  //   });
+  // };
 
   const analyzeFrame = async (analysisType) => {
     if (!analysisId) {

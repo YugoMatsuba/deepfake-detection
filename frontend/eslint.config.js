@@ -23,7 +23,28 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
+      'react-refresh/only-export-components': ['warn'],  // Downgrade to warning
+    },
+  },
+  // Configuration for test files
+  {
+    files: ['**/*.test.{js,jsx}', '**/tests/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.jest,
+        ...globals.node,
+      },
+    },
+  },
+  // Configuration for config files (vite, jest, etc.)
+  {
+    files: ['*.config.{js,mjs}', 'vite.config.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
     },
   },
 ])

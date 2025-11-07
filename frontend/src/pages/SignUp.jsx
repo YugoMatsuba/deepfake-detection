@@ -27,7 +27,7 @@ export default function SignUp() {
         throw new Error("Passwords do not match");
       }
       const usernameValue = username.trim();
-      const data = await signup(usernameValue, password);
+      await signup(usernameValue, password);
 
       // Success - show pending approval message (backend doesn't auto-login)
       setSuccess(true);

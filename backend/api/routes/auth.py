@@ -60,7 +60,7 @@ def _client_ip() -> str:
     xri = request.headers.get("X-Real-IP")
     if xri:
         return xri
-    return request.remote_addr or "0.0.0.0"
+    return request.remote_addr or "unknown"
 
 def _ua() -> str:
     return request.headers.get("User-Agent", "")

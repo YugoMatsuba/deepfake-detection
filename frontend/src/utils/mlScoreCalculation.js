@@ -49,7 +49,7 @@ export function calculateTop5EnsembleScore(mlData) {
 
   // Filter to frames that have scores from all 3 models
   const ensembleScores = [];
-  for (const [index, scores] of frameScoresMap.entries()) {
+  for (const [_index, scores] of frameScoresMap.entries()) {
     if (scores.xception !== undefined && scores.spsl !== undefined && scores.ucf !== undefined) {
       const ensembleScore = (scores.xception + scores.spsl + scores.ucf) / 3;
       ensembleScores.push(ensembleScore);

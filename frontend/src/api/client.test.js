@@ -106,7 +106,7 @@ describe('fetchJson', () => {
     });
 
     // Start the promise but don't await (it never resolves)
-    const promise = fetchJson('/protected');
+    fetchJson('/protected');
 
     // Give it a tick to process
     await new Promise(resolve => setTimeout(resolve, 0));

@@ -2,15 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "./Card";
 import { Button } from "./Button";
-import { startImageAnalysis } from "../api/videos";
-import { useAnalysis } from "../app/AnalysisProvider";
 import InfoButton from "../components/InfoButton";
 import { forensicsInfo } from "../utils/ForensicsInfo";
 
 const ImageAnalysis = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { selectedModules } = useAnalysis();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);

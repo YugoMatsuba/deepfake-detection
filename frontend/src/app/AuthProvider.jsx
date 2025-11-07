@@ -39,31 +39,20 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     setError(null);
-    
-    try {
-      const data = await apiLogin({ username, password });
-      setUser(data.user);
-      setStatus('authenticated');
-      return data;
-    } catch (err) {
-      // Let the caller handle the error
-      throw err;
-    }
+    const data = await apiLogin({ username, password });
+    setUser(data.user);
+    setStatus('authenticated');
+    return data;
   };
 
   const signup = async (username, password) => {
-  setError(null);
-  try {
+    setError(null);
     const data = await apiSignUp({ username, password });
     // If your backend logs the user in immediately after signup:
     setUser(data.user);
     setStatus('authenticated'); // or 'registered' if you prefer a separate state
     return data;
-  } catch (err) {
-    // Let caller (e.g., SignUp page) handle display
-    throw err;
-  }
-};
+  };
 
   const logout = async () => {
     try {
