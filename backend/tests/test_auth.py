@@ -38,7 +38,7 @@ class TestAuthRoutes(unittest.TestCase):
         mock_db.commit.return_value = None
 
         response = self.client.post('/api/auth/register',
-                                  json={'username': 'admin', 'password': 'password123'})
+                                    json={'username': 'admin', 'password': 'password123'})
 
         self.assertEqual(response.status_code, 201)
 
@@ -68,7 +68,7 @@ class TestAuthRoutes(unittest.TestCase):
 
         with self.app.test_request_context():
             response = self.client.post('/api/auth/login',
-                                      json={'username': 'testuser', 'password': 'password123'})
+                                        json={'username': 'testuser', 'password': 'password123'})
 
             self.assertEqual(response.status_code, 200)
             data = response.get_json()
@@ -82,7 +82,7 @@ class TestAuthRoutes(unittest.TestCase):
         mock_get_db.return_value.__enter__.return_value = mock_db
 
         response = self.client.post('/api/auth/login',
-                                  json={'username': 'nonexistent', 'password': 'wrong'})
+                                    json={'username': 'nonexistent', 'password': 'wrong'})
 
         self.assertEqual(response.status_code, 401)
         data = response.get_json()

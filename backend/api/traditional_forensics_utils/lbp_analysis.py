@@ -142,7 +142,7 @@ def run_lbp_analysis(input_path, top_percent=10, output_dir=None, analysis_id=No
         with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all tasks
             futures = {executor.submit(_compute_lbp_worker, path): path
-                      for path in frame_paths}
+                       for path in frame_paths}
 
             # Collect results as they complete
             for future in as_completed(futures):

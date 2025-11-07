@@ -8,6 +8,7 @@ from storage import DATA_ROOT
 
 frame_rate_bp = Blueprint("framerate", __name__)
 
+
 @frame_rate_bp.get("/framerate")
 @require_user
 def get_frame_rate():

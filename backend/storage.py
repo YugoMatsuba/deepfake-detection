@@ -219,5 +219,3 @@ def delete_analysis_files(analysis_id: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to delete analysis files for {analysis_id}: {e}")
         return False
-
-

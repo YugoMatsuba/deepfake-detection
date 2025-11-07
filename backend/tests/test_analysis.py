@@ -73,7 +73,7 @@ class TestAnalysisRoutes(unittest.TestCase):
             sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/analyses/test-analysis-id/start',
-                                  json={'modules': ['xception'], 'traditional': ['ela']})
+                                    json={'modules': ['xception'], 'traditional': ['ela']})
 
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
@@ -159,7 +159,7 @@ class TestAnalysisRoutes(unittest.TestCase):
             sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/analyses/test-analysis-id/frames/42/forensics',
-                                  json={'methods': ['ela']})
+                                    json={'methods': ['ela']})
 
         self.assertEqual(response.status_code, 200)
         data = response.get_json()

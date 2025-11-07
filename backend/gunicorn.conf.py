@@ -40,4 +40,3 @@ worker_class = "gthread"
 # Trust proxy headers when running behind reverse proxy
 forwarded_allow_ips = "*"
 secure_scheme_headers = {"X-Forwarded-Proto": "https"}
-

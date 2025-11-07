@@ -585,5 +585,3 @@ def _get_assessment(score: float) -> str:
         return "High Risk"
     else:
         return "Critical"
-
-

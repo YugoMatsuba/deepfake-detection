@@ -62,14 +62,17 @@ def _client_ip() -> str:
         return xri
     return request.remote_addr or "unknown"
 
+
 def _ua() -> str:
     return request.headers.get("User-Agent", "")
+
 
 def _require_json() -> dict:
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         return {}
     return data
+
 
 def _require_auth(db: Session) -> Optional[User]:
     """
@@ -79,6 +82,7 @@ def _require_auth(db: Session) -> Optional[User]:
     if not uid:
         return None
     return db.get(User, uid)
+
 
 def _require_admin(db: Session) -> Optional[User]:
     """
@@ -174,6 +178,7 @@ def login():
         db.commit()
         return jsonify(user={"id": u.id, "username": u.username, "role": u.role}), 200
 
+
 @bp.post("/signup")
 def signup():
     """
@@ -227,6 +232,7 @@ def signup():
             message="Account created. Awaiting admin approval.",
             user_id=u.id
         ), 201
+
 
 @bp.post("/logout")
 def logout():

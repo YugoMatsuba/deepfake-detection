@@ -59,8 +59,8 @@ class TestVideoUploadRoutes(unittest.TestCase):
             sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/videos',
-                                  data={'file': file_obj},
-                                  content_type='multipart/form-data')
+                                    data={'file': file_obj},
+                                    content_type='multipart/form-data')
 
         self.assertEqual(response.status_code, 201)
         data = response.get_json()
@@ -86,8 +86,8 @@ class TestVideoUploadRoutes(unittest.TestCase):
             sess['user_id'] = self.test_user_id
 
         response = self.client.post('/api/videos',
-                                  data={'file': file_obj},
-                                  content_type='multipart/form-data')
+                                    data={'file': file_obj},
+                                    content_type='multipart/form-data')
 
         self.assertEqual(response.status_code, 400)
 
