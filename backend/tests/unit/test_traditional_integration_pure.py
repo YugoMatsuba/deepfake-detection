@@ -5,6 +5,8 @@ Tests the dict transformation functions from api/traditional_integration.py
 that convert forensics module outputs to API response format.
 """
 
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 from api.traditional_integration import (
     _parse_frame_number,
@@ -306,8 +308,11 @@ class TestRunTraditionalForensics:
         assert result == {}
 
     @patch("api.traditional_integration.extract_frames")
-    def test_frame_extraction_failure_returns_errors_for_all_modules(self, mock_extract):
+    @patch("api.traditional_integration.DATA_ROOT")
+    def test_frame_extraction_failure_returns_errors_for_all_modules(self, mock_data_root, mock_extract):
         """Frame extraction failure returns error for all requested modules."""
+        # Mock DATA_ROOT to use temp directory
+        mock_data_root.__truediv__ = lambda self, x: Path(tempfile.gettempdir()) / x
         mock_extract.side_effect = RuntimeError("Failed to extract frames")
 
         result = run_traditional_forensics("/video.mp4", ["ela", "noise", "lbp"], "test_id")
@@ -322,8 +327,10 @@ class TestRunTraditionalForensics:
             assert "Frame extraction failed" in result[module_name]["error"]
 
     @patch("api.traditional_integration.extract_frames")
-    def test_empty_frames_extraction_returns_error(self, mock_extract):
+    @patch("api.traditional_integration.DATA_ROOT")
+    def test_empty_frames_extraction_returns_error(self, mock_data_root, mock_extract):
         """Empty frames list from extraction returns error."""
+        mock_data_root.__truediv__ = lambda self, x: Path(tempfile.gettempdir()) / x
         mock_extract.return_value = []  # No frames extracted
 
         result = run_traditional_forensics("/video.mp4", ["ela"], "test_id")
@@ -333,8 +340,10 @@ class TestRunTraditionalForensics:
 
     @patch("api.traditional_integration.extract_frames")
     @patch("api.traditional_integration.run_ela")
-    def test_unknown_module_returns_error(self, mock_ela, mock_extract):
+    @patch("api.traditional_integration.DATA_ROOT")
+    def test_unknown_module_returns_error(self, mock_data_root, mock_ela, mock_extract):
         """Unknown module name returns error result."""
+        mock_data_root.__truediv__ = lambda self, x: Path(tempfile.gettempdir()) / x
         mock_extract.return_value = ["/path/frame1.jpg"]
 
         result = run_traditional_forensics("/video.mp4", ["unknown_module"], "test_id")
@@ -345,8 +354,10 @@ class TestRunTraditionalForensics:
 
     @patch("api.traditional_integration.extract_frames")
     @patch("api.traditional_integration.run_ela")
-    def test_module_analysis_failure_returns_error_for_that_module(self, mock_ela, mock_extract):
+    @patch("api.traditional_integration.DATA_ROOT")
+    def test_module_analysis_failure_returns_error_for_that_module(self, mock_data_root, mock_ela, mock_extract):
         """Individual module failure returns error for that module only."""
+        mock_data_root.__truediv__ = lambda self, x: Path(tempfile.gettempdir()) / x
         mock_extract.return_value = ["/path/frame1.jpg"]
         mock_ela.side_effect = ValueError("ELA processing failed")
 
@@ -358,8 +369,10 @@ class TestRunTraditionalForensics:
     @patch("api.traditional_integration.extract_frames")
     @patch("api.traditional_integration.run_ela")
     @patch("api.traditional_integration.run_noise_analysis")
-    def test_one_module_fails_others_succeed(self, mock_noise, mock_ela, mock_extract):
+    @patch("api.traditional_integration.DATA_ROOT")
+    def test_one_module_fails_others_succeed(self, mock_data_root, mock_noise, mock_ela, mock_extract):
         """One module failure doesn't affect other modules."""
+        mock_data_root.__truediv__ = lambda self, x: Path(tempfile.gettempdir()) / x
         mock_extract.return_value = ["/path/frame1.jpg"]
         mock_ela.return_value = {"mode": "single_frame", "frame": "frame1.jpg", "score": 1.5}
         mock_noise.side_effect = RuntimeError("Noise analysis crashed")
