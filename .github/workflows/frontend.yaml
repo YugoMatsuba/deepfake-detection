@@ -36,5 +36,10 @@ jobs:
     - name: Lint with ESLint
       run: npm run lint
 
+    - name: Check formatting with Prettier
+      run: |
+        # This will FAIL if code is not formatted according to Prettier style
+        npm run format:check
+
     - name: Run unit tests with coverage
       run: npm test -- --coverage --coverageReporters=text --coverageReporters=lcov --runInBand

@@ -75,6 +75,20 @@ jobs:
         # This enforces code quality and will FAIL the build on violations
         flake8 .
 
+    - name: Check formatting with Black
+      working-directory: backend
+      run: |
+        # Black is installed via requirements-test.txt
+        # This will FAIL if code is not formatted according to Black style
+        black --check .
+
+    - name: Lint with Ruff
+      working-directory: backend
+      run: |
+        # Ruff is installed via requirements-test.txt
+        # This will FAIL on linting violations (uses pyproject.toml config)
+        ruff check .
+
     - name: Test with pytest + coverage
       working-directory: backend
       env:
