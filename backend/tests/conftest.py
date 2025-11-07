@@ -9,7 +9,11 @@ import sys
 from pathlib import Path
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Add project root to sys.path so tests can import ml/ package
+project_root = str(Path(__file__).resolve().parents[2])  # /Users/.../deepfake_AI
+backend_dir = str(Path(__file__).resolve().parents[1])  # /Users/.../deepfake_AI/backend
+sys.path.insert(0, project_root)
+sys.path.insert(0, backend_dir)
 
 from api import init_engine, engine as get_engine
 from models import Base
