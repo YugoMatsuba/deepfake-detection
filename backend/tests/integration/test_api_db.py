@@ -32,13 +32,9 @@ def client():
             sys.modules["cleanup_scheduler"] = cleanup_module
             stack.callback(lambda: sys.modules.pop("cleanup_scheduler", None))
         else:
-            stack.enter_context(
-                patch.object(cleanup_module, "init_scheduler", return_value=None)
-            )
+            stack.enter_context(patch.object(cleanup_module, "init_scheduler", return_value=None))
             if hasattr(cleanup_module, "cleanup_job"):
-                stack.enter_context(
-                    patch.object(cleanup_module, "cleanup_job", return_value=None)
-                )
+                stack.enter_context(patch.object(cleanup_module, "cleanup_job", return_value=None))
 
         try:
             importlib.import_module("database")
@@ -49,9 +45,7 @@ def client():
             stack.callback(lambda: sys.modules.pop("database", None))
 
         app_module = importlib.import_module("app")
-        stack.enter_context(
-            patch.object(app_module, "bootstrap_owner_from_env", return_value=None)
-        )
+        stack.enter_context(patch.object(app_module, "bootstrap_owner_from_env", return_value=None))
         app = app_module.create_app()
         app.config.update(TESTING=True)
 

@@ -8,28 +8,29 @@ Tests isolated computational logic without external dependencies:
 - compute_lbp: LBP histogram-based scoring (basic)
 - compute_noise: Blockwise noise inconsistency (basic)
 """
+
 import sys
 import os
 import numpy as np
 from PIL import Image
 import tempfile
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.traditional_forensics_utils.ela_analysis import (
     stretch_to_uint8 as ela_stretch,
     downscale_overlay as ela_downscale,
-    compute_ela_score
+    compute_ela_score,
 )
 from api.traditional_forensics_utils.lbp_analysis import (
     stretch_to_uint8 as lbp_stretch,
     downscale_overlay as lbp_downscale,
-    compute_lbp
+    compute_lbp,
 )
 from api.traditional_forensics_utils.noise_analysis import (
     stretch_to_uint8 as noise_stretch,
     downscale_overlay as noise_downscale,
-    compute_noise
+    compute_noise,
 )
 
 
@@ -39,11 +40,7 @@ class TestStretchToUint8:
     def test_stretch_normal_range(self):
         """Test stretching with normal value distribution."""
         # Create array with known percentile values
-        arr = np.array([
-            [0, 10, 20, 30, 40],
-            [50, 60, 70, 80, 90],
-            [100, 110, 120, 130, 140]
-        ], dtype=np.float32)
+        arr = np.array([[0, 10, 20, 30, 40], [50, 60, 70, 80, 90], [100, 110, 120, 130, 140]], dtype=np.float32)
 
         result = ela_stretch(arr, low_pct=5, high_pct=95)
 
@@ -66,12 +63,7 @@ class TestStretchToUint8:
 
     def test_stretch_high_contrast(self):
         """Test stretch with extreme value range."""
-        arr = np.array([
-            [0, 0, 0, 0],
-            [0, 1000, 1000, 0],
-            [0, 1000, 1000, 0],
-            [0, 0, 0, 0]
-        ], dtype=np.float32)
+        arr = np.array([[0, 0, 0, 0], [0, 1000, 1000, 0], [0, 1000, 1000, 0], [0, 0, 0, 0]], dtype=np.float32)
 
         result = ela_stretch(arr, low_pct=1, high_pct=99)
 
@@ -119,7 +111,7 @@ class TestDownscaleOverlay:
     def test_downscale_oversized_image(self):
         """Test downscaling image larger than max_width."""
         # Create 1920x1080 image
-        img = Image.new('RGB', (1920, 1080), color=(255, 0, 0))
+        img = Image.new("RGB", (1920, 1080), color=(255, 0, 0))
 
         result = ela_downscale(img, max_width=960)
 
@@ -132,7 +124,7 @@ class TestDownscaleOverlay:
 
     def test_no_downscale_small_image(self):
         """Test that images smaller than max_width are not upscaled."""
-        img = Image.new('RGB', (640, 480), color=(0, 255, 0))
+        img = Image.new("RGB", (640, 480), color=(0, 255, 0))
 
         result = lbp_downscale(img, max_width=960)
 
@@ -142,7 +134,7 @@ class TestDownscaleOverlay:
 
     def test_downscale_exact_max_width(self):
         """Test image exactly at max_width (no scaling needed)."""
-        img = Image.new('L', (960, 540), color=128)
+        img = Image.new("L", (960, 540), color=128)
 
         result = noise_downscale(img, max_width=960)
 
@@ -159,7 +151,7 @@ class TestDownscaleOverlay:
         ]
 
         for (width, height), max_width in test_cases:
-            img = Image.new('RGB', (width, height))
+            img = Image.new("RGB", (width, height))
             result = ela_downscale(img, max_width=max_width)
 
             # Calculate expected dimensions
@@ -177,38 +169,38 @@ class TestDownscaleOverlay:
     def test_downscale_different_modes(self):
         """Test downscaling on different image modes (RGB, L)."""
         # RGB image
-        img_rgb = Image.new('RGB', (2000, 1000), color=(255, 0, 0))
+        img_rgb = Image.new("RGB", (2000, 1000), color=(255, 0, 0))
         result_rgb = ela_downscale(img_rgb, max_width=800)
-        assert result_rgb.mode == 'RGB'
+        assert result_rgb.mode == "RGB"
         assert result_rgb.width == 800
 
         # Grayscale image
-        img_l = Image.new('L', (2000, 1000), color=128)
+        img_l = Image.new("L", (2000, 1000), color=128)
         result_l = lbp_downscale(img_l, max_width=800)
-        assert result_l.mode == 'L'
+        assert result_l.mode == "L"
         assert result_l.width == 800
 
 
 class TestComputeElaScore:
     """Test ELA score computation (basic functional tests)."""
 
-    def create_test_image(self, size=(256, 256), pattern='solid'):
+    def create_test_image(self, size=(256, 256), pattern="solid"):
         """Helper to create test images."""
-        if pattern == 'solid':
-            return Image.new('RGB', size, color=(128, 128, 128))
-        elif pattern == 'gradient':
+        if pattern == "solid":
+            return Image.new("RGB", size, color=(128, 128, 128))
+        elif pattern == "gradient":
             arr = np.zeros((size[1], size[0], 3), dtype=np.uint8)
             arr[:, :, 0] = np.linspace(0, 255, size[0], dtype=np.uint8)
-            return Image.fromarray(arr, mode='RGB')
-        elif pattern == 'noise':
+            return Image.fromarray(arr, mode="RGB")
+        elif pattern == "noise":
             arr = np.random.randint(0, 256, (*size[::-1], 3), dtype=np.uint8)
-            return Image.fromarray(arr, mode='RGB')
+            return Image.fromarray(arr, mode="RGB")
 
     def test_compute_ela_basic(self):
         """Test that compute_ela_score runs without errors."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(pattern='gradient')
-            img.save(f.name, 'JPEG', quality=90)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(pattern="gradient")
+            img.save(f.name, "JPEG", quality=90)
             temp_path = f.name
 
         try:
@@ -221,7 +213,7 @@ class TestComputeElaScore:
             assert isinstance(ela_image, Image.Image)
 
             # ELA image should be RGB
-            assert ela_image.mode == 'RGB'
+            assert ela_image.mode == "RGB"
 
             # Score should be non-negative (std is always >= 0)
             assert score >= 0
@@ -231,9 +223,9 @@ class TestComputeElaScore:
 
     def test_compute_ela_returns_downscaled_image(self):
         """Test that ELA image is downscaled to max width."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(size=(2000, 1500), pattern='noise')
-            img.save(f.name, 'JPEG', quality=85)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(size=(2000, 1500), pattern="noise")
+            img.save(f.name, "JPEG", quality=85)
             temp_path = f.name
 
         try:
@@ -247,9 +239,9 @@ class TestComputeElaScore:
 
     def test_compute_ela_different_qualities(self):
         """Test ELA with different resave qualities."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(pattern='gradient')
-            img.save(f.name, 'JPEG', quality=95)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(pattern="gradient")
+            img.save(f.name, "JPEG", quality=95)
             temp_path = f.name
 
         try:
@@ -268,24 +260,24 @@ class TestComputeElaScore:
 class TestComputeLbp:
     """Test LBP computation (basic functional tests)."""
 
-    def create_test_image(self, size=(256, 256), pattern='solid'):
+    def create_test_image(self, size=(256, 256), pattern="solid"):
         """Helper to create grayscale test images."""
-        if pattern == 'solid':
-            return Image.new('L', size, color=128)
-        elif pattern == 'checkerboard':
+        if pattern == "solid":
+            return Image.new("L", size, color=128)
+        elif pattern == "checkerboard":
             arr = np.zeros(size[::-1], dtype=np.uint8)
             arr[::2, ::2] = 255
             arr[1::2, 1::2] = 255
-            return Image.fromarray(arr, mode='L')
-        elif pattern == 'noise':
+            return Image.fromarray(arr, mode="L")
+        elif pattern == "noise":
             arr = np.random.randint(0, 256, size[::-1], dtype=np.uint8)
-            return Image.fromarray(arr, mode='L')
+            return Image.fromarray(arr, mode="L")
 
     def test_compute_lbp_basic(self):
         """Test that compute_lbp runs without errors."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(pattern='checkerboard')
-            img.save(f.name, 'JPEG', quality=95)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(pattern="checkerboard")
+            img.save(f.name, "JPEG", quality=95)
             temp_path = f.name
 
         try:
@@ -298,7 +290,7 @@ class TestComputeLbp:
             assert isinstance(lbp_image, Image.Image)
 
             # LBP image should be grayscale
-            assert lbp_image.mode == 'L'
+            assert lbp_image.mode == "L"
 
             # Score should be non-negative (std is always >= 0)
             assert score >= 0
@@ -308,9 +300,9 @@ class TestComputeLbp:
 
     def test_compute_lbp_returns_downscaled_image(self):
         """Test that LBP image is downscaled."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(size=(2000, 1500), pattern='noise')
-            img.save(f.name, 'JPEG', quality=90)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(size=(2000, 1500), pattern="noise")
+            img.save(f.name, "JPEG", quality=90)
             temp_path = f.name
 
         try:
@@ -324,9 +316,9 @@ class TestComputeLbp:
 
     def test_compute_lbp_different_parameters(self):
         """Test LBP with different P and R parameters."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(pattern='checkerboard')
-            img.save(f.name, 'JPEG', quality=95)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(pattern="checkerboard")
+            img.save(f.name, "JPEG", quality=95)
             temp_path = f.name
 
         try:
@@ -349,22 +341,22 @@ class TestComputeLbp:
 class TestComputeNoise:
     """Test noise analysis computation (basic functional tests)."""
 
-    def create_test_image(self, size=(256, 256), pattern='solid'):
+    def create_test_image(self, size=(256, 256), pattern="solid"):
         """Helper to create grayscale test images."""
-        if pattern == 'solid':
-            return Image.new('L', size, color=128)
-        elif pattern == 'gradient':
+        if pattern == "solid":
+            return Image.new("L", size, color=128)
+        elif pattern == "gradient":
             arr = np.tile(np.linspace(0, 255, size[0], dtype=np.uint8), (size[1], 1))
-            return Image.fromarray(arr, mode='L')
-        elif pattern == 'noise':
+            return Image.fromarray(arr, mode="L")
+        elif pattern == "noise":
             arr = np.random.randint(0, 256, size[::-1], dtype=np.uint8)
-            return Image.fromarray(arr, mode='L')
+            return Image.fromarray(arr, mode="L")
 
     def test_compute_noise_basic(self):
         """Test that compute_noise runs without errors."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(pattern='gradient')
-            img.save(f.name, 'JPEG', quality=90)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(pattern="gradient")
+            img.save(f.name, "JPEG", quality=90)
             temp_path = f.name
 
         try:
@@ -377,16 +369,16 @@ class TestComputeNoise:
             assert isinstance(noise_image, Image.Image)
 
             # Noise image should be grayscale
-            assert noise_image.mode == 'L'
+            assert noise_image.mode == "L"
 
         finally:
             os.unlink(temp_path)
 
     def test_compute_noise_returns_downscaled_image(self):
         """Test that noise overlay is downscaled."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(size=(2000, 1500), pattern='noise')
-            img.save(f.name, 'JPEG', quality=90)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(size=(2000, 1500), pattern="noise")
+            img.save(f.name, "JPEG", quality=90)
             temp_path = f.name
 
         try:
@@ -400,9 +392,9 @@ class TestComputeNoise:
 
     def test_compute_noise_output_types(self):
         """Test that noise analysis returns correct types."""
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as f:
-            img = self.create_test_image(pattern='noise')
-            img.save(f.name, 'JPEG', quality=90)
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            img = self.create_test_image(pattern="noise")
+            img.save(f.name, "JPEG", quality=90)
             temp_path = f.name
 
         try:

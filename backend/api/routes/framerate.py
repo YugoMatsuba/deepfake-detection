@@ -30,9 +30,7 @@ def get_frame_rate():
             analyses = db.query(Analysis).order_by(Analysis.created_at.desc()).all()
         else:
             # Regular users see only their own
-            analyses = db.query(Analysis).filter(
-                Analysis.user_id == user.id
-            ).order_by(Analysis.created_at.desc()).all()
+            analyses = db.query(Analysis).filter(Analysis.user_id == user.id).order_by(Analysis.created_at.desc()).all()
 
         if not analyses:
             return jsonify({"error": "No videos found"}), 404
@@ -53,10 +51,12 @@ def get_frame_rate():
                     fps = cap.get(cv2.CAP_PROP_FPS)
                     cap.release()
 
-                    return jsonify({
-                        "video_id": analysis.id,
-                        "original_name": analysis.original_filename or video_path.name,
-                        "frame_rate": fps
-                    })
+                    return jsonify(
+                        {
+                            "video_id": analysis.id,
+                            "original_name": analysis.original_filename or video_path.name,
+                            "frame_rate": fps,
+                        }
+                    )
 
         return jsonify({"error": "No valid video files found"}), 404

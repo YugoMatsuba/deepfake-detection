@@ -31,7 +31,7 @@ export default function PastReports() {
       if (offset === 0) {
         setReports(data?.reports || []);
       } else {
-        setReports(prev => [...prev, ...(data?.reports || [])]);
+        setReports((prev) => [...prev, ...(data?.reports || [])]);
       }
       setTotal(data?.total || 0);
     } catch (err) {
@@ -228,87 +228,104 @@ export default function PastReports() {
                 {filteredReports.map((report) => {
                   const mediaType = report.media_type || "video"; // Default to video for backward compatibility
                   return (
-                  <tr key={report.analysis_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {/* Media type icon */}
-                        {mediaType === "image" ? (
-                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {report.original_filename}
-                          </div>
-                          <div className="text-xs text-gray-500 font-mono">
-                            {report.analysis_id.substring(0, 8)}...
+                    <tr key={report.analysis_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {/* Media type icon */}
+                          {mediaType === "image" ? (
+                            <svg
+                              className="w-5 h-5 text-green-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="w-5 h-5 text-blue-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {report.original_filename}
+                            </div>
+                            <div className="text-xs text-gray-500 font-mono">
+                              {report.analysis_id.substring(0, 8)}...
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    {(user?.role === "admin" || user?.role === "owner") && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {report.username || "Unknown"}
                       </td>
-                    )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {formatDate(report.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {formatDate(report.completed_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex gap-2">
-                        {report.has_ml_results && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            ML
-                          </span>
-                        )}
-                        {report.has_traditional_results && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Traditional
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
-                      <button
-                        onClick={() => handleRerunAnalysis(report.analysis_id, mediaType)}
-                        className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition text-xs mr-2"
-                      >
-                        Reopen Analysis
-                      </button>
-                      {mediaType === "video" && (
-                        <button
-                          onClick={() =>
-                            downloadPDF(
-                              report.analysis_id,
-                              report.original_filename.replace(/\.[^/.]+$/, "") +
-                                "_report.pdf"
-                            )
-                          }
-                          disabled={downloading === report.analysis_id}
-                          className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs mr-2"
-                        >
-                          {downloading === report.analysis_id
-                            ? "Downloading..."
-                            : "Download PDF"}
-                        </button>
+                      {(user?.role === "admin" || user?.role === "owner") && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {report.username || "Unknown"}
+                        </td>
                       )}
-                      <button
-                        onClick={() => setDeleteConfirm(report.analysis_id)}
-                        disabled={deleting === report.analysis_id}
-                        className="px-3 py-1.5 rounded-lg border border-red-600 text-red-600 font-medium hover:bg-red-50 active:bg-red-100 transition disabled:opacity-50 text-xs"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {formatDate(report.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {formatDate(report.completed_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex gap-2">
+                          {report.has_ml_results && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              ML
+                            </span>
+                          )}
+                          {report.has_traditional_results && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Traditional
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-left text-sm">
+                        <button
+                          onClick={() => handleRerunAnalysis(report.analysis_id, mediaType)}
+                          className="px-3 py-1.5 rounded-lg border border-green-600 bg-green-600 text-white font-medium hover:opacity-95 active:opacity-90 transition text-xs mr-2"
+                        >
+                          Reopen Analysis
+                        </button>
+                        {mediaType === "video" && (
+                          <button
+                            onClick={() =>
+                              downloadPDF(
+                                report.analysis_id,
+                                report.original_filename.replace(/\.[^/.]+$/, "") + "_report.pdf"
+                              )
+                            }
+                            disabled={downloading === report.analysis_id}
+                            className="px-3 py-1.5 rounded-lg border border-blue-600 bg-blue-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-50 text-xs mr-2"
+                          >
+                            {downloading === report.analysis_id ? "Downloading..." : "Download PDF"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setDeleteConfirm(report.analysis_id)}
+                          disabled={deleting === report.analysis_id}
+                          className="px-3 py-1.5 rounded-lg border border-red-600 text-red-600 font-medium hover:bg-red-50 active:bg-red-100 transition disabled:opacity-50 text-xs"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -324,7 +341,7 @@ export default function PastReports() {
               disabled={loading}
               className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
             >
-              {loading ? 'Loading...' : `Load More (${filteredReports.length} of ${total})`}
+              {loading ? "Loading..." : `Load More (${filteredReports.length} of ${total})`}
             </button>
           </div>
         )}
@@ -333,12 +350,10 @@ export default function PastReports() {
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h2 className="text-xl font-bold text-red-600 mb-4">
-                Delete Analysis?
-              </h2>
+              <h2 className="text-xl font-bold text-red-600 mb-4">Delete Analysis?</h2>
               <p className="text-gray-700 mb-6">
-                This will permanently delete this analysis record and all
-                associated files. This action cannot be undone.
+                This will permanently delete this analysis record and all associated files. This
+                action cannot be undone.
               </p>
 
               <div className="flex gap-3">
@@ -347,9 +362,7 @@ export default function PastReports() {
                   disabled={deleting === deleteConfirm}
                   className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50 transition"
                 >
-                  {deleting === deleteConfirm
-                    ? "Deleting..."
-                    : "Delete Permanently"}
+                  {deleting === deleteConfirm ? "Deleting..." : "Delete Permanently"}
                 </button>
                 <button
                   onClick={() => setDeleteConfirm(null)}

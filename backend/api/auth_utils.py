@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from models import Analysis, User, AuditLog
 from api import get_db
@@ -34,6 +35,7 @@ PRIVILEGED_ROLES = ("admin", "owner")
 # User Fetching & Session Helpers
 # ============================================================================
 
+
 def current_user(db: Session) -> User:
     """
     Get current authenticated user from session.
@@ -48,7 +50,7 @@ def current_user(db: Session) -> User:
         401: Not logged in or user inactive
     """
     # Check if already fetched this request
-    if hasattr(g, 'user') and g.user:
+    if hasattr(g, "user") and g.user:
         return g.user
 
     uid = session.get("user_id")
@@ -79,7 +81,7 @@ def _audit_log(db: Session, event: str, user_id: Optional[int] = None, details: 
         event=event,
         ip=request.remote_addr,
         user_agent=request.headers.get("User-Agent"),
-        details_json=details
+        details_json=details,
     )
     db.add(log)
 
@@ -87,6 +89,7 @@ def _audit_log(db: Session, event: str, user_id: Optional[int] = None, details: 
 # ============================================================================
 # Authorization Decorators
 # ============================================================================
+
 
 def require_login(f):
     """
@@ -104,11 +107,13 @@ def require_login(f):
             user_id = session["user_id"]  # Guaranteed to exist
             ...
     """
+
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             return jsonify(error="unauthorized"), 401
         return f(*args, **kwargs)
+
     return decorated
 
 
@@ -123,6 +128,7 @@ def require_user(f):
         - 401: Not logged in or inactive
         - 403: Pending approval
     """
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         with get_db() as db:
@@ -133,6 +139,7 @@ def require_user(f):
 
             g.user = user
             return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -147,6 +154,7 @@ def require_admin(f):
         - 401: Not logged in or inactive
         - 403: Not admin/owner, or pending approval
     """
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         with get_db() as db:
@@ -160,6 +168,7 @@ def require_admin(f):
 
             g.user = user
             return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -174,6 +183,7 @@ def require_owner(f):
         - 401: Not logged in or inactive
         - 403: Not owner
     """
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         with get_db() as db:
@@ -184,6 +194,7 @@ def require_owner(f):
 
             g.user = user
             return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -210,7 +221,7 @@ def check_analysis_ownership(db: Session, analysis_id: str) -> Analysis:
         Caller must use @require_user decorator which sets g.user
     """
     # g.user already set by @require_user decorator
-    user_id = g.user.id if hasattr(g, 'user') and g.user else None
+    user_id = g.user.id if hasattr(g, "user") and g.user else None
     if not user_id:
         abort(401, description="Unauthorized")
 
@@ -253,7 +264,7 @@ def check_analysis_ownership_or_admin(db: Session, analysis_id: str) -> Analysis
         Caller must use @require_user decorator which sets g.user
     """
     # g.user already set by @require_user decorator
-    user_id = g.user.id if hasattr(g, 'user') and g.user else None
+    user_id = g.user.id if hasattr(g, "user") and g.user else None
     if not user_id:
         abort(401, description="Unauthorized")
 
@@ -288,16 +299,14 @@ def get_current_user_id() -> Optional[int]:
 # Admin Guard Rails
 # ============================================================================
 
+
 def count_active_admins(db: Session) -> int:
     """
     Count active users with admin or owner role.
 
     Used to prevent deleting/demoting the last admin.
     """
-    return db.query(User).filter(
-        User.role.in_(["admin", "owner"]),
-        User.active.is_(True)
-    ).count()
+    return db.query(User).filter(User.role.in_(["admin", "owner"]), User.active.is_(True)).count()
 
 
 def is_last_admin(db: Session, user: User) -> bool:

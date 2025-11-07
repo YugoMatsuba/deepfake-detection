@@ -5,9 +5,11 @@ Tests isolated computational logic without external dependencies:
 - _calculate_top5_ensemble_score: Top-5 ensemble averaging from ML results
 - _get_assessment: Score-to-risk threshold classification
 """
+
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from api.routes.reports import _calculate_top5_ensemble_score, _get_assessment
 
@@ -18,44 +20,44 @@ class TestCalculateTop5EnsembleScore:
     def test_normal_case_more_than_5_frames(self):
         """Test with more than 5 frames (all models present)."""
         ml_results = {
-            'xception': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
-                    {'index': 1, 'score': 0.8},
-                    {'index': 2, 'score': 0.7},
-                    {'index': 3, 'score': 0.6},
-                    {'index': 4, 'score': 0.5},
-                    {'index': 5, 'score': 0.4},
+            "xception": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
+                    {"index": 1, "score": 0.8},
+                    {"index": 2, "score": 0.7},
+                    {"index": 3, "score": 0.6},
+                    {"index": 4, "score": 0.5},
+                    {"index": 5, "score": 0.4},
                 ]
             },
-            'spsl': {
-                'frames': [
-                    {'index': 0, 'score': 0.85},
-                    {'index': 1, 'score': 0.75},
-                    {'index': 2, 'score': 0.65},
-                    {'index': 3, 'score': 0.55},
-                    {'index': 4, 'score': 0.45},
-                    {'index': 5, 'score': 0.35},
+            "spsl": {
+                "frames": [
+                    {"index": 0, "score": 0.85},
+                    {"index": 1, "score": 0.75},
+                    {"index": 2, "score": 0.65},
+                    {"index": 3, "score": 0.55},
+                    {"index": 4, "score": 0.45},
+                    {"index": 5, "score": 0.35},
                 ]
             },
-            'ucf': {
-                'frames': [
-                    {'index': 0, 'score': 0.95},
-                    {'index': 1, 'score': 0.85},
-                    {'index': 2, 'score': 0.75},
-                    {'index': 3, 'score': 0.65},
-                    {'index': 4, 'score': 0.55},
-                    {'index': 5, 'score': 0.45},
+            "ucf": {
+                "frames": [
+                    {"index": 0, "score": 0.95},
+                    {"index": 1, "score": 0.85},
+                    {"index": 2, "score": 0.75},
+                    {"index": 3, "score": 0.65},
+                    {"index": 4, "score": 0.55},
+                    {"index": 5, "score": 0.45},
                 ]
-            }
+            },
         }
 
         result = _calculate_top5_ensemble_score(ml_results)
 
         # Should return a dict with score and classification
         assert result is not None
-        assert 'score' in result
-        assert 'classification' in result
+        assert "score" in result
+        assert "classification" in result
 
         # Calculate expected ensemble scores
         # Frame 0: (0.9 + 0.85 + 0.95) / 3 = 0.9
@@ -67,38 +69,38 @@ class TestCalculateTop5EnsembleScore:
         # Top 5: [0.9, 0.8, 0.7, 0.6, 0.5]
         # Mean: (0.9 + 0.8 + 0.7 + 0.6 + 0.5) / 5 = 0.7
 
-        assert abs(result['score'] - 0.7) < 0.01
+        assert abs(result["score"] - 0.7) < 0.01
 
     def test_exactly_5_frames(self):
         """Test with exactly 5 frames."""
         ml_results = {
-            'xception': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
-                    {'index': 1, 'score': 0.8},
-                    {'index': 2, 'score': 0.7},
-                    {'index': 3, 'score': 0.6},
-                    {'index': 4, 'score': 0.5},
+            "xception": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
+                    {"index": 1, "score": 0.8},
+                    {"index": 2, "score": 0.7},
+                    {"index": 3, "score": 0.6},
+                    {"index": 4, "score": 0.5},
                 ]
             },
-            'spsl': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
-                    {'index': 1, 'score': 0.8},
-                    {'index': 2, 'score': 0.7},
-                    {'index': 3, 'score': 0.6},
-                    {'index': 4, 'score': 0.5},
+            "spsl": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
+                    {"index": 1, "score": 0.8},
+                    {"index": 2, "score": 0.7},
+                    {"index": 3, "score": 0.6},
+                    {"index": 4, "score": 0.5},
                 ]
             },
-            'ucf': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
-                    {'index': 1, 'score': 0.8},
-                    {'index': 2, 'score': 0.7},
-                    {'index': 3, 'score': 0.6},
-                    {'index': 4, 'score': 0.5},
+            "ucf": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
+                    {"index": 1, "score": 0.8},
+                    {"index": 2, "score": 0.7},
+                    {"index": 3, "score": 0.6},
+                    {"index": 4, "score": 0.5},
                 ]
-            }
+            },
         }
 
         result = _calculate_top5_ensemble_score(ml_results)
@@ -106,32 +108,32 @@ class TestCalculateTop5EnsembleScore:
         assert result is not None
         # All frames have same score across models, so ensemble = model score
         # Mean of [0.9, 0.8, 0.7, 0.6, 0.5] = 0.7
-        assert abs(result['score'] - 0.7) < 0.01
+        assert abs(result["score"] - 0.7) < 0.01
 
     def test_fewer_than_5_frames(self):
         """Test with fewer than 5 frames (takes all available)."""
         ml_results = {
-            'xception': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
-                    {'index': 1, 'score': 0.7},
-                    {'index': 2, 'score': 0.5},
+            "xception": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
+                    {"index": 1, "score": 0.7},
+                    {"index": 2, "score": 0.5},
                 ]
             },
-            'spsl': {
-                'frames': [
-                    {'index': 0, 'score': 0.8},
-                    {'index': 1, 'score': 0.6},
-                    {'index': 2, 'score': 0.4},
+            "spsl": {
+                "frames": [
+                    {"index": 0, "score": 0.8},
+                    {"index": 1, "score": 0.6},
+                    {"index": 2, "score": 0.4},
                 ]
             },
-            'ucf': {
-                'frames': [
-                    {'index': 0, 'score': 1.0},
-                    {'index': 1, 'score': 0.8},
-                    {'index': 2, 'score': 0.6},
+            "ucf": {
+                "frames": [
+                    {"index": 0, "score": 1.0},
+                    {"index": 1, "score": 0.8},
+                    {"index": 2, "score": 0.6},
                 ]
-            }
+            },
         }
 
         result = _calculate_top5_ensemble_score(ml_results)
@@ -142,29 +144,29 @@ class TestCalculateTop5EnsembleScore:
         # Frame 1: (0.7 + 0.6 + 0.8) / 3 = 0.7
         # Frame 2: (0.5 + 0.4 + 0.6) / 3 = 0.5
         # Mean: (0.9 + 0.7 + 0.5) / 3 = 0.7
-        assert abs(result['score'] - 0.7) < 0.01
+        assert abs(result["score"] - 0.7) < 0.01
 
     def test_missing_model_data(self):
         """Test with one model missing (frames must have all 3 models)."""
         ml_results = {
-            'xception': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
-                    {'index': 1, 'score': 0.8},
+            "xception": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
+                    {"index": 1, "score": 0.8},
                 ]
             },
-            'spsl': {
-                'frames': [
-                    {'index': 0, 'score': 0.85},
+            "spsl": {
+                "frames": [
+                    {"index": 0, "score": 0.85},
                     # Frame 1 missing
                 ]
             },
-            'ucf': {
-                'frames': [
-                    {'index': 0, 'score': 0.95},
-                    {'index': 1, 'score': 0.75},
+            "ucf": {
+                "frames": [
+                    {"index": 0, "score": 0.95},
+                    {"index": 1, "score": 0.75},
                 ]
-            }
+            },
         }
 
         result = _calculate_top5_ensemble_score(ml_results)
@@ -172,7 +174,7 @@ class TestCalculateTop5EnsembleScore:
         # Only frame 0 has all 3 models
         # Frame 0 ensemble: (0.9 + 0.85 + 0.95) / 3 = 0.9
         assert result is not None
-        assert abs(result['score'] - 0.9) < 0.01
+        assert abs(result["score"] - 0.9) < 0.01
 
     def test_empty_ml_results(self):
         """Test with empty ML results."""
@@ -185,21 +187,21 @@ class TestCalculateTop5EnsembleScore:
     def test_no_frames_with_all_models(self):
         """Test when no frames have all 3 models."""
         ml_results = {
-            'xception': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
+            "xception": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
                 ]
             },
-            'spsl': {
-                'frames': [
-                    {'index': 1, 'score': 0.85},
+            "spsl": {
+                "frames": [
+                    {"index": 1, "score": 0.85},
                 ]
             },
-            'ucf': {
-                'frames': [
-                    {'index': 2, 'score': 0.95},
+            "ucf": {
+                "frames": [
+                    {"index": 2, "score": 0.95},
                 ]
-            }
+            },
         }
 
         result = _calculate_top5_ensemble_score(ml_results)
@@ -210,13 +212,13 @@ class TestCalculateTop5EnsembleScore:
     def test_partial_model_data(self):
         """Test with only some models present."""
         ml_results = {
-            'xception': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
+            "xception": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
                 ]
             },
-            'spsl': None,
-            'ucf': None
+            "spsl": None,
+            "ucf": None,
         }
 
         result = _calculate_top5_ensemble_score(ml_results)
@@ -227,66 +229,66 @@ class TestCalculateTop5EnsembleScore:
     def test_missing_score_or_index(self):
         """Test handling of frames with missing score or index."""
         ml_results = {
-            'xception': {
-                'frames': [
-                    {'index': 0, 'score': 0.9},
-                    {'index': 1},  # Missing score
+            "xception": {
+                "frames": [
+                    {"index": 0, "score": 0.9},
+                    {"index": 1},  # Missing score
                 ]
             },
-            'spsl': {
-                'frames': [
-                    {'index': 0, 'score': 0.85},
-                    {'score': 0.75},  # Missing index
+            "spsl": {
+                "frames": [
+                    {"index": 0, "score": 0.85},
+                    {"score": 0.75},  # Missing index
                 ]
             },
-            'ucf': {
-                'frames': [
-                    {'index': 0, 'score': 0.95},
-                    {'index': 1, 'score': 0.85},
+            "ucf": {
+                "frames": [
+                    {"index": 0, "score": 0.95},
+                    {"index": 1, "score": 0.85},
                 ]
-            }
+            },
         }
 
         result = _calculate_top5_ensemble_score(ml_results)
 
         # Only frame 0 should be valid (has all 3 models with valid data)
         assert result is not None
-        assert abs(result['score'] - 0.9) < 0.01
+        assert abs(result["score"] - 0.9) < 0.01
 
     def test_classification_included(self):
         """Test that classification is correctly determined based on score."""
         # High score (>= 0.9)
         ml_results_high = {
-            'xception': {'frames': [{'index': 0, 'score': 0.95}]},
-            'spsl': {'frames': [{'index': 0, 'score': 0.95}]},
-            'ucf': {'frames': [{'index': 0, 'score': 0.95}]}
+            "xception": {"frames": [{"index": 0, "score": 0.95}]},
+            "spsl": {"frames": [{"index": 0, "score": 0.95}]},
+            "ucf": {"frames": [{"index": 0, "score": 0.95}]},
         }
 
         result = _calculate_top5_ensemble_score(ml_results_high)
         assert result is not None
-        assert result['classification'] == "Very likely fake"
+        assert result["classification"] == "Very likely fake"
 
         # Very low score (< 0.4) -> "Very likely real"
         ml_results_very_low = {
-            'xception': {'frames': [{'index': 0, 'score': 0.2}]},
-            'spsl': {'frames': [{'index': 0, 'score': 0.2}]},
-            'ucf': {'frames': [{'index': 0, 'score': 0.2}]}
+            "xception": {"frames": [{"index": 0, "score": 0.2}]},
+            "spsl": {"frames": [{"index": 0, "score": 0.2}]},
+            "ucf": {"frames": [{"index": 0, "score": 0.2}]},
         }
 
         result = _calculate_top5_ensemble_score(ml_results_very_low)
         assert result is not None
-        assert result['classification'] == "Very likely real"
+        assert result["classification"] == "Very likely real"
 
         # Medium-low score (0.4-0.6) -> "Likely real"
         ml_results_med_low = {
-            'xception': {'frames': [{'index': 0, 'score': 0.5}]},
-            'spsl': {'frames': [{'index': 0, 'score': 0.5}]},
-            'ucf': {'frames': [{'index': 0, 'score': 0.5}]}
+            "xception": {"frames": [{"index": 0, "score": 0.5}]},
+            "spsl": {"frames": [{"index": 0, "score": 0.5}]},
+            "ucf": {"frames": [{"index": 0, "score": 0.5}]},
         }
 
         result = _calculate_top5_ensemble_score(ml_results_med_low)
         assert result is not None
-        assert result['classification'] == "Likely real"
+        assert result["classification"] == "Likely real"
 
 
 class TestGetAssessment:
@@ -320,8 +322,8 @@ class TestGetAssessment:
         """Test exact threshold boundaries."""
         # Exact boundaries
         assert _get_assessment(0.3) == "Medium Risk"  # Exactly 0.3
-        assert _get_assessment(0.5) == "High Risk"    # Exactly 0.5
-        assert _get_assessment(0.7) == "Critical"     # Exactly 0.7
+        assert _get_assessment(0.5) == "High Risk"  # Exactly 0.5
+        assert _get_assessment(0.7) == "Critical"  # Exactly 0.7
 
         # Just below boundaries
         assert _get_assessment(0.2999) == "Low Risk"
@@ -338,7 +340,7 @@ class TestGetAssessment:
 
         # Values slightly outside normal range (should still work)
         assert _get_assessment(-0.1) == "Low Risk"  # Negative (below threshold)
-        assert _get_assessment(1.5) == "Critical"   # Above 1.0
+        assert _get_assessment(1.5) == "Critical"  # Above 1.0
 
     def test_precision_handling(self):
         """Test that function handles floating point precision correctly."""

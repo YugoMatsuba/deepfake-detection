@@ -5,10 +5,7 @@ Tests database query functions and business logic from api/auth_utils.py
 that don't require Flask request context.
 """
 
-from api.auth_utils import (
-    count_active_admins,
-    is_last_admin
-)
+from api.auth_utils import count_active_admins, is_last_admin
 from api import get_db
 from models import User
 

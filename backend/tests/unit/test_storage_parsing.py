@@ -17,12 +17,7 @@ class TestProbeVideoMetadata:
     @patch("storage._probe_with_opencv")
     def test_uses_ffprobe_when_successful(self, mock_opencv, mock_ffprobe):
         """Uses ffprobe results when available and valid."""
-        mock_ffprobe.return_value = {
-            "fps": 29.97,
-            "frame_count": 300,
-            "width": 1920,
-            "height": 1080
-        }
+        mock_ffprobe.return_value = {"fps": 29.97, "frame_count": 300, "width": 1920, "height": 1080}
 
         result = probe_video_metadata("/video.mp4")
 
@@ -41,12 +36,7 @@ class TestProbeVideoMetadata:
         """Falls back to OpenCV when ffprobe fails."""
         mock_ffprobe.return_value = None  # ffprobe failed
 
-        mock_opencv.return_value = {
-            "fps": 30.0,
-            "frame_count": 150,
-            "width": 1280,
-            "height": 720
-        }
+        mock_opencv.return_value = {"fps": 30.0, "frame_count": 150, "width": 1280, "height": 720}
 
         result = probe_video_metadata("/video.mp4")
 
@@ -73,19 +63,9 @@ class TestProbeVideoMetadata:
     @patch("storage._probe_with_opencv")
     def test_rejects_ffprobe_with_zero_values(self, mock_opencv, mock_ffprobe):
         """Falls back to opencv when ffprobe returns zeros."""
-        mock_ffprobe.return_value = {
-            "fps": 0.0,  # Invalid
-            "frame_count": 0,
-            "width": 1920,
-            "height": 1080
-        }
+        mock_ffprobe.return_value = {"fps": 0.0, "frame_count": 0, "width": 1920, "height": 1080}  # Invalid
 
-        mock_opencv.return_value = {
-            "fps": 30.0,
-            "frame_count": 100,
-            "width": 1920,
-            "height": 1080
-        }
+        mock_opencv.return_value = {"fps": 30.0, "frame_count": 100, "width": 1920, "height": 1080}
 
         result = probe_video_metadata("/video.mp4")
 
@@ -101,15 +81,12 @@ class TestProbeWithFfprobe:
     def test_parses_fraction_fps(self, mock_run):
         """Parse FPS from fraction format (e.g., '30/1')."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [{
-                    "codec_type": "video",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "30/1"
-                }],
-                "format": {"duration": "10.0"}
-            })
+            stdout=json.dumps(
+                {
+                    "streams": [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "30/1"}],
+                    "format": {"duration": "10.0"},
+                }
+            )
         )
 
         result = _probe_with_ffprobe("/video.mp4")
@@ -121,15 +98,12 @@ class TestProbeWithFfprobe:
     def test_parses_decimal_fps(self, mock_run):
         """Parse FPS from decimal format (e.g., '29.97')."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [{
-                    "codec_type": "video",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "29.97"
-                }],
-                "format": {"duration": "5.0"}
-            })
+            stdout=json.dumps(
+                {
+                    "streams": [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "29.97"}],
+                    "format": {"duration": "5.0"},
+                }
+            )
         )
 
         result = _probe_with_ffprobe("/video.mp4")
@@ -141,15 +115,12 @@ class TestProbeWithFfprobe:
     def test_handles_complex_fraction_fps(self, mock_run):
         """Parse FPS from complex fractions (e.g., '24000/1001' for 23.976)."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [{
-                    "codec_type": "video",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "24000/1001"
-                }],
-                "format": {"duration": "10.0"}
-            })
+            stdout=json.dumps(
+                {
+                    "streams": [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "24000/1001"}],
+                    "format": {"duration": "10.0"},
+                }
+            )
         )
 
         result = _probe_with_ffprobe("/video.mp4")
@@ -162,15 +133,12 @@ class TestProbeWithFfprobe:
     def test_handles_zero_denominator_gracefully(self, mock_run):
         """Handles zero denominator in FPS fraction."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [{
-                    "codec_type": "video",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "30/0"  # Invalid
-                }],
-                "format": {"duration": "10.0"}
-            })
+            stdout=json.dumps(
+                {
+                    "streams": [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "30/0"}],  # Invalid
+                    "format": {"duration": "10.0"},
+                }
+            )
         )
 
         result = _probe_with_ffprobe("/video.mp4")
@@ -183,18 +151,15 @@ class TestProbeWithFfprobe:
     def test_skips_audio_streams(self, mock_run):
         """Only processes video streams, not audio."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [
-                    {"codec_type": "audio"},  # Should be skipped
-                    {
-                        "codec_type": "video",
-                        "width": 1280,
-                        "height": 720,
-                        "r_frame_rate": "25/1"
-                    }
-                ],
-                "format": {"duration": "8.0"}
-            })
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {"codec_type": "audio"},  # Should be skipped
+                        {"codec_type": "video", "width": 1280, "height": 720, "r_frame_rate": "25/1"},
+                    ],
+                    "format": {"duration": "8.0"},
+                }
+            )
         )
 
         result = _probe_with_ffprobe("/video.mp4")
@@ -208,12 +173,7 @@ class TestProbeWithFfprobe:
     def test_returns_none_when_no_video_stream(self, mock_run):
         """Returns None when no video stream found."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [
-                    {"codec_type": "audio"}  # Only audio
-                ],
-                "format": {}
-            })
+            stdout=json.dumps({"streams": [{"codec_type": "audio"}], "format": {}})  # Only audio
         )
 
         result = _probe_with_ffprobe("/video.mp4")
@@ -251,15 +211,12 @@ class TestProbeWithFfprobe:
     def test_calculates_frame_count_from_duration_and_fps(self, mock_run):
         """Calculates frame count from duration × fps."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [{
-                    "codec_type": "video",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "60/1"
-                }],
-                "format": {"duration": "2.5"}
-            })
+            stdout=json.dumps(
+                {
+                    "streams": [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "60/1"}],
+                    "format": {"duration": "2.5"},
+                }
+            )
         )
 
         result = _probe_with_ffprobe("/video.mp4")
@@ -271,15 +228,12 @@ class TestProbeWithFfprobe:
     def test_returns_zero_frame_count_when_duration_missing(self, mock_run):
         """Returns 0 frame count when duration is missing."""
         mock_run.return_value = MagicMock(
-            stdout=json.dumps({
-                "streams": [{
-                    "codec_type": "video",
-                    "width": 1920,
-                    "height": 1080,
-                    "r_frame_rate": "30/1"
-                }],
-                "format": {}  # No duration
-            })
+            stdout=json.dumps(
+                {
+                    "streams": [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "30/1"}],
+                    "format": {},  # No duration
+                }
+            )
         )
 
         result = _probe_with_ffprobe("/video.mp4")

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 const InfoButton = ({ title, content }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,7 +27,10 @@ const InfoButton = ({ title, content }) => {
 
       {/* Modal Popup */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setIsOpen(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setIsOpen(false)}
+        >
           <div
             className="relative w-[500px] max-w-[90%] bg-white rounded-lg shadow-xl p-6"
             onClick={(e) => e.stopPropagation()}
@@ -39,16 +42,17 @@ const InfoButton = ({ title, content }) => {
               aria-label="Close"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
 
             {/* Title */}
-            {title && (
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 pr-8">
-                {title}
-              </h3>
-            )}
+            {title && <h3 className="text-lg font-semibold text-gray-900 mb-4 pr-8">{title}</h3>}
 
             {/* Content */}
             <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">

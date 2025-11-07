@@ -50,7 +50,7 @@ def save_video_for_analysis(tmp_path: Path, ext: str, analysis_id: str) -> tuple
 
     # Compute SHA-256 of video bytes (streaming to avoid loading entire file in memory)
     hasher = hashlib.sha256()
-    with out.open('rb') as f:
+    with out.open("rb") as f:
         while chunk := f.read(65536):  # 64KB chunks
             hasher.update(chunk)
     sha = hasher.hexdigest()
@@ -87,12 +87,7 @@ def probe_video_metadata(path: Path) -> dict:
         return _probe_with_opencv(path)
     except Exception:
         # Ultimate fallback: zeros
-        return {
-            "fps": 0.0,
-            "frame_count": 0,
-            "width": 0,
-            "height": 0
-        }
+        return {"fps": 0.0, "frame_count": 0, "width": 0, "height": 0}
 
 
 def _probe_with_ffprobe(path: Path) -> Optional[dict]:
@@ -104,18 +99,11 @@ def _probe_with_ffprobe(path: Path) -> Optional[dict]:
     try:
         # Run ffprobe to get video stream info as JSON
         result = subprocess.run(
-            [
-                "ffprobe",
-                "-v", "quiet",
-                "-print_format", "json",
-                "-show_format",
-                "-show_streams",
-                str(path)
-            ],
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", str(path)],
             capture_output=True,
             text=True,
             timeout=10,
-            check=True
+            check=True,
         )
 
         data = json.loads(result.stdout)
@@ -147,15 +135,16 @@ def _probe_with_ffprobe(path: Path) -> Optional[dict]:
         duration = float(format_info.get("duration", 0))
         frame_count = int(fps * duration) if fps > 0 and duration > 0 else 0
 
-        return {
-            "fps": fps,
-            "frame_count": frame_count,
-            "width": width,
-            "height": height
-        }
+        return {"fps": fps, "frame_count": frame_count, "width": width, "height": height}
 
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-            FileNotFoundError, json.JSONDecodeError, ValueError, KeyError):
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        FileNotFoundError,
+        json.JSONDecodeError,
+        ValueError,
+        KeyError,
+    ):
         return None
 
 
@@ -176,12 +165,7 @@ def _probe_with_opencv(path: Path) -> dict:
         # Sanity check: OpenCV sometimes reports fps=0 for certain codecs
         # We accept zeros here since caller can handle missing data
 
-        return {
-            "fps": fps,
-            "frame_count": frame_count,
-            "width": width,
-            "height": height
-        }
+        return {"fps": fps, "frame_count": frame_count, "width": width, "height": height}
     finally:
         cap.release()
 

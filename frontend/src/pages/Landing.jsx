@@ -1,11 +1,11 @@
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../app/useAuth.js';
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../app/useAuth.js";
 
 export default function Landing() {
   const { status, user } = useAuth();
 
   // Loading state
-  if (status === 'loading' || status === 'idle') {
+  if (status === "loading" || status === "idle") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-gray-600">Loading...</div>
@@ -14,12 +14,12 @@ export default function Landing() {
   }
 
   // Not authenticated - redirect to login
-  if (status === 'unauthenticated') {
+  if (status === "unauthenticated") {
     return <Navigate to="/login" replace />;
   }
 
   // Admin or owner - redirect to role select
-  if (user?.role === 'admin' || user?.role === 'owner') {
+  if (user?.role === "admin" || user?.role === "owner") {
     return <Navigate to="/role-select" replace />;
   }
 

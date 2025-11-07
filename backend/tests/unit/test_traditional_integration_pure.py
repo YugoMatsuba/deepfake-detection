@@ -11,7 +11,7 @@ from api.traditional_integration import (
     transform_ela_result,
     transform_noise_result,
     transform_lbp_result,
-    run_traditional_forensics
+    run_traditional_forensics,
 )
 
 
@@ -56,11 +56,7 @@ class TestTransformElaResult:
 
     def test_single_frame_mode(self):
         """Transform single-frame ELA result."""
-        raw_result = {
-            "mode": "single_frame",
-            "frame": "frame_0005.jpg",
-            "score": 2.34
-        }
+        raw_result = {"mode": "single_frame", "frame": "frame_0005.jpg", "score": 2.34}
         result = transform_ela_result(raw_result, "test_analysis_id")
 
         assert result["score"] == 2.34
@@ -73,11 +69,7 @@ class TestTransformElaResult:
 
     def test_single_frame_no_parse_frame_number(self):
         """Single-frame mode with unparseable frame name."""
-        raw_result = {
-            "mode": "single_frame",
-            "frame": "invalid_frame.jpg",
-            "score": 1.5
-        }
+        raw_result = {"mode": "single_frame", "frame": "invalid_frame.jpg", "score": 1.5}
         result = transform_ela_result(raw_result, "test_id")
 
         assert result["frames"][0]["frame_number"] is None
@@ -89,8 +81,8 @@ class TestTransformElaResult:
             "mode": "multi_frame",
             "top_frames": [
                 {"frame": "frame_0003.jpg", "score": 3.2, "raw_score": 3.2, "flagged": True},
-                {"frame": "frame_0007.jpg", "score": 2.8, "raw_score": 2.8, "flagged": False}
-            ]
+                {"frame": "frame_0007.jpg", "score": 2.8, "raw_score": 2.8, "flagged": False},
+            ],
         }
         result = transform_ela_result(raw_result, "analysis_abc")
 
@@ -113,11 +105,7 @@ class TestTransformElaResult:
 
     def test_multi_frame_raw_score_fallback(self):
         """Multi-frame mode falls back to 'score' if no 'raw_score'."""
-        raw_result = {
-            "top_frames": [
-                {"frame": "frame_0001.jpg", "score": 1.5}  # No raw_score
-            ]
-        }
+        raw_result = {"top_frames": [{"frame": "frame_0001.jpg", "score": 1.5}]}  # No raw_score
         result = transform_ela_result(raw_result, "test_id")
 
         assert result["frames"][0]["raw_score"] == 1.5
@@ -145,11 +133,7 @@ class TestTransformNoiseResult:
 
     def test_single_frame_mode(self):
         """Transform single-frame noise result."""
-        raw_result = {
-            "mode": "single_frame",
-            "frame": "frame_0010.jpg",
-            "confidence": 0.82
-        }
+        raw_result = {"mode": "single_frame", "frame": "frame_0010.jpg", "confidence": 0.82}
         result = transform_noise_result(raw_result, "test_analysis_id")
 
         assert result["confidence"] == 0.82
@@ -163,11 +147,7 @@ class TestTransformNoiseResult:
 
     def test_single_frame_no_parse_frame_number(self):
         """Single-frame mode with unparseable frame name."""
-        raw_result = {
-            "mode": "single_frame",
-            "frame": "bad_name.jpg",
-            "confidence": 0.5
-        }
+        raw_result = {"mode": "single_frame", "frame": "bad_name.jpg", "confidence": 0.5}
         result = transform_noise_result(raw_result, "test_id")
 
         assert result["frames"][0]["frame_number"] is None
@@ -179,8 +159,8 @@ class TestTransformNoiseResult:
             "mode": "multi_frame",
             "top_frames": [
                 {"frame": "frame_0002.jpg", "score": 2.1, "raw_score": 2.1, "flagged": True},
-                {"frame": "frame_0008.jpg", "score": 1.7, "raw_score": 1.7, "flagged": False}
-            ]
+                {"frame": "frame_0008.jpg", "score": 1.7, "raw_score": 1.7, "flagged": False},
+            ],
         }
         result = transform_noise_result(raw_result, "analysis_xyz")
 
@@ -205,11 +185,7 @@ class TestTransformNoiseResult:
 
     def test_multi_frame_raw_score_fallback(self):
         """Multi-frame mode falls back to 'score' if no 'raw_score'."""
-        raw_result = {
-            "top_frames": [
-                {"frame": "frame_0003.jpg", "score": 0.9}  # No raw_score
-            ]
-        }
+        raw_result = {"top_frames": [{"frame": "frame_0003.jpg", "score": 0.9}]}  # No raw_score
         result = transform_noise_result(raw_result, "test_id")
 
         assert result["frames"][0]["raw_score"] == 0.9
@@ -240,11 +216,7 @@ class TestTransformLbpResult:
 
     def test_single_frame_mode(self):
         """Transform single-frame LBP result."""
-        raw_result = {
-            "mode": "single_frame",
-            "frame": "frame_0012.jpg",
-            "score": 0.67
-        }
+        raw_result = {"mode": "single_frame", "frame": "frame_0012.jpg", "score": 0.67}
         result = transform_lbp_result(raw_result, "test_analysis_id")
 
         assert result["score"] == 0.67
@@ -257,11 +229,7 @@ class TestTransformLbpResult:
 
     def test_single_frame_no_parse_frame_number(self):
         """Single-frame mode with unparseable frame name."""
-        raw_result = {
-            "mode": "single_frame",
-            "frame": "unknown.jpg",
-            "score": 0.4
-        }
+        raw_result = {"mode": "single_frame", "frame": "unknown.jpg", "score": 0.4}
         result = transform_lbp_result(raw_result, "test_id")
 
         assert result["frames"][0]["frame_number"] is None
@@ -272,21 +240,9 @@ class TestTransformLbpResult:
         raw_result = {
             "mode": "multi_frame",
             "top_frames": [
-                {
-                    "frame": "frame_0004.jpg",
-                    "score": 0.85,
-                    "normalized_score": 0.85,
-                    "raw_score": 0.85,
-                    "flagged": True
-                },
-                {
-                    "frame": "frame_0009.jpg",
-                    "score": 0.72,
-                    "normalized_score": 0.72,
-                    "raw_score": 0.72,
-                    "flagged": False
-                }
-            ]
+                {"frame": "frame_0004.jpg", "score": 0.85, "normalized_score": 0.85, "raw_score": 0.85, "flagged": True},
+                {"frame": "frame_0009.jpg", "score": 0.72, "normalized_score": 0.72, "raw_score": 0.72, "flagged": False},
+            ],
         }
         result = transform_lbp_result(raw_result, "analysis_lbp")
 
@@ -309,11 +265,7 @@ class TestTransformLbpResult:
 
     def test_multi_frame_normalized_score_fallback(self):
         """Multi-frame mode falls back to 'score' if no 'normalized_score'."""
-        raw_result = {
-            "top_frames": [
-                {"frame": "frame_0001.jpg", "score": 0.6, "raw_score": 0.6}  # No normalized_score
-            ]
-        }
+        raw_result = {"top_frames": [{"frame": "frame_0001.jpg", "score": 0.6, "raw_score": 0.6}]}  # No normalized_score
         result = transform_lbp_result(raw_result, "test_id")
 
         assert result["frames"][0]["score"] == 0.6
@@ -321,11 +273,7 @@ class TestTransformLbpResult:
 
     def test_multi_frame_raw_score_fallback_to_score(self):
         """Multi-frame mode falls back to 'score' if no 'raw_score'."""
-        raw_result = {
-            "top_frames": [
-                {"frame": "frame_0001.jpg", "normalized_score": 0.55}  # No raw_score or score
-            ]
-        }
+        raw_result = {"top_frames": [{"frame": "frame_0001.jpg", "normalized_score": 0.55}]}  # No raw_score or score
         result = transform_lbp_result(raw_result, "test_id")
 
         # raw_score falls back to score field (0.0 default)

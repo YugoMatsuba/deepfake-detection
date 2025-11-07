@@ -114,8 +114,8 @@ def compute_noise(frame_path):
             # Extract window at strided position
             row_start = i * stride
             col_start = j * stride
-            window_residual = residual[row_start:row_start + bs, col_start:col_start + bs]
-            window_edge_mask = edge_mask[row_start:row_start + bs, col_start:col_start + bs]
+            window_residual = residual[row_start : row_start + bs, col_start : col_start + bs]
+            window_edge_mask = edge_mask[row_start : row_start + bs, col_start : col_start + bs]
 
             # Use non-edge pixels; fallback to all if none remain
             masked_pixels = window_residual[window_edge_mask]
@@ -145,12 +145,12 @@ def compute_noise(frame_path):
     current_h, current_w = z_map_upsampled.shape
 
     # Crop if larger
-    z_map_upsampled = z_map_upsampled[:min(current_h, target_h), :min(current_w, target_w)]
+    z_map_upsampled = z_map_upsampled[: min(current_h, target_h), : min(current_w, target_w)]
 
     # Pad if smaller (shouldn't happen with stride=2, but safety check)
     if z_map_upsampled.shape[0] < target_h or z_map_upsampled.shape[1] < target_w:
         padded = np.zeros((target_h, target_w))
-        padded[:z_map_upsampled.shape[0], :z_map_upsampled.shape[1]] = z_map_upsampled
+        padded[: z_map_upsampled.shape[0], : z_map_upsampled.shape[1]] = z_map_upsampled
         z_map_upsampled = padded
 
     # Apply percentile stretch and convert to uint8
@@ -159,7 +159,7 @@ def compute_noise(frame_path):
     # Light blur to reduce visual noise and smooth heatmap
     z_map_u8 = cv2.GaussianBlur(z_map_u8, (3, 3), 1.0)
 
-    overlay_img = Image.fromarray(z_map_u8, mode='L')
+    overlay_img = Image.fromarray(z_map_u8, mode="L")
 
     # Downscale for efficient transport
     overlay_img = downscale_overlay(overlay_img, NOISE_MAX_WIDTH)
@@ -204,8 +204,7 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
 
     # Collect frame paths
     if os.path.isdir(input_path):
-        frame_files = [f for f in os.listdir(input_path)
-                       if f.lower().endswith((".jpg", ".png"))]
+        frame_files = [f for f in os.listdir(input_path) if f.lower().endswith((".jpg", ".png"))]
         if not frame_files:
             return {"error": f"No frames found in folder {input_path}"}
         frame_paths = [os.path.join(input_path, f) for f in frame_files]
@@ -228,8 +227,7 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
 
         with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all tasks
-            futures = {executor.submit(_compute_noise_worker, path): path
-                       for path in frame_paths}
+            futures = {executor.submit(_compute_noise_worker, path): path for path in frame_paths}
 
             # Collect results as they complete
             for future in as_completed(futures):
@@ -252,11 +250,7 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
         # Save overlay to disk
         _save_overlay(residual_img, filename, output_dir)
         # Return raw score (NO tanh transformation)
-        return {
-            "mode": "single_frame",
-            "frame": filename,
-            "confidence": float(score)
-        }
+        return {"mode": "single_frame", "frame": filename, "confidence": float(score)}
 
     # Multi-frame case: Compute z-scores for ALL frames
     scores_only = [s for _, s, _ in results]
@@ -265,8 +259,7 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
 
     # Compute z-scores (no zero-clipping - negatives are meaningful)
     # Keep both raw scores and z-scores for persistence
-    normalized = [(f, s, (s - mean_score) / std_score, img, idx)
-                  for idx, (f, s, img) in enumerate(results)]
+    normalized = [(f, s, (s - mean_score) / std_score, img, idx) for idx, (f, s, img) in enumerate(results)]
     sorted_results = sorted(normalized, key=lambda x: x[2], reverse=True)
 
     # Cap at 32 frames to limit JSON payload size
@@ -296,15 +289,14 @@ def run_noise_analysis(input_path, top_percent=10, output_dir=None, analysis_id=
         if is_flagged:
             _save_overlay(img, fname, output_dir)
 
-        all_frames.append({
-            "frame": fname,
-            "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
-            "score": float(z_score),
-            "flagged": is_flagged  # Mark NMS-selected frames as flagged
-        })
+        all_frames.append(
+            {
+                "frame": fname,
+                "raw_score": float(raw_score),  # Preserve raw score for z-score recalculation
+                "score": float(z_score),
+                "flagged": is_flagged,  # Mark NMS-selected frames as flagged
+            }
+        )
 
     # Return ALL frames JSON
-    return {
-        "mode": "multi_frame",
-        "top_frames": all_frames  # Now contains ALL frames, not just top
-    }
+    return {"mode": "multi_frame", "top_frames": all_frames}  # Now contains ALL frames, not just top

@@ -42,6 +42,7 @@ from api import get_db, hash_password, verify_password  # type: ignore
 # Import models from consolidated models.py (now managed by Alembic)
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from models import User, AuditLog
 
@@ -49,6 +50,7 @@ bp = Blueprint("auth", __name__)
 
 
 # --- Helpers (no business logic; just parsing/skeletons) ---
+
 
 def _client_ip() -> str:
     xff = request.headers.get("X-Forwarded-For")
@@ -93,6 +95,7 @@ def _require_admin(db: Session) -> Optional[User]:
 
 
 # --- Endpoints (skeletons only) ---
+
 
 @bp.post("/register")
 def register():
@@ -207,9 +210,9 @@ def signup():
         u = User(
             username=username,
             password_hash=hash_password(password),
-            role="user",                 # default role
-            active=False,                # pending approval
-            pending_approval=True,       # requires admin approval
+            role="user",  # default role
+            active=False,  # pending approval
+            pending_approval=True,  # requires admin approval
         )
         db.add(u)
 
@@ -226,10 +229,7 @@ def signup():
         db.commit()
 
         # Do NOT auto-login; user needs approval first
-        return jsonify(
-            message="Account created. Awaiting admin approval.",
-            user_id=u.id
-        ), 201
+        return jsonify(message="Account created. Awaiting admin approval.", user_id=u.id), 201
 
 
 @bp.post("/logout")
@@ -261,12 +261,17 @@ def me():
     with get_db() as db:
         try:
             user = current_user(db)  # Raises 401 if not logged in or inactive
-            return jsonify(user={
-                "id": user.id,
-                "username": user.username,
-                "role": user.role,
-                "active": user.active,
-                "pending_approval": user.pending_approval
-            }), 200
+            return (
+                jsonify(
+                    user={
+                        "id": user.id,
+                        "username": user.username,
+                        "role": user.role,
+                        "active": user.active,
+                        "pending_approval": user.pending_approval,
+                    }
+                ),
+                200,
+            )
         except Exception:
             return jsonify(error="unauthenticated"), 401

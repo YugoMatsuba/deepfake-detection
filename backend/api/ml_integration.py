@@ -65,7 +65,7 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
             models=modules,
             device=device,
             weights=None,  # Will use defaults from constants
-            compute_hashes=True
+            compute_hashes=True,
         )
 
         # Check for errors
@@ -100,7 +100,7 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
         api_results[model_name] = {
             "score": model.get("score"),
             "frames": model.get("frames", []),
-            "weights_hash": model.get("weights_hash")
+            "weights_hash": model.get("weights_hash"),
         }
 
     return {
@@ -112,10 +112,7 @@ def run_ml_analysis(video_path: str, modules: list[str], device: str | None = No
 
 
 def run_single_frame_ml_analysis(
-    video_path: str,
-    frame_number: int,
-    models: list[str],
-    device: str | None = None
+    video_path: str, frame_number: int, models: list[str], device: str | None = None
 ) -> dict[str, Any]:
     """
     Run ML deepfake detection on a single frame.
@@ -157,7 +154,7 @@ def run_single_frame_ml_analysis(
             frame_number=frame_number,
             models=models,
             device=device,
-            weights=None  # Will use defaults from constants
+            weights=None,  # Will use defaults from constants
         )
 
         # Check for errors
@@ -178,16 +175,13 @@ def run_single_frame_ml_analysis(
     # ML runner returns: {"frame_number": 42, "time": 1.4, "models": {"xception": {"score": 0.856}, ...}, ...}
     # We need flattened structure with model results at top level
 
-    api_results = {
-        "frame_number": results.get("frame_number"),
-        "time": results.get("time")
-    }
+    api_results = {"frame_number": results.get("frame_number"), "time": results.get("time")}
 
     for model_name, model_data in results.get("models", {}).items():
         api_results[model_name] = {
             "score": model_data.get("score"),
             "index": results.get("frame_number"),
-            "time": results.get("time")
+            "time": results.get("time"),
         }
 
     return api_results

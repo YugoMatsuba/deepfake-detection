@@ -12,8 +12,8 @@ export async function startAnalysis(analysisId, mlModules, traditionalModules) {
     method: "POST",
     json: {
       modules: mlModules,
-      traditional: traditionalModules
-    }
+      traditional: traditionalModules,
+    },
   });
 }
 
@@ -22,7 +22,7 @@ export async function startImageAnalysis(analysisId, mlModules, traditionalModul
     method: "POST",
     json: {
       modules: mlModules,
-      traditional: traditionalModules
-    }
+      traditional: traditionalModules,
+    },
   });
 }

@@ -5,9 +5,9 @@
  * Uses fetchJson for auth handling and credentials.
  */
 
-import { fetchJson } from './client.js';
+import { fetchJson } from "./client.js";
 
-const BASE_URL = '/admin';
+const BASE_URL = "/admin";
 
 // ============================================================================
 // User Approval Management
@@ -29,7 +29,7 @@ export async function getPendingUsers(limit = 100) {
  */
 export async function approveUser(userId) {
   return fetchJson(`${BASE_URL}/users/${userId}/approve`, {
-    method: 'POST'
+    method: "POST",
   });
 }
 
@@ -40,7 +40,7 @@ export async function approveUser(userId) {
  */
 export async function rejectUser(userId) {
   return fetchJson(`${BASE_URL}/users/${userId}/reject`, {
-    method: 'POST'
+    method: "POST",
   });
 }
 
@@ -58,7 +58,7 @@ export async function rejectUser(userId) {
  */
 export async function getAuditLogs({ limit = 50, offset = 0, userId = null } = {}) {
   const params = new URLSearchParams({ limit, offset });
-  if (userId) params.set('user_id', userId);
+  if (userId) params.set("user_id", userId);
 
   return fetchJson(`${BASE_URL}/audit-logs?${params}`);
 }
@@ -76,10 +76,15 @@ export async function getAuditLogs({ limit = 50, offset = 0, userId = null } = {
  * @param {string} params.status - Optional filter by status
  * @returns {Promise<{analyses: Array, total: number, limit: number, offset: number}>}
  */
-export async function getAllAnalyses({ limit = 50, offset = 0, userId = null, status = null } = {}) {
+export async function getAllAnalyses({
+  limit = 50,
+  offset = 0,
+  userId = null,
+  status = null,
+} = {}) {
   const params = new URLSearchParams({ limit, offset });
-  if (userId) params.set('user_id', userId);
-  if (status) params.set('status', status);
+  if (userId) params.set("user_id", userId);
+  if (status) params.set("status", status);
 
   return fetchJson(`${BASE_URL}/analyses?${params}`);
 }
@@ -92,8 +97,8 @@ export async function getAllAnalyses({ limit = 50, offset = 0, userId = null, st
  */
 export async function reassignAnalysis(analysisId, newUserId) {
   return fetchJson(`${BASE_URL}/analyses/${analysisId}/reassign`, {
-    method: 'POST',
-    json: { new_user_id: newUserId }
+    method: "POST",
+    json: { new_user_id: newUserId },
   });
 }
 
@@ -106,7 +111,7 @@ export async function reassignAnalysis(analysisId, newUserId) {
 export async function searchUsers(query, limit = 20) {
   const params = new URLSearchParams({
     q: query ? query.trim() : "",
-    limit
+    limit,
   });
   return fetchJson(`${BASE_URL}/users/search?${params}`);
 }
@@ -123,7 +128,7 @@ export async function searchUsers(query, limit = 20) {
  */
 export async function promoteUser(userId) {
   return fetchJson(`${BASE_URL}/users/${userId}/promote`, {
-    method: 'POST'
+    method: "POST",
   });
 }
 
@@ -135,7 +140,7 @@ export async function promoteUser(userId) {
  */
 export async function demoteUser(userId) {
   return fetchJson(`${BASE_URL}/users/${userId}/demote`, {
-    method: 'POST'
+    method: "POST",
   });
 }
 
@@ -147,7 +152,7 @@ export async function demoteUser(userId) {
  */
 export async function deactivateUser(userId) {
   return fetchJson(`${BASE_URL}/users/${userId}/deactivate`, {
-    method: 'POST'
+    method: "POST",
   });
 }
 
@@ -160,7 +165,7 @@ export async function deactivateUser(userId) {
  */
 export async function changeUserPassword(userId, newPassword) {
   return fetchJson(`${BASE_URL}/users/${userId}/change-password`, {
-    method: 'POST',
-    json: { new_password: newPassword }
+    method: "POST",
+    json: { new_password: newPassword },
   });
 }

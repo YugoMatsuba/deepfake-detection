@@ -15,10 +15,7 @@ class TestCaptureMLProvenance:
     @patch("api.routes.analysis.datetime")
     def test_captures_git_commit_hash(self, mock_datetime, mock_run):
         """Captures git commit hash when git is available."""
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="abc123def456\n"
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="abc123def456\n")
         mock_datetime.now().isoformat.return_value = "2025-01-15T10:30:00Z"
 
         result = _capture_ml_provenance()
@@ -139,7 +136,7 @@ class TestGetVideoMetadata:
             cv2.CAP_PROP_FPS: 30.0,
             cv2.CAP_PROP_FRAME_COUNT: 300.0,
             cv2.CAP_PROP_FRAME_WIDTH: 1920.0,
-            cv2.CAP_PROP_FRAME_HEIGHT: 1080.0
+            cv2.CAP_PROP_FRAME_HEIGHT: 1080.0,
         }.get(prop, 0.0)
         mock_cap_class.return_value = mock_cap
 
@@ -165,7 +162,7 @@ class TestGetVideoMetadata:
             cv2.CAP_PROP_FPS: 25.0,
             cv2.CAP_PROP_FRAME_COUNT: 250.0,
             cv2.CAP_PROP_FRAME_WIDTH: 1280.0,
-            cv2.CAP_PROP_FRAME_HEIGHT: 720.0
+            cv2.CAP_PROP_FRAME_HEIGHT: 720.0,
         }.get(prop, 0.0)
         mock_cap_class.return_value = mock_cap
 
@@ -188,7 +185,7 @@ class TestGetVideoMetadata:
             cv2.CAP_PROP_FPS: 0.0,  # Invalid FPS
             cv2.CAP_PROP_FRAME_COUNT: 100.0,
             cv2.CAP_PROP_FRAME_WIDTH: 1920.0,
-            cv2.CAP_PROP_FRAME_HEIGHT: 1080.0
+            cv2.CAP_PROP_FRAME_HEIGHT: 1080.0,
         }.get(prop, 0.0)
         mock_cap_class.return_value = mock_cap
 
@@ -211,7 +208,7 @@ class TestGetVideoMetadata:
             cv2.CAP_PROP_FPS: 30.0,
             cv2.CAP_PROP_FRAME_COUNT: 150.7,  # Float
             cv2.CAP_PROP_FRAME_WIDTH: 1920.9,  # Float
-            cv2.CAP_PROP_FRAME_HEIGHT: 1080.1  # Float
+            cv2.CAP_PROP_FRAME_HEIGHT: 1080.1,  # Float
         }.get(prop, 0.0)
         mock_cap_class.return_value = mock_cap
 
@@ -276,7 +273,7 @@ class TestGetVideoMetadata:
             cv2.CAP_PROP_FPS: 30.0,
             cv2.CAP_PROP_FRAME_COUNT: -1.0,  # Invalid
             cv2.CAP_PROP_FRAME_WIDTH: 1920.0,
-            cv2.CAP_PROP_FRAME_HEIGHT: 1080.0
+            cv2.CAP_PROP_FRAME_HEIGHT: 1080.0,
         }.get(prop, 0.0)
         mock_cap_class.return_value = mock_cap
 

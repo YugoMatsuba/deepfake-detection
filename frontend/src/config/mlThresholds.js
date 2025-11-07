@@ -19,7 +19,7 @@ export const ML_THRESHOLDS = [
   { minScore: 0.8, label: "Possibly fake" },
   { minScore: 0.6, label: "Uncertain" },
   { minScore: 0.4, label: "Likely real" },
-  { minScore: 0, label: "Very likely real" }
+  { minScore: 0, label: "Very likely real" },
 ];
 
 /**
@@ -68,5 +68,5 @@ export function getMethodologyInfo() {
 Each frame's score is calculated as the ensemble average across all 3 ML models (Xception, SPSL, UCF).
 
 Classification Bands:
-${bands.join('\n')}`;
+${bands.join("\n")}`;
 }

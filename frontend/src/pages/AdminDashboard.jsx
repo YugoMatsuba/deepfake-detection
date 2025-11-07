@@ -7,7 +7,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("pending");
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const canManageRoles = user?.role === 'owner' || user?.role === 'admin';
+  const canManageRoles = user?.role === "owner" || user?.role === "admin";
 
   const handleLogout = async () => {
     await logout();
@@ -50,29 +50,17 @@ export default function AdminDashboard() {
         {/* Tab Navigation */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
           <div className="flex border-b border-gray-200">
-            <TabButton
-              active={activeTab === "pending"}
-              onClick={() => setActiveTab("pending")}
-            >
+            <TabButton active={activeTab === "pending"} onClick={() => setActiveTab("pending")}>
               Pending Users
             </TabButton>
-            <TabButton
-              active={activeTab === "logs"}
-              onClick={() => setActiveTab("logs")}
-            >
+            <TabButton active={activeTab === "logs"} onClick={() => setActiveTab("logs")}>
               Audit Logs
             </TabButton>
-            <TabButton
-              active={activeTab === "analyses"}
-              onClick={() => setActiveTab("analyses")}
-            >
+            <TabButton active={activeTab === "analyses"} onClick={() => setActiveTab("analyses")}>
               Analyses
             </TabButton>
             {canManageRoles && (
-              <TabButton
-                active={activeTab === "roles"}
-                onClick={() => setActiveTab("roles")}
-              >
+              <TabButton active={activeTab === "roles"} onClick={() => setActiveTab("roles")}>
                 Role Management
               </TabButton>
             )}
@@ -96,9 +84,7 @@ function TabButton({ active, onClick, children }) {
     <button
       onClick={onClick}
       className={`px-6 py-3 font-medium transition ${
-        active
-          ? "border-b-2 border-blue-600 text-blue-600"
-          : "text-gray-600 hover:text-gray-900"
+        active ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600 hover:text-gray-900"
       }`}
     >
       {children}
@@ -136,7 +122,7 @@ function PendingUsersTab() {
     try {
       await adminApi.approveUser(userId);
       // Optimistic UI: remove immediately
-      setUsers(users.filter(u => u.id !== userId));
+      setUsers(users.filter((u) => u.id !== userId));
     } catch (err) {
       alert(`Failed to approve user: ${err.message}`);
       // Rollback: reload
@@ -152,7 +138,7 @@ function PendingUsersTab() {
     try {
       await adminApi.rejectUser(userId);
       // Optimistic UI: remove immediately
-      setUsers(users.filter(u => u.id !== userId));
+      setUsers(users.filter((u) => u.id !== userId));
     } catch (err) {
       alert(`Failed to reject user: ${err.message}`);
       // Rollback: reload
@@ -261,10 +247,8 @@ function AuditLogsTab() {
           <tbody>
             {logs.map((log) => (
               <tr key={log.id} className="border-b border-gray-100 even:bg-gray-50">
-                <td className="px-4 py-2 text-sm">
-                  {new Date(log.created_at).toLocaleString()}
-                </td>
-                <td className="px-4 py-2 text-sm">{log.username || '-'}</td>
+                <td className="px-4 py-2 text-sm">{new Date(log.created_at).toLocaleString()}</td>
+                <td className="px-4 py-2 text-sm">{log.username || "-"}</td>
                 <td className="px-4 py-2 text-sm">{log.event}</td>
                 <td className="px-4 py-2 text-sm text-gray-600">{log.ip}</td>
                 <td className="px-4 py-2 text-sm text-gray-600">
@@ -272,7 +256,9 @@ function AuditLogsTab() {
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded">
                       {JSON.stringify(log.details).slice(0, 50)}...
                     </code>
-                  ) : '-'}
+                  ) : (
+                    "-"
+                  )}
                 </td>
               </tr>
             ))}
@@ -287,7 +273,7 @@ function AuditLogsTab() {
             disabled={loading}
             className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {loading ? 'Loading...' : `Load More (${logs.length} of ${total})`}
+            {loading ? "Loading..." : `Load More (${logs.length} of ${total})`}
           </button>
         </div>
       )}
@@ -336,11 +322,16 @@ function AnalysesTab() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'succeeded': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'running': return 'bg-blue-100 text-blue-800';
-      case 'queued': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "succeeded":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      case "running":
+        return "bg-blue-100 text-blue-800";
+      case "queued":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -368,16 +359,18 @@ function AnalysesTab() {
             {analyses.map((analysis) => (
               <tr key={analysis.id} className="border-b border-gray-100 even:bg-gray-50">
                 <td className="px-4 py-2 text-sm font-mono">{analysis.id.slice(0, 8)}...</td>
-                <td className="px-4 py-2 text-sm" title={analysis.original_filename || 'N/A'}>
+                <td className="px-4 py-2 text-sm" title={analysis.original_filename || "N/A"}>
                   {analysis.original_filename
-                    ? (analysis.original_filename.length > 30
-                        ? `${analysis.original_filename.slice(0, 27)}...`
-                        : analysis.original_filename)
-                    : '-'}
+                    ? analysis.original_filename.length > 30
+                      ? `${analysis.original_filename.slice(0, 27)}...`
+                      : analysis.original_filename
+                    : "-"}
                 </td>
                 <td className="px-4 py-2 text-sm">{analysis.username}</td>
                 <td className="px-4 py-2">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(analysis.status)}`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(analysis.status)}`}
+                  >
                     {analysis.status}
                   </span>
                 </td>
@@ -405,7 +398,7 @@ function AnalysesTab() {
             disabled={loading}
             className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {loading ? 'Loading...' : `Load More (${analyses.length} of ${total})`}
+            {loading ? "Loading..." : `Load More (${analyses.length} of ${total})`}
           </button>
         </div>
       )}
@@ -443,7 +436,7 @@ function ReassignModal({ analysis, onClose, onSuccess }) {
         const data = await adminApi.searchUsers(query);
         setUsers(data.users);
       } catch (err) {
-        console.error('Search failed:', err);
+        console.error("Search failed:", err);
       }
     }, 300);
 
@@ -470,11 +463,18 @@ function ReassignModal({ analysis, onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 grid place-items-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-[min(92vw,500px)]" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 grid place-items-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg p-6 w-[min(92vw,500px)]"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-xl font-semibold mb-4">Reassign Analysis</h2>
         <p className="text-sm text-gray-600 mb-4">
-          Analysis ID: <code className="font-mono bg-gray-100 px-2 py-1 rounded">{analysis.id}</code>
+          Analysis ID:{" "}
+          <code className="font-mono bg-gray-100 px-2 py-1 rounded">{analysis.id}</code>
         </p>
         <p className="text-sm text-gray-600 mb-4">
           Current user: <strong>{analysis.username}</strong>
@@ -499,7 +499,7 @@ function ReassignModal({ analysis, onClose, onSuccess }) {
                 key={user.id}
                 onClick={() => setSelectedUser(user)}
                 className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition ${
-                  selectedUser?.id === user.id ? 'bg-blue-100' : ''
+                  selectedUser?.id === user.id ? "bg-blue-100" : ""
                 }`}
               >
                 {user.username}
@@ -528,7 +528,7 @@ function ReassignModal({ analysis, onClose, onSuccess }) {
             disabled={!selectedUser || loading}
             className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {loading ? 'Reassigning...' : 'Reassign'}
+            {loading ? "Reassigning..." : "Reassign"}
           </button>
         </div>
       </div>
@@ -560,18 +560,17 @@ function RoleManagementTab() {
       const sorted = data.users.sort((a, b) => a.username.localeCompare(b.username));
       setAllUsers(sorted);
     } catch (err) {
-      console.error('Failed to load users:', err);
+      console.error("Failed to load users:", err);
     } finally {
       setLoading(false);
     }
   };
 
   // Filter users client-side based on search query
-  const filteredUsers = query.trim().length === 0
-    ? allUsers
-    : allUsers.filter(user =>
-        user.username.toLowerCase().includes(query.trim().toLowerCase())
-      );
+  const filteredUsers =
+    query.trim().length === 0
+      ? allUsers
+      : allUsers.filter((user) => user.username.toLowerCase().includes(query.trim().toLowerCase()));
 
   const handlePromote = async (userId, username) => {
     if (!confirm(`Promote "${username}" to admin?`)) return;
@@ -640,9 +639,13 @@ function RoleManagementTab() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Username</th>
+                <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">
+                  Username
+                </th>
                 <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Role</th>
-                <th className="text-right px-4 py-2 text-sm font-semibold text-gray-700">Actions</th>
+                <th className="text-right px-4 py-2 text-sm font-semibold text-gray-700">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -650,16 +653,20 @@ function RoleManagementTab() {
                 <tr key={user.id} className="border-b border-gray-100 even:bg-gray-50">
                   <td className="px-4 py-3">{user.username}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      user.role === 'owner' ? 'bg-purple-100 text-purple-800' :
-                      user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${
+                        user.role === "owner"
+                          ? "bg-purple-100 text-purple-800"
+                          : user.role === "admin"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
                       {user.role}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">
-                    {user.role === 'user' && (
+                    {user.role === "user" && (
                       <>
                         <button
                           onClick={() => handlePromote(user.id, user.username)}
@@ -681,7 +688,7 @@ function RoleManagementTab() {
                         </button>
                       </>
                     )}
-                    {user.role === 'admin' && (
+                    {user.role === "admin" && (
                       <>
                         <button
                           onClick={() => handleDemote(user.id, user.username)}
@@ -703,7 +710,7 @@ function RoleManagementTab() {
                         </button>
                       </>
                     )}
-                    {user.role === 'owner' && (
+                    {user.role === "owner" && (
                       <span className="text-sm text-gray-500">Cannot modify owner</span>
                     )}
                   </td>
@@ -716,10 +723,7 @@ function RoleManagementTab() {
 
       {/* Password Change Modal */}
       {passwordModal && (
-        <PasswordChangeModal
-          user={passwordModal}
-          onClose={() => setPasswordModal(null)}
-        />
+        <PasswordChangeModal user={passwordModal} onClose={() => setPasswordModal(null)} />
       )}
     </div>
   );
@@ -762,8 +766,14 @@ function PasswordChangeModal({ user, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 grid place-items-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg p-6 w-[min(92vw,450px)]" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 grid place-items-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg p-6 w-[min(92vw,450px)]"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-xl font-semibold mb-4">Change Password</h2>
         <p className="text-sm text-gray-600 mb-4">
           Changing password for: <strong>{user.username}</strong>
@@ -814,7 +824,7 @@ function PasswordChangeModal({ user, onClose }) {
               disabled={loading}
               className="px-4 py-2 rounded-lg border border-blue-600 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
             >
-              {loading ? 'Changing...' : 'Change Password'}
+              {loading ? "Changing..." : "Change Password"}
             </button>
           </div>
         </form>

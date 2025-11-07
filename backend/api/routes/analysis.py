@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 try:
     import sys
     from pathlib import Path
+
     # Add ml directory to path if not already present
     ml_dir = Path(__file__).parent.parent.parent / "ml"
     if ml_dir.exists() and str(ml_dir) not in sys.path:
@@ -69,7 +70,7 @@ def _capture_ml_provenance(device: Optional[str] = None) -> Dict[str, Any]:
             cwd=Path(__file__).parent.parent.parent,  # Project root
             capture_output=True,
             text=True,
-            timeout=2
+            timeout=2,
         )
         if result.returncode == 0:
             commit_hash = result.stdout.strip()
@@ -83,7 +84,7 @@ def _capture_ml_provenance(device: Optional[str] = None) -> Dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "commit_hash": commit_hash,
         "device": device_used,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -184,7 +185,7 @@ def start_analysis(analysis_id: str):
                     ml_output = run_ml_analysis(
                         video_path=analysis.video_path,
                         modules=ml_modules,
-                        device=None  # Will use env var DEVICE or auto-detect
+                        device=None,  # Will use env var DEVICE or auto-detect
                     )
                     ml_results = ml_output.get("models", {})
                     # Prefer ML runner's video metadata (same source as baseline, but validated through pipeline)
@@ -205,10 +206,7 @@ def start_analysis(analysis_id: str):
                             scores = []
                             for model_name, model_data in ml_results.items():
                                 model_frames = model_data.get("frames", [])
-                                frame_score = next(
-                                    (f["score"] for f in model_frames if f["index"] == frame_index),
-                                    None
-                                )
+                                frame_score = next((f["score"] for f in model_frames if f["index"] == frame_index), None)
                                 if frame_score is not None:
                                     scores.append(frame_score)
 
@@ -224,25 +222,20 @@ def start_analysis(analysis_id: str):
                 if traditional_modules:
                     print(f"[Analysis] Starting traditional forensics: {', '.join(traditional_modules)}")
                     traditional_results = run_traditional_forensics(
-                        video_path=analysis.video_path,
-                        modules=traditional_modules,
-                        analysis_id=analysis.id
+                        video_path=analysis.video_path, modules=traditional_modules, analysis_id=analysis.id
                     )
                     print(f"✓ Traditional forensics completed for {analysis.id}")
 
                 # Run metadata forensics analysis (always run, fast ~1-3s)
                 metadata_result = {}
                 try:
-                    metadata_result = run_metadata_analysis(
-                        video_path=analysis.video_path,
-                        video_sha256=analysis.video_sha256
-                    )
+                    metadata_result = run_metadata_analysis(video_path=analysis.video_path, video_sha256=analysis.video_sha256)
                 except Exception as e:
                     logger.error(f"Metadata analysis failed for {analysis.id}: {e}")
                     metadata_result = {
                         "error": f"Metadata analysis failed: {str(e)}",
                         "analyzed_at": None,
-                        "file_hash": analysis.video_sha256
+                        "file_hash": analysis.video_sha256,
                     }
 
                 # Build result_json for DB storage
@@ -250,7 +243,7 @@ def start_analysis(analysis_id: str):
                     "metadata": metadata_result,  # Forensic metadata (EXIF, integrity, frame hashes)
                     "video": video_meta,  # Video playback metadata (fps, frame_count, duration, resolution)
                     "ml": {},
-                    "traditional": {}
+                    "traditional": {},
                 }
 
                 # ML results: Store ALL 32 frames in database
@@ -260,15 +253,12 @@ def start_analysis(analysis_id: str):
                     all_frames = model_data.get("frames", [])
 
                     # Mark ALL frames as not requested by user (initial auto-analysis)
-                    frames_with_flag = [
-                        {**frame, "requested_adhoc": False}
-                        for frame in all_frames
-                    ]
+                    frames_with_flag = [{**frame, "requested_adhoc": False} for frame in all_frames]
 
                     result_json["ml"][model_name] = {
                         "score": model_data.get("score"),
                         "frames": frames_with_flag,  # Store ALL 32 frames
-                        "weights_hash": model_data.get("weights_hash")
+                        "weights_hash": model_data.get("weights_hash"),
                     }
 
                 # Traditional results: save scores and frame metadata
@@ -276,7 +266,7 @@ def start_analysis(analysis_id: str):
                     result_json["traditional"][method_name] = {
                         "score": method_data.get("score"),
                         "confidence": method_data.get("confidence"),  # for noise
-                        "frames": method_data.get("frames", [])
+                        "frames": method_data.get("frames", []),
                         # NOTE: overlay URLs are included, overlays persisted to disk
                     }
 
@@ -307,7 +297,7 @@ def start_analysis(analysis_id: str):
                 "status": "succeeded",
                 "result": analysis.result_json,  # Same as GET endpoint
                 "created_at": analysis.created_at.isoformat(),
-                "completed_at": analysis.updated_at.isoformat()
+                "completed_at": analysis.updated_at.isoformat(),
             }
 
             return jsonify(response), 200
@@ -454,7 +444,7 @@ def start_image_analysis(analysis_id: str):
                     image_sha256=analysis.video_sha256,
                     ml_modules=ml_modules,
                     traditional_modules=traditional_modules,
-                    analysis_id=analysis.id
+                    analysis_id=analysis.id,
                 )
 
                 # Mark as succeeded and store results
@@ -464,13 +454,18 @@ def start_image_analysis(analysis_id: str):
 
                 print(f"✓ Image analysis completed for {analysis.id}")
 
-                return jsonify({
-                    "analysis_id": analysis.id,
-                    "status": "succeeded",
-                    "result": results,
-                    "created_at": analysis.created_at.isoformat(),
-                    "completed_at": analysis.updated_at.isoformat()
-                }), 200
+                return (
+                    jsonify(
+                        {
+                            "analysis_id": analysis.id,
+                            "status": "succeeded",
+                            "result": results,
+                            "created_at": analysis.created_at.isoformat(),
+                            "completed_at": analysis.updated_at.isoformat(),
+                        }
+                    ),
+                    200,
+                )
 
             except Exception as e:
                 # Mark as failed
@@ -538,18 +533,14 @@ def get_analysis(analysis_id: str):
             "result": analysis.result_json,  # Scores + overlay URLs
             "error": analysis.error,
             "created_at": analysis.created_at.isoformat(),
-            "updated_at": analysis.updated_at.isoformat()
+            "updated_at": analysis.updated_at.isoformat(),
         }
 
         return jsonify(response), 200
 
 
 def _merge_and_recompute_traditional(
-    method_name: str,
-    new_frame_result: dict,
-    existing_data: dict,
-    frame_number: int,
-    analysis_id: str
+    method_name: str, new_frame_result: dict, existing_data: dict, frame_number: int, analysis_id: str
 ) -> dict:
     """
     Merge new frame analysis with existing data and recompute z-scores across ALL frames.
@@ -600,7 +591,7 @@ def _merge_and_recompute_traditional(
         "raw_score": float(raw_score),
         "overlay_url": f"/api/analyses/{analysis_id}/forensics/{method_name}/frames/{frame_number}/overlay",
         "flagged": True,  # Ad-hoc frames are explicitly requested by user, so flagged
-        "requested_adhoc": True  # Mark as user-requested ad-hoc analysis
+        "requested_adhoc": True,  # Mark as user-requested ad-hoc analysis
     }
 
     if frame_index is not None:
@@ -631,10 +622,7 @@ def _merge_and_recompute_traditional(
     overall_score = float(max(z_scores))
 
     # 6. Return updated structure
-    result = {
-        "score": overall_score,
-        "frames": existing_frames
-    }
+    result = {"score": overall_score, "frames": existing_frames}
 
     # Noise also has "confidence" at top level
     if method_name == "noise":
@@ -643,11 +631,7 @@ def _merge_and_recompute_traditional(
     return result
 
 
-def _merge_analysis_results_with_dedup(
-    existing_data: dict,
-    new_results: dict,
-    method_name: str
-) -> dict:
+def _merge_analysis_results_with_dedup(existing_data: dict, new_results: dict, method_name: str) -> dict:
     """
     Merge new full-sampling analysis results with existing data, deduplicating frames.
 
@@ -670,24 +654,19 @@ def _merge_analysis_results_with_dedup(
     existing_frame_numbers = {f.get("frame_number") for f in existing_frames}
 
     # Step 3: Filter out duplicates from new frames
-    unique_new_frames = [
-        f for f in new_frames
-        if f.get("frame_number") not in existing_frame_numbers
-    ]
+    unique_new_frames = [f for f in new_frames if f.get("frame_number") not in existing_frame_numbers]
 
-    print(f"[MERGE DEBUG] {method_name}: {len(existing_frames)} existing, "
-          f"{len(new_frames)} new, {len(unique_new_frames)} unique new")
+    print(
+        f"[MERGE DEBUG] {method_name}: {len(existing_frames)} existing, "
+        f"{len(new_frames)} new, {len(unique_new_frames)} unique new"
+    )
 
     # Step 4: Merge frames
     all_frames = existing_frames + unique_new_frames
 
     if not all_frames:
         # No frames at all - return empty result
-        return {
-            "score": 0.0,
-            "confidence": 0.0 if method_name == "noise" else None,
-            "frames": []
-        }
+        return {"score": 0.0, "confidence": 0.0 if method_name == "noise" else None, "frames": []}
 
     # Step 5: Recalculate z-scores across ALL frames
     raw_scores = [f["raw_score"] for f in all_frames]
@@ -708,10 +687,7 @@ def _merge_analysis_results_with_dedup(
     overall_score = float(max(z_scores))
 
     # Step 7: Return merged structure
-    result = {
-        "score": overall_score,
-        "frames": all_frames
-    }
+    result = {"score": overall_score, "frames": all_frames}
 
     # Noise also has "confidence" at top level
     if method_name == "noise":
@@ -772,12 +748,11 @@ def analyze_frame(analysis_id: str, frame_number: int):
             VALID_METHODS = {"ela", "noise", "lbp"}
             invalid_methods = set(methods) - VALID_METHODS
             if invalid_methods:
-                return jsonify(
-                    error=f"Invalid methods: {', '.join(sorted(invalid_methods))}"
-                ), 400
+                return jsonify(error=f"Invalid methods: {', '.join(sorted(invalid_methods))}"), 400
 
             # Extract frame to persistent directory
             from storage import DATA_ROOT
+
             frames_dir = DATA_ROOT / analysis.id / "frames"
             frames_dir.mkdir(parents=True, exist_ok=True)
             frame_path = str(frames_dir / f"frame_{frame_number}.jpg")
@@ -785,11 +760,7 @@ def analyze_frame(analysis_id: str, frame_number: int):
             try:
                 # Only extract if frame doesn't already exist (avoid JPEG re-encoding variance)
                 if not os.path.exists(frame_path):
-                    extract_single_frame(
-                        video_path=analysis.video_path,
-                        frame_number=frame_number,
-                        output_path=frame_path
-                    )
+                    extract_single_frame(video_path=analysis.video_path, frame_number=frame_number, output_path=frame_path)
 
                 # Fetch current result_json from DB (deep copy to trigger SQLAlchemy change detection)
                 current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
@@ -817,17 +788,9 @@ def analyze_frame(analysis_id: str, frame_number: int):
                         existing_frames = method_data.get("frames", [])
                         frame_data = next((f for f in existing_frames if f.get("frame_number") == frame_number), None)
                         if frame_data:
-                            results[method] = {
-                                "score": frame_data.get("score"),
-                                "frame_number": frame_number,
-                                "cached": True
-                            }
+                            results[method] = {"score": frame_data.get("score"), "frame_number": frame_number, "cached": True}
 
-                    response = {
-                        "analysis_id": analysis.id,
-                        "frame_number": frame_number,
-                        "results": results
-                    }
+                    response = {"analysis_id": analysis.id, "frame_number": frame_number, "results": results}
                     return jsonify(response), 200
 
                 # Run each requested forensics method on the single frame
@@ -842,26 +805,17 @@ def analyze_frame(analysis_id: str, frame_number: int):
                         # Run analysis and get raw single-frame result
                         if method == "ela":
                             raw_result = run_ela(
-                                frame_path,
-                                top_percent=10,
-                                output_dir=str(method_dir),
-                                analysis_id=analysis.id
+                                frame_path, top_percent=10, output_dir=str(method_dir), analysis_id=analysis.id
                             )
 
                         elif method == "noise":
                             raw_result = run_noise_analysis(
-                                frame_path,
-                                top_percent=10,
-                                output_dir=str(method_dir),
-                                analysis_id=analysis.id
+                                frame_path, top_percent=10, output_dir=str(method_dir), analysis_id=analysis.id
                             )
 
                         elif method == "lbp":
                             raw_result = run_lbp_analysis(
-                                frame_path,
-                                top_percent=10,
-                                output_dir=str(method_dir),
-                                analysis_id=analysis.id
+                                frame_path, top_percent=10, output_dir=str(method_dir), analysis_id=analysis.id
                             )
 
                         else:
@@ -875,7 +829,7 @@ def analyze_frame(analysis_id: str, frame_number: int):
                             new_frame_result=raw_result,
                             existing_data=existing_method_data,
                             frame_number=frame_number,
-                            analysis_id=analysis.id
+                            analysis_id=analysis.id,
                         )
 
                         # Update result_json with merged data
@@ -885,20 +839,13 @@ def analyze_frame(analysis_id: str, frame_number: int):
                         results[method] = updated_method_data
 
                     except Exception as e:
-                        results[method] = {
-                            "score": None,
-                            "error": f"Analysis failed: {str(e)}"
-                        }
+                        results[method] = {"score": None, "error": f"Analysis failed: {str(e)}"}
 
                 # Save updated result_json back to DB
                 analysis.result_json = current_json
                 db.commit()
 
-                response = {
-                    "analysis_id": analysis.id,
-                    "frame_number": frame_number,
-                    "results": results
-                }
+                response = {"analysis_id": analysis.id, "frame_number": frame_number, "results": results}
 
                 return jsonify(response), 200
 
@@ -967,9 +914,7 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
             VALID_MODELS = {"xception", "spsl", "ucf"}
             invalid_models = set(models) - VALID_MODELS
             if invalid_models:
-                return jsonify(
-                    error=f"Invalid models: {', '.join(sorted(invalid_models))}"
-                ), 400
+                return jsonify(error=f"Invalid models: {', '.join(sorted(invalid_models))}"), 400
 
             # Check if frame already analyzed for ALL requested models (short-circuit if so)
             current_json = copy.deepcopy(analysis.result_json) if analysis.result_json else {}
@@ -1000,7 +945,7 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                     "frame_number": frame_number,
                     "time": 0.0,  # Cached result, no compute time
                     "results": model_results,
-                    "cached": True
+                    "cached": True,
                 }
                 return jsonify(response), 200
 
@@ -1010,7 +955,7 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                     video_path=analysis.video_path,
                     frame_number=frame_number,
                     models=models,
-                    device=None  # Will use env var DEVICE or auto-detect
+                    device=None,  # Will use env var DEVICE or auto-detect
                 )
 
                 # Extract frame_number and time from results
@@ -1035,13 +980,12 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                             "index": response_frame_number,
                             "time": response_time,
                             "score": model_result.get("score"),
-                            "requested_adhoc": True  # Mark as user-requested
+                            "requested_adhoc": True,  # Mark as user-requested
                         }
 
                         # Find if frame already exists
                         frame_idx = next(
-                            (i for i, f in enumerate(existing_frames) if f.get("index") == response_frame_number),
-                            None
+                            (i for i, f in enumerate(existing_frames) if f.get("index") == response_frame_number), None
                         )
 
                         if frame_idx is not None:
@@ -1074,13 +1018,14 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
                     "analysis_id": analysis.id,
                     "frame_number": response_frame_number,
                     "time": response_time,
-                    "results": model_results
+                    "results": model_results,
                 }
 
                 return jsonify(response), 200
 
             except Exception as e:
                 import traceback
+
                 error_trace = traceback.format_exc()
                 logger.error(f"ML analysis failed for frame {frame_number}: {error_trace}")
 
@@ -1095,6 +1040,7 @@ def analyze_frame_ml(analysis_id: str, frame_number: int):
         raise  # Re-raise HTTP exceptions (401/403/404)
     except Exception as e:
         import traceback
+
         error_trace = traceback.format_exc()
         logger.error(f"Unexpected error in ad-hoc ML endpoint: {error_trace}")
         return jsonify(error=str(e)), 500
@@ -1145,7 +1091,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                     ml_output = run_ml_analysis(
                         video_path=analysis.video_path,
                         modules=["xception", "spsl", "ucf"],
-                        device=None  # Will use env var DEVICE or auto-detect
+                        device=None,  # Will use env var DEVICE or auto-detect
                     )
                     ml_results = ml_output.get("models", {})
 
@@ -1159,13 +1105,13 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                         existing_indices = {f.get("index") for f in existing_frames}
                         unique_new = [f for f in new_frames if f.get("index") not in existing_indices]
 
-                        print(f"[FULL ANALYSIS] {model_name}: {len(existing_frames)} existing, "
-                              f"{len(new_frames)} new, {len(unique_new)} unique new")
+                        print(
+                            f"[FULL ANALYSIS] {model_name}: {len(existing_frames)} existing, "
+                            f"{len(new_frames)} new, {len(unique_new)} unique new"
+                        )
 
                         # Merge and mark new frames as requested_adhoc=False (auto-analysis)
-                        all_frames = existing_frames + [
-                            {**f, "requested_adhoc": False} for f in unique_new
-                        ]
+                        all_frames = existing_frames + [{**f, "requested_adhoc": False} for f in unique_new]
 
                         # Recalculate per-model score (average)
                         frame_scores = [f["score"] for f in all_frames if f.get("score") is not None]
@@ -1175,7 +1121,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                         current_json["ml"][model_name] = {
                             "score": avg_score,
                             "frames": all_frames,
-                            "weights_hash": new_model_data.get("weights_hash")
+                            "weights_hash": new_model_data.get("weights_hash"),
                         }
 
                     print("[FULL ANALYSIS] ✓ ML analysis completed")
@@ -1184,9 +1130,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                     # Traditional forensics
                     print(f"[FULL ANALYSIS] Running {method} forensics...")
                     traditional_results = run_traditional_forensics(
-                        video_path=analysis.video_path,
-                        modules=[method],
-                        analysis_id=analysis.id
+                        video_path=analysis.video_path, modules=[method], analysis_id=analysis.id
                     )
 
                     new_method_data = traditional_results.get(method, {})
@@ -1194,9 +1138,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
 
                     # Merge with deduplication
                     merged_data = _merge_analysis_results_with_dedup(
-                        existing_data=existing_method_data,
-                        new_results=new_method_data,
-                        method_name=method
+                        existing_data=existing_method_data, new_results=new_method_data, method_name=method
                     )
 
                     # Update traditional data
@@ -1216,7 +1158,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                     "analysis_id": analysis.id,
                     "status": analysis.status,
                     "result": current_json,
-                    "updated_at": analysis.updated_at.isoformat()
+                    "updated_at": analysis.updated_at.isoformat(),
                 }
 
                 return jsonify(response), 200

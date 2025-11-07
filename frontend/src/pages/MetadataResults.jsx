@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 /**
  * Metadata forensics display components
@@ -20,9 +20,7 @@ export function MetadataAnomaliesSummary({ metadata }) {
   if (totalAnomalies === 0) {
     return (
       <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
-        <p className="text-green-700 font-semibold">
-          ✓ No metadata anomalies detected
-        </p>
+        <p className="text-green-700 font-semibold">✓ No metadata anomalies detected</p>
       </div>
     );
   }
@@ -30,7 +28,7 @@ export function MetadataAnomaliesSummary({ metadata }) {
   return (
     <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
       <p className="text-yellow-800 font-semibold mb-2">
-        ⚠ {totalAnomalies} metadata {totalAnomalies === 1 ? 'anomaly' : 'anomalies'} detected
+        ⚠ {totalAnomalies} metadata {totalAnomalies === 1 ? "anomaly" : "anomalies"} detected
       </p>
 
       {/* Missing Fields */}
@@ -69,18 +67,16 @@ export function IntegrityStatus({ metadata }) {
   const status = integrity.integrity_status || "UNKNOWN";
 
   const statusColors = {
-    "PASSED": "bg-green-50 border-green-500 text-green-700",
-    "FAILED": "bg-red-50 border-red-500 text-red-700",
-    "UNKNOWN": "bg-gray-50 border-gray-500 text-gray-700"
+    PASSED: "bg-green-50 border-green-500 text-green-700",
+    FAILED: "bg-red-50 border-red-500 text-red-700",
+    UNKNOWN: "bg-gray-50 border-gray-500 text-gray-700",
   };
 
   const color = statusColors[status] || statusColors.UNKNOWN;
 
   return (
     <div className={`border-l-4 p-4 mb-4 ${color}`}>
-      <p className="font-semibold">
-        Container Integrity: {status}
-      </p>
+      <p className="font-semibold">Container Integrity: {status}</p>
       {integrity.errors?.length > 0 && (
         <div className="mt-2 text-sm">
           <p className="font-medium">Errors detected:</p>
@@ -90,9 +86,7 @@ export function IntegrityStatus({ metadata }) {
             ))}
           </ul>
           {integrity.errors.length > 3 && (
-            <p className="ml-4 mt-1 italic">
-              ... and {integrity.errors.length - 3} more
-            </p>
+            <p className="ml-4 mt-1 italic">... and {integrity.errors.length - 3} more</p>
           )}
         </div>
       )}
@@ -110,9 +104,7 @@ export function FrameHashesSummary({ metadata }) {
     if (!frameCount || frameCount === 0) {
       return (
         <div className="bg-gray-50 border-l-4 border-gray-400 p-4 mb-4">
-          <p className="text-gray-700 font-semibold">
-            Frame hash analysis unavailable
-          </p>
+          <p className="text-gray-700 font-semibold">Frame hash analysis unavailable</p>
         </div>
       );
     }
@@ -134,9 +126,9 @@ export function FrameHashesSummary({ metadata }) {
       <div className="text-sm text-orange-600 ml-4">
         {duplicates.slice(0, 3).map((dup, idx) => (
           <div key={idx} className="mb-1">
-            • Frame hash {dup.hash.slice(0, 8)}... appears {dup.count} times
-            {' '}(indices: {dup.frame_indices.slice(0, 5).join(', ')}
-            {dup.frame_indices.length > 5 ? '...' : ''})
+            • Frame hash {dup.hash.slice(0, 8)}... appears {dup.count} times (indices:{" "}
+            {dup.frame_indices.slice(0, 5).join(", ")}
+            {dup.frame_indices.length > 5 ? "..." : ""})
           </div>
         ))}
         {duplicates.length > 3 && (

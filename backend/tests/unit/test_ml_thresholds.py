@@ -5,11 +5,7 @@ Tests the classification logic and methodology description generation
 from api/config/ml_thresholds.py without any external dependencies.
 """
 
-from api.config.ml_thresholds import (
-    get_classification,
-    get_methodology_description,
-    ML_THRESHOLDS
-)
+from api.config.ml_thresholds import get_classification, get_methodology_description, ML_THRESHOLDS
 
 
 class TestGetClassification:

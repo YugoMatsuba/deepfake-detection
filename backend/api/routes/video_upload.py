@@ -24,8 +24,15 @@ from storage import save_video_for_analysis, probe_video_metadata, DATA_ROOT
 video_bp = Blueprint("video", __name__)
 
 ALLOWED_MIME = {
-    "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "video/avi",
-    "image/jpeg", "image/png", "image/heic", "image/webp"
+    "video/mp4",
+    "video/quicktime",
+    "video/x-matroska",
+    "video/webm",
+    "video/avi",
+    "image/jpeg",
+    "image/png",
+    "image/heic",
+    "image/webp",
 }
 
 
@@ -95,12 +102,7 @@ def upload_video():
             analysis.meta_json = meta
 
             # Commit happens automatically in context manager
-            return jsonify({
-                "analysis_id": analysis.id,
-                "media_type": media_type,
-                "video_sha256": sha256,
-                "meta": meta
-            }), 201
+            return jsonify({"analysis_id": analysis.id, "media_type": media_type, "video_sha256": sha256, "meta": meta}), 201
 
         except Exception as e:
             # Rollback happens automatically in context manager
@@ -109,6 +111,7 @@ def upload_video():
                 video_dir = DATA_ROOT / analysis.id
                 if video_dir.exists():
                     import shutil
+
                     shutil.rmtree(video_dir)
             except Exception:
                 pass
@@ -147,10 +150,7 @@ def list_videos():
             if analysis_dir.exists():
                 video_files = list(analysis_dir.glob("video.*"))
                 if video_files:
-                    videos.append({
-                        "id": analysis.id,
-                        "path": f"/api/analyses/{analysis.id}/video"
-                    })
+                    videos.append({"id": analysis.id, "path": f"/api/analyses/{analysis.id}/video"})
 
         return jsonify(videos), 200
 
@@ -226,7 +226,7 @@ def get_analysis_image(analysis_id: str):
             ".jpeg": "image/jpeg",
             ".png": "image/png",
             ".heic": "image/heic",
-            ".webp": "image/webp"
+            ".webp": "image/webp",
         }
         mimetype = mimetype_map.get(ext, "image/jpeg")
 

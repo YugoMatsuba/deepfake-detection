@@ -4,6 +4,7 @@ Pytest configuration for backend tests.
 Ensures database engine is initialized before any tests run.
 Provides clean database state for each test.
 """
+
 import sys
 from pathlib import Path
 import pytest
@@ -39,7 +40,7 @@ def _engine(tmp_path_factory):
             "\n"
             "For Docker container testing:\n"
             "  docker compose exec backend bash -c \\\n"
-            "    \"TEST_DATABASE_URL=postgresql+psycopg://deepfake:secret2@db:5432 pytest tests/ -v\"\n"
+            '    "TEST_DATABASE_URL=postgresql+psycopg://deepfake:secret2@db:5432 pytest tests/ -v"\n'
             "\n"
             "For CI: GitHub Actions provides PostgreSQL service automatically.\n"
         )
@@ -52,6 +53,7 @@ def _engine(tmp_path_factory):
 
     # Extract connection parts to create/drop test database
     from sqlalchemy import create_engine, text
+
     admin_url = f"{base_url}/postgres"
     test_url = f"{base_url}/{test_db_name}"
 

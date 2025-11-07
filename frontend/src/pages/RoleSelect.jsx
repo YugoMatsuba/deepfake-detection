@@ -11,7 +11,7 @@ export default function RoleSelect() {
         <header className="text-center mb-6">
           <h1 className="text-3xl font-semibold mb-2">Welcome, {user?.username}</h1>
           <p className="text-gray-700 text-sm">
-            You have {user?.role === 'owner' ? 'owner' : 'admin'} access. Choose where to go:
+            You have {user?.role === "owner" ? "owner" : "admin"} access. Choose where to go:
           </p>
         </header>
 
@@ -38,10 +38,7 @@ export default function RoleSelect() {
         </div>
 
         <footer className="mt-6 text-center">
-          <button
-            onClick={logout}
-            className="text-gray-700 underline text-sm hover:text-gray-900"
-          >
+          <button onClick={logout} className="text-gray-700 underline text-sm hover:text-gray-900">
             Logout
           </button>
         </footer>

@@ -21,12 +21,12 @@ class TestRunMlAnalysisTransform:
                     "name": "Xception",
                     "score": 0.87,
                     "frames": [{"index": 0, "score": 0.90}, {"index": 1, "score": 0.84}],
-                    "weights_hash": "abc123"
+                    "weights_hash": "abc123",
                 }
             ],
             "video": {"fps": 29.97},
             "frames": [0, 1],
-            "timing_ms": {"total": 1234}
+            "timing_ms": {"total": 1234},
         }
 
         result = run_ml_analysis("/path/to/video.mp4", ["xception"], device="cpu")
@@ -49,11 +49,11 @@ class TestRunMlAnalysisTransform:
             "models": [
                 {"name": "Xception", "score": 0.87, "frames": [], "weights_hash": "hash1"},
                 {"name": "SPSL", "score": 0.92, "frames": [], "weights_hash": "hash2"},
-                {"name": "UCF", "score": 0.85, "frames": [], "weights_hash": "hash3"}
+                {"name": "UCF", "score": 0.85, "frames": [], "weights_hash": "hash3"},
             ],
             "video": {},
             "frames": [],
-            "timing_ms": {}
+            "timing_ms": {},
         }
 
         result = run_ml_analysis("/path/to/video.mp4", ["xception", "spsl", "ucf"], device="cuda")
@@ -71,12 +71,7 @@ class TestRunMlAnalysisTransform:
     @patch("ml.runner.run")
     def test_model_name_lowercase_conversion(self, mock_run):
         """Model names are converted to lowercase."""
-        mock_run.return_value = {
-            "models": [
-                {"name": "Xception", "score": 0.5},
-                {"name": "SPSL", "score": 0.6}
-            ]
-        }
+        mock_run.return_value = {"models": [{"name": "Xception", "score": 0.5}, {"name": "SPSL", "score": 0.6}]}
 
         result = run_ml_analysis("/video.mp4", ["xception", "spsl"])
 
@@ -93,10 +88,7 @@ class TestRunMlAnalysisTransform:
                 {
                     "name": "xception",
                     "score": 0.75,
-                    "frames": [
-                        {"index": 0, "time": 0.0, "score": 0.80},
-                        {"index": 5, "time": 0.17, "score": 0.70}
-                    ]
+                    "frames": [{"index": 0, "time": 0.0, "score": 0.80}, {"index": 5, "time": 0.17, "score": 0.70}],
                 }
             ]
         }
@@ -117,7 +109,7 @@ class TestRunMlAnalysisTransform:
             "models": [
                 {
                     "name": "xception",
-                    "score": 0.65
+                    "score": 0.65,
                     # No frames field
                 }
             ]
@@ -153,12 +145,7 @@ class TestRunMlAnalysisTransform:
     @patch("ml.runner.run")
     def test_raises_exception_on_ml_error(self, mock_run):
         """Raises exception when ML runner returns error."""
-        mock_run.return_value = {
-            "error": {
-                "stage": "face_detection",
-                "message": "No face detected in video"
-            }
-        }
+        mock_run.return_value = {"error": {"stage": "face_detection", "message": "No face detected in video"}}
 
         try:
             run_ml_analysis("/video.mp4", ["xception"])
@@ -177,10 +164,7 @@ class TestRunSingleFrameMlAnalysisTransform:
         mock_analyze.return_value = {
             "frame_number": 42,
             "time": 1.4,
-            "models": {
-                "xception": {"score": 0.856},
-                "spsl": {"score": 0.923}
-            }
+            "models": {"xception": {"score": 0.856}, "spsl": {"score": 0.923}},
         }
 
         result = run_single_frame_ml_analysis("/video.mp4", 42, ["xception", "spsl"], device="cpu")
@@ -204,10 +188,7 @@ class TestRunSingleFrameMlAnalysisTransform:
         mock_analyze.return_value = {
             "frame_number": 10,
             "time": 0.33,
-            "models": {
-                "xception": {"score": 0.75},
-                "ucf": {"score": 0.82}
-            }
+            "models": {"xception": {"score": 0.75}, "ucf": {"score": 0.82}},
         }
 
         result = run_single_frame_ml_analysis("/video.mp4", 10, ["xception", "ucf"])
@@ -227,11 +208,7 @@ class TestRunSingleFrameMlAnalysisTransform:
         mock_analyze.return_value = {
             "frame_number": 99,
             "time": 3.3,
-            "models": {
-                "xception": {"score": 0.60},
-                "spsl": {"score": 0.70},
-                "ucf": {"score": 0.80}
-            }
+            "models": {"xception": {"score": 0.60}, "spsl": {"score": 0.70}, "ucf": {"score": 0.80}},
         }
 
         result = run_single_frame_ml_analysis("/video.mp4", 99, ["xception", "spsl", "ucf"])
@@ -244,11 +221,7 @@ class TestRunSingleFrameMlAnalysisTransform:
     @patch("ml.runner.analyze_single_frame")
     def test_handles_empty_models(self, mock_analyze):
         """Handles empty models dict gracefully."""
-        mock_analyze.return_value = {
-            "frame_number": 5,
-            "time": 0.17,
-            "models": {}
-        }
+        mock_analyze.return_value = {"frame_number": 5, "time": 0.17, "models": {}}
 
         result = run_single_frame_ml_analysis("/video.mp4", 5, [])
 
@@ -270,11 +243,7 @@ class TestRunSingleFrameMlAnalysisTransform:
     @patch("ml.runner.analyze_single_frame")
     def test_raises_exception_on_error(self, mock_analyze):
         """Raises exception when ML runner returns error."""
-        mock_analyze.return_value = {
-            "error": {
-                "message": "No face detected in frame 42"
-            }
-        }
+        mock_analyze.return_value = {"error": {"message": "No face detected in frame 42"}}
 
         try:
             run_single_frame_ml_analysis("/video.mp4", 42, ["xception"])
