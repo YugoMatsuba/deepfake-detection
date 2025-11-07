@@ -14,18 +14,18 @@ exclude =
     build,
     dist
 
-# Ignore specific rules
+# Ignore specific rules (no inline comments allowed in ignore list)
 ignore =
-    E402,  # module level import not at top (needed for path manipulation)
-    W503,  # line break before binary operator (conflicts with black)
-    W504,  # line break after binary operator (conflicts with black)
+    E402,
+    W503,
+    W504
 
 # Error codes to always enforce
 select =
-    E,    # pycodestyle errors
-    F,    # pyflakes
-    C90,  # mccabe complexity
-    W,    # pycodestyle warnings
+    E,
+    F,
+    C90,
+    W
 
 # Per-file ignores
 per-file-ignores =

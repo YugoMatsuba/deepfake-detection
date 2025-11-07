@@ -212,7 +212,6 @@ useEffect(() => {
     if (!videoUrl) {
       setIsPlaying(false);
       setCurrentFrame(0);
-      setCurrentTime(0);
     }
   }, [videoUrl]);
 
