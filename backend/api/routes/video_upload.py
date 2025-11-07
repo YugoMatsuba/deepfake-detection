@@ -13,8 +13,7 @@ Flow:
 from __future__ import annotations
 import tempfile
 from pathlib import Path
-from flask import Blueprint, jsonify, request, session, send_file
-from flask_cors import cross_origin
+from flask import Blueprint, jsonify, request, send_file
 from werkzeug.utils import secure_filename
 
 from api import get_db
@@ -130,7 +129,6 @@ def list_videos():
     - 401: Unauthorized (no session)
     """
     with get_db() as db:
-        from flask import g
         from api.auth_utils import current_user
 
         user = current_user(db)
@@ -174,7 +172,7 @@ def get_analysis_video(analysis_id: str):
     """
     with get_db() as db:
         # Check access (ownership or admin)
-        analysis = check_analysis_ownership_or_admin(db, analysis_id)
+        _ = check_analysis_ownership_or_admin(db, analysis_id)
 
         # Find video file in analysis directory
         video_dir = DATA_ROOT / analysis_id
@@ -207,7 +205,7 @@ def get_analysis_image(analysis_id: str):
     """
     with get_db() as db:
         # Check access (ownership or admin)
-        analysis = check_analysis_ownership_or_admin(db, analysis_id)
+        _ = check_analysis_ownership_or_admin(db, analysis_id)
 
         # Find image file in analysis directory
         image_dir = DATA_ROOT / analysis_id
@@ -255,7 +253,7 @@ def get_forensics_overlay(analysis_id: str, method: str, frame_number: int):
     """
     with get_db() as db:
         # Check access (ownership or admin)
-        analysis = check_analysis_ownership_or_admin(db, analysis_id)
+        _ = check_analysis_ownership_or_admin(db, analysis_id)
 
         # Validate method
         if method not in ["noise", "ela", "lbp"]:

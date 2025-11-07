@@ -65,7 +65,12 @@ class TestAnalysisRoutes(unittest.TestCase):
         mock_traditional.return_value = {
             'ela': {
                 'score': 0.65,
-                'frames': [{'frame': 'frame_0001.jpg', 'frame_number': 1, 'score': 0.65, 'overlay_url': '/api/analyses/test-analysis-id/forensics/ela/frames/1/overlay'}]
+                'frames': [{
+                    'frame': 'frame_0001.jpg',
+                    'frame_number': 1,
+                    'score': 0.65,
+                    'overlay_url': '/api/analyses/test-analysis-id/forensics/ela/frames/1/overlay'
+                }]
             }
         }
 

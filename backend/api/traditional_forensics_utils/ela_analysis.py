@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from io import BytesIO
-from PIL import Image, ImageChops, ImageEnhance
+from PIL import Image, ImageChops
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
 

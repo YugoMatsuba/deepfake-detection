@@ -6,7 +6,6 @@ Bridges Flask backend with traditional forensics module.
 Handles traditional forensics execution and output transformation for API responses.
 """
 from __future__ import annotations
-import os
 from pathlib import Path
 from typing import Any, Optional
 

@@ -133,7 +133,7 @@ class TestVideoUploadRoutes(unittest.TestCase):
             sess['user_id'] = self.test_user_id
 
         # Use secure endpoint
-        response = self.client.get('/api/analyses/test-analysis-id/video')
+        _ = self.client.get('/api/analyses/test-analysis-id/video')
         mock_send_file.assert_called_once()
 
     @patch('api.routes.video_upload.get_db')

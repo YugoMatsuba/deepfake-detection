@@ -148,7 +148,7 @@ def run_single_frame_ml_analysis(
 
     # Import ML runner and error handling
     from ml.runner import analyze_single_frame
-    from ml.errors import classify_error, MLAnalysisError
+    from ml.errors import MLAnalysisError
 
     try:
         # Run single frame inference

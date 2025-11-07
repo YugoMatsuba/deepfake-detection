@@ -5,10 +5,7 @@ Image analysis orchestrator.
 Coordinates ML inference, traditional forensics, and EXIF analysis for single images.
 """
 from __future__ import annotations
-import os
-import shutil
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 import logging
 
 from storage import DATA_ROOT

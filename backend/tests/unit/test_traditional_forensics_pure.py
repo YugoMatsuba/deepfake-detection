@@ -8,12 +8,10 @@ Tests isolated computational logic without external dependencies:
 - compute_lbp: LBP histogram-based scoring (basic)
 - compute_noise: Blockwise noise inconsistency (basic)
 """
-import pytest
 import sys
 import os
 import numpy as np
 from PIL import Image
-from io import BytesIO
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))

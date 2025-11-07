@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, Index, text, CheckConstraint, JSON
+from sqlalchemy import Integer, String, Text, DateTime, Boolean, ForeignKey, Index, text, CheckConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from api import Base

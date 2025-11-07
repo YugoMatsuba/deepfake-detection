@@ -9,7 +9,7 @@ Routes:
 from __future__ import annotations
 import io
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 from flask import Blueprint, jsonify, send_file, g, request
 from sqlalchemy import select, func
@@ -17,12 +17,12 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.enums import TA_CENTER
 
 from api import get_db
 from api.auth_utils import require_user, check_analysis_ownership_or_admin
-from api.config.ml_thresholds import get_classification, get_methodology_description
+from api.config.ml_thresholds import get_classification
 from models import Analysis, User
 
 reports_bp = Blueprint("reports", __name__)
@@ -160,7 +160,7 @@ def download_pdf_report(analysis_id: str):
 
         # Generate PDF in memory
         buffer = io.BytesIO()
-        pdf = _generate_pdf_report(analysis, buffer)
+        _generate_pdf_report(analysis, buffer)
 
         # Rewind buffer for reading
         buffer.seek(0)

@@ -5,7 +5,6 @@ Tests isolated computational logic without external dependencies:
 - _calculate_top5_ensemble_score: Top-5 ensemble averaging from ML results
 - _get_assessment: Score-to-risk threshold classification
 """
-import pytest
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))

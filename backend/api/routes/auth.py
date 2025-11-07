@@ -31,15 +31,13 @@ GET /api/auth/me
 """
 
 from __future__ import annotations
-from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.exc import IntegrityError
 from flask import Blueprint, request, jsonify, session
-from sqlalchemy import String, Integer, Boolean, ForeignKey, Text, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, Session
+from sqlalchemy.orm import Session
 
-from api import Base, get_db, hash_password, verify_password  # type: ignore
+from api import get_db, hash_password, verify_password  # type: ignore
 
 # Import models from consolidated models.py (now managed by Alembic)
 import sys

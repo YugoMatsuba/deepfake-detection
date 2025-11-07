@@ -14,7 +14,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional
-from datetime import datetime, timedelta, timezone
 
 import cv2
 

@@ -11,13 +11,12 @@ from __future__ import annotations
 import copy
 import os
 import subprocess
-import tempfile
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import cv2
 import numpy as np
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request
 from sqlalchemy import update
 from werkzeug.exceptions import HTTPException
 
@@ -26,12 +25,7 @@ from api.auth_utils import require_user, check_analysis_ownership_or_admin
 from models import Analysis
 from storage import delete_analysis_files
 from api.ml_integration import run_ml_analysis, run_single_frame_ml_analysis
-from api.traditional_integration import (
-    run_traditional_forensics,
-    transform_ela_result,
-    transform_noise_result,
-    transform_lbp_result,
-)
+from api.traditional_integration import run_traditional_forensics
 from api.traditional_forensics_utils.frame_extraction import extract_single_frame
 from api.traditional_forensics_utils.ela_analysis import run_ela
 from api.traditional_forensics_utils.noise_analysis import run_noise_analysis
@@ -197,7 +191,6 @@ def start_analysis(analysis_id: str):
                     # Prefer ML runner's video metadata (same source as baseline, but validated through pipeline)
                     video_meta = ml_output.get("video") or video_meta
                     ml_frames_meta = ml_output.get("frames", [])
-                    ml_timing_meta = ml_output.get("timing_ms")
 
                     # Log completion
                     print(f"✓ ML analysis completed for {analysis.id} ({', '.join(ml_modules)})")

@@ -11,7 +11,6 @@ Responsibilities (no business logic here):
 
 from __future__ import annotations
 import os
-from pathlib import Path
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_compress import Compress

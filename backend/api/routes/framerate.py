@@ -1,6 +1,5 @@
-from flask import Blueprint, jsonify, g
+from flask import Blueprint, jsonify
 import cv2
-from pathlib import Path
 from api import get_db
 from api.auth_utils import require_user, current_user
 from models import Analysis

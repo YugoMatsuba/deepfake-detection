@@ -1,13 +1,12 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from flask import Flask
-import pytest
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from api.routes.auth import bp
-from models import User, AuditLog
+from models import User
 
 
 class TestAuthRoutes(unittest.TestCase):

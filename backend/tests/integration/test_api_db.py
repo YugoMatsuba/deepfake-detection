@@ -12,9 +12,9 @@ from api import get_db
 from models import User
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def client():
-    os.environ.setdefault("DB_BOOTSTRAP", "1")
+    # Changed to function scope to work with _schema fixture from conftest.py
 
     with ExitStack() as stack:
         backend_dir = Path(__file__).resolve().parents[2]
@@ -50,6 +50,9 @@ def client():
             stack.callback(lambda: sys.modules.pop("database", None))
 
         app_module = importlib.import_module("app")
+        stack.enter_context(
+            patch.object(app_module, "bootstrap_owner_from_env", return_value=None)
+        )
         app = app_module.create_app()
         app.config.update(TESTING=True)
 

@@ -17,62 +17,65 @@ from models import Base
 @pytest.fixture(scope="session", autouse=True)
 def _engine(tmp_path_factory):
     """
-    Initialize database engine once for entire test session.
+    Initialize PostgreSQL test database for entire test session.
 
-    Tries PostgreSQL first, falls back to SQLite if PostgreSQL isn't available.
+    Creates a unique temporary database, runs tests, then cleans up.
     """
     import os
     import uuid
 
     test_db_url = os.getenv("TEST_DATABASE_URL")
 
-    if test_db_url and test_db_url.startswith("postgresql"):
-        try:
-            # Try PostgreSQL setup
-            print(f"Attempting PostgreSQL connection: {test_db_url}")
+    if not test_db_url or not test_db_url.startswith("postgresql"):
+        raise RuntimeError(
+            "\n"
+            "TEST_DATABASE_URL must be set to a PostgreSQL connection string.\n"
+            "\n"
+            "For local testing:\n"
+            "  1. Start PostgreSQL: docker compose up -d db\n"
+            "  2. Set TEST_DATABASE_URL:\n"
+            "     export TEST_DATABASE_URL=postgresql+psycopg://deepfake:secret2@localhost:5432\n"
+            "  3. Run tests: pytest tests/ -v\n"
+            "\n"
+            "For Docker container testing:\n"
+            "  docker compose exec backend bash -c \\\n"
+            "    \"TEST_DATABASE_URL=postgresql+psycopg://deepfake:secret2@db:5432 pytest tests/ -v\"\n"
+            "\n"
+            "For CI: GitHub Actions provides PostgreSQL service automatically.\n"
+        )
 
-            # Generate unique database name for this test session
-            test_db_name = f"test_{uuid.uuid4().hex[:8]}"
-            base_url = test_db_url
+    print(f"Attempting PostgreSQL connection: {test_db_url}")
 
-            # Extract connection parts to create/drop test database
-            from sqlalchemy import create_engine, text
-            admin_url = f"{base_url}/postgres"
-            test_url = f"{base_url}/{test_db_name}"
+    # Generate unique database name for this test session
+    test_db_name = f"test_{uuid.uuid4().hex[:8]}"
+    base_url = test_db_url
 
-            # Create test database
-            admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-            with admin_engine.connect() as conn:
-                conn.execute(text(f"CREATE DATABASE {test_db_name}"))
-            admin_engine.dispose()
+    # Extract connection parts to create/drop test database
+    from sqlalchemy import create_engine, text
+    admin_url = f"{base_url}/postgres"
+    test_url = f"{base_url}/{test_db_name}"
 
-            # Initialize test engine
-            init_engine(test_url)
-            print(f"✓ PostgreSQL test database created: {test_db_name}")
+    # Create test database
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        conn.execute(text(f"CREATE DATABASE {test_db_name}"))
+    admin_engine.dispose()
 
-            yield
+    # Initialize test engine
+    init_engine(test_url)
+    print(f"✓ PostgreSQL test database created: {test_db_name}")
 
-            # Cleanup: drop test database
-            get_engine().dispose()
-            admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-            with admin_engine.connect() as conn:
-                # Terminate connections to test database before dropping
-                conn.execute(text(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{test_db_name}'"))
-                conn.execute(text(f"DROP DATABASE {test_db_name}"))
-            admin_engine.dispose()
-            print(f"✓ PostgreSQL test database dropped: {test_db_name}")
-            return
-
-        except Exception as e:
-            print(f"PostgreSQL setup failed: {e}")
-            print("Falling back to SQLite...")
-
-    # Fallback to SQLite
-    print("Using SQLite for tests")
-    dbdir = tmp_path_factory.mktemp("db")
-    init_engine(f"sqlite:///{dbdir}/test.db")
     yield
+
+    # Cleanup: drop test database
     get_engine().dispose()
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        # Terminate connections to test database before dropping
+        conn.execute(text(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{test_db_name}'"))
+        conn.execute(text(f"DROP DATABASE {test_db_name}"))
+    admin_engine.dispose()
+    print(f"✓ PostgreSQL test database dropped: {test_db_name}")
 
 
 @pytest.fixture(autouse=True)
