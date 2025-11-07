@@ -9,10 +9,10 @@ Public API:
     analyze_single_frame: Single frame analysis
     MLAnalysisError: Base exception for ML errors
     classify_error: Error classification helper
-"""
 
-from ml.runner import run, analyze_single_frame
-from ml.errors import MLAnalysisError, classify_error
+Note: Imports are not performed at package level to avoid loading heavy
+dependencies (torch, cv2, etc.) until actually needed.
+"""
 
 __all__ = [
     "run",
