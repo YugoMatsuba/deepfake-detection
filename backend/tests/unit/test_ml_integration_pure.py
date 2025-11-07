@@ -14,9 +14,11 @@ ml_mock = MagicMock()
 ml_runner_mock = MagicMock()
 ml_errors_mock = MagicMock()
 
+
 # Create a proper exception class for MLAnalysisError that can be caught
 class MLAnalysisError(Exception):
     pass
+
 
 sys.modules["ml"] = ml_mock
 sys.modules["ml.runner"] = ml_runner_mock
