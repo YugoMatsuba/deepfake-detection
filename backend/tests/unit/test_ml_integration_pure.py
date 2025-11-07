@@ -12,7 +12,7 @@ from api.ml_integration import run_ml_analysis, run_single_frame_ml_analysis
 class TestRunMlAnalysisTransform:
     """Test run_ml_analysis output transformation."""
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_transforms_single_model_output(self, mock_run):
         """Transform single model output to API format."""
         mock_run.return_value = {
@@ -42,7 +42,7 @@ class TestRunMlAnalysisTransform:
         assert result["frames"] == [0, 1]
         assert result["timing_ms"]["total"] == 1234
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_transforms_multiple_models_output(self, mock_run):
         """Transform multiple models output to API format."""
         mock_run.return_value = {
@@ -68,7 +68,7 @@ class TestRunMlAnalysisTransform:
         assert result["models"]["spsl"]["score"] == 0.92
         assert result["models"]["ucf"]["score"] == 0.85
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_model_name_lowercase_conversion(self, mock_run):
         """Model names are converted to lowercase."""
         mock_run.return_value = {"models": [{"name": "Xception", "score": 0.5}, {"name": "SPSL", "score": 0.6}]}
@@ -80,7 +80,7 @@ class TestRunMlAnalysisTransform:
         assert "xception" in result["models"]  # Lowercase
         assert "spsl" in result["models"]  # Lowercase
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_preserves_frame_data(self, mock_run):
         """Frame data is preserved in output."""
         mock_run.return_value = {
@@ -102,7 +102,7 @@ class TestRunMlAnalysisTransform:
         assert frames[0]["score"] == 0.80
         assert frames[1]["index"] == 5
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_handles_missing_frames_field(self, mock_run):
         """Handles missing frames field gracefully."""
         mock_run.return_value = {
@@ -119,7 +119,7 @@ class TestRunMlAnalysisTransform:
 
         assert result["models"]["xception"]["frames"] == []
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_uses_device_env_var_when_none(self, mock_run):
         """Uses DEVICE env var when device parameter is None."""
         mock_run.return_value = {"models": []}
@@ -131,7 +131,7 @@ class TestRunMlAnalysisTransform:
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["device"] == "cuda"
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_defaults_to_cpu_when_device_env_not_set(self, mock_run):
         """Defaults to cpu when DEVICE env var not set."""
         mock_run.return_value = {"models": []}
@@ -142,7 +142,7 @@ class TestRunMlAnalysisTransform:
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["device"] == "cpu"
 
-    @patch("api.ml_integration.run")
+    @patch("ml.runner.run")
     def test_raises_exception_on_ml_error(self, mock_run):
         """Raises exception when ML runner returns error."""
         mock_run.return_value = {"error": {"stage": "face_detection", "message": "No face detected in video"}}
