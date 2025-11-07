@@ -5,7 +5,31 @@ Tests the dict transformation from ml.runner output format to API response forma
 in api/ml_integration.py by mocking ML runner calls.
 """
 
-from unittest.mock import patch
+import sys
+from unittest.mock import MagicMock, patch
+
+# Mock ml package and submodules before any imports that might use them
+# This prevents torch import errors in CI (which doesn't have torch installed)
+ml_mock = MagicMock()
+ml_runner_mock = MagicMock()
+ml_errors_mock = MagicMock()
+
+# Create a proper exception class for MLAnalysisError that can be caught
+class MLAnalysisError(Exception):
+    pass
+
+sys.modules["ml"] = ml_mock
+sys.modules["ml.runner"] = ml_runner_mock
+sys.modules["ml.errors"] = ml_errors_mock
+
+# Make ml.runner and ml.errors accessible as attributes
+ml_mock.runner = ml_runner_mock
+ml_mock.errors = ml_errors_mock
+
+# Set MLAnalysisError as a real exception class
+ml_errors_mock.MLAnalysisError = MLAnalysisError
+ml_errors_mock.classify_error = MagicMock()
+
 from api.ml_integration import run_ml_analysis, run_single_frame_ml_analysis
 
 
