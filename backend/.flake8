@@ -1,0 +1,37 @@
+[flake8]
+# Enforce stricter code quality standards
+max-line-length = 127
+max-complexity = 10
+
+# Exclude generated/migration files
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    alembic/versions,
+    alembic/env.py,
+    build,
+    dist
+
+# Ignore specific rules
+ignore =
+    E402,  # module level import not at top (needed for path manipulation)
+    W503,  # line break before binary operator (conflicts with black)
+    W504,  # line break after binary operator (conflicts with black)
+
+# Error codes to always enforce
+select =
+    E,    # pycodestyle errors
+    F,    # pyflakes
+    C90,  # mccabe complexity
+    W,    # pycodestyle warnings
+
+# Per-file ignores
+per-file-ignores =
+    __init__.py:F401,F403
+
+# Show source code for violations
+show-source = True
+statistics = True
+count = True
