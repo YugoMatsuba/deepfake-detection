@@ -290,7 +290,7 @@ def _generate_pdf_report(analysis: Analysis, buffer: io.BytesIO) -> None:
             summary_text = (
                 f"<b>Overall Synthetic Media Score: {score_pct}</b><br/>"
                 f"Classification: {classification}<br/>"
-                f"<i>(Overall averaged from top 5 highest-scoring frames across all models)</i>"
+                "<i>(Overall averaged from top 5 highest-scoring frames across all models)</i>"
             )
             story.append(Paragraph(summary_text, styles['Normal']))
             story.append(Spacer(1, 0.2 * inch))

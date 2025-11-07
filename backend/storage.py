@@ -155,7 +155,8 @@ def _probe_with_ffprobe(path: Path) -> Optional[dict]:
             "height": height
         }
 
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError, ValueError, KeyError):
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
+            FileNotFoundError, json.JSONDecodeError, ValueError, KeyError):
         return None
 
 

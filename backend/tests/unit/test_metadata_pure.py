@@ -80,10 +80,10 @@ class TestParseFrameHashes:
         """Test handling of malformed lines (fewer than 6 fields)."""
         raw_hashes = [
             "# ffmpeg framemd5 v1",
-            "0, 0, 0, 1, 1382400, valid32charhashvalid32charhash12",
+            "0, 0, 0, 1, 1382400, abcd1234abcd1234abcd1234abcd1234",
             "malformed line",
             "0, 0",  # Only 2 fields
-            "0, 1, 1, 1, 1382400, another32charhashvalue32chars12"
+            "0, 1, 1, 1, 1382400, efgh5678efgh5678efgh5678efgh5678"
         ]
 
         result = parse_frame_hashes(raw_hashes)

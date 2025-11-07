@@ -111,7 +111,7 @@ def upload_video():
                 if video_dir.exists():
                     import shutil
                     shutil.rmtree(video_dir)
-            except:
+            except Exception:
                 pass
             return jsonify(error=f"Upload failed: {str(e)}"), 500
 

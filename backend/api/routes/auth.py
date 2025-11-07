@@ -270,5 +270,5 @@ def me():
                 "active": user.active,
                 "pending_approval": user.pending_approval
             }), 200
-        except:
+        except Exception:
             return jsonify(error="unauthenticated"), 401

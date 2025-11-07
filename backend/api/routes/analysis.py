@@ -683,7 +683,8 @@ def _merge_analysis_results_with_dedup(
         if f.get("frame_number") not in existing_frame_numbers
     ]
 
-    print(f"[MERGE DEBUG] {method_name}: {len(existing_frames)} existing, {len(new_frames)} new, {len(unique_new_frames)} unique new")
+    print(f"[MERGE DEBUG] {method_name}: {len(existing_frames)} existing, "
+          f"{len(new_frames)} new, {len(unique_new_frames)} unique new")
 
     # Step 4: Merge frames
     all_frames = existing_frames + unique_new_frames
@@ -745,15 +746,18 @@ def analyze_frame(analysis_id: str, frame_number: int):
       "results": {
         "ela": {
           "score": 0.73,
-          "frames": [{"frame_number": 42, "score": 0.73, "overlay_url": "/api/analyses/{id}/forensics/ela/frames/42/overlay"}]
+          "frames": [{"frame_number": 42, "score": 0.73,
+                      "overlay_url": "/api/analyses/{id}/forensics/ela/frames/42/overlay"}]
         },
         "noise": {
           "confidence": 0.68,
-          "frames": [{"frame_number": 42, "confidence": 0.68, "overlay_url": "/api/analyses/{id}/forensics/noise/frames/42/overlay"}]
+          "frames": [{"frame_number": 42, "confidence": 0.68,
+                      "overlay_url": "/api/analyses/{id}/forensics/noise/frames/42/overlay"}]
         },
         "lbp": {
           "score": 0.81,
-          "frames": [{"frame_number": 42, "score": 0.81, "overlay_url": "/api/analyses/{id}/forensics/lbp/frames/42/overlay"}]
+          "frames": [{"frame_number": 42, "score": 0.81,
+                      "overlay_url": "/api/analyses/{id}/forensics/lbp/frames/42/overlay"}]
         }
       }
     }
@@ -1145,7 +1149,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
             try:
                 if method == "ml":
                     # Run full ML analysis on all 3 models
-                    print(f"[FULL ANALYSIS] Running ML inference...")
+                    print("[FULL ANALYSIS] Running ML inference...")
                     ml_output = run_ml_analysis(
                         video_path=analysis.video_path,
                         modules=["xception", "spsl", "ucf"],
@@ -1163,7 +1167,8 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                         existing_indices = {f.get("index") for f in existing_frames}
                         unique_new = [f for f in new_frames if f.get("index") not in existing_indices]
 
-                        print(f"[FULL ANALYSIS] {model_name}: {len(existing_frames)} existing, {len(new_frames)} new, {len(unique_new)} unique new")
+                        print(f"[FULL ANALYSIS] {model_name}: {len(existing_frames)} existing, "
+                              f"{len(new_frames)} new, {len(unique_new)} unique new")
 
                         # Merge and mark new frames as requested_adhoc=False (auto-analysis)
                         all_frames = existing_frames + [
@@ -1181,7 +1186,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                             "weights_hash": new_model_data.get("weights_hash")
                         }
 
-                    print(f"[FULL ANALYSIS] ✓ ML analysis completed")
+                    print("[FULL ANALYSIS] ✓ ML analysis completed")
 
                 else:
                     # Traditional forensics
@@ -1212,7 +1217,7 @@ def run_full_analysis_retroactive(analysis_id: str, method: str):
                 analysis.updated_at = datetime.now(timezone.utc)
                 # Commit happens automatically via context manager
 
-                print(f"[FULL ANALYSIS] ✓ Saved to database")
+                print("[FULL ANALYSIS] ✓ Saved to database")
 
                 # Return full analysis result
                 response = {
